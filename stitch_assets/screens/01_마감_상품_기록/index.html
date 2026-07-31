@@ -1,0 +1,404 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LuckyPick | Prize History</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-effect {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        body {
+            background-color: #f8f9ff;
+            color: #0b1c30;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-low": "#eff4ff",
+                      "secondary": "#855300",
+                      "surface-variant": "#d3e4fe",
+                      "surface-bright": "#f8f9ff",
+                      "inverse-primary": "#adc6ff",
+                      "outline": "#727785",
+                      "tertiary-fixed": "#6ffbbe",
+                      "surface-container-highest": "#d3e4fe",
+                      "secondary-container": "#fea619",
+                      "on-surface": "#0b1c30",
+                      "secondary-fixed": "#ffddb8",
+                      "on-secondary-fixed-variant": "#653e00",
+                      "on-error-container": "#93000a",
+                      "surface-dim": "#cbdbf5",
+                      "on-primary-fixed-variant": "#004395",
+                      "on-tertiary-container": "#f5fff6",
+                      "on-error": "#ffffff",
+                      "outline-variant": "#c2c6d6",
+                      "on-tertiary": "#ffffff",
+                      "on-surface-variant": "#424754",
+                      "error-container": "#ffdad6",
+                      "primary-fixed-dim": "#adc6ff",
+                      "on-background": "#0b1c30",
+                      "primary-container": "#2170e4",
+                      "tertiary": "#006947",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary-fixed": "#002113",
+                      "on-tertiary-fixed-variant": "#005236",
+                      "surface-container-high": "#dce9ff",
+                      "surface-tint": "#005ac2",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-fixed": "#d8e2ff",
+                      "secondary-fixed-dim": "#ffb95f",
+                      "on-primary-container": "#fefcff",
+                      "on-secondary-fixed": "#2a1700",
+                      "tertiary-fixed-dim": "#4edea3",
+                      "surface": "#f8f9ff",
+                      "tertiary-container": "#00855b",
+                      "on-primary": "#ffffff",
+                      "primary": "#0058be",
+                      "surface-container": "#e5eeff",
+                      "inverse-surface": "#213145",
+                      "background": "#f8f9ff",
+                      "on-secondary-container": "#684000",
+                      "on-primary-fixed": "#001a42",
+                      "inverse-on-surface": "#eaf1ff",
+                      "error": "#ba1a1a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-md": "24px",
+                      "container-margin": "24px",
+                      "stack-sm": "12px",
+                      "stack-lg": "48px",
+                      "gutter": "16px",
+                      "base": "8px"
+              },
+              "fontFamily": {
+                      "timer-numeric": ["JetBrains Mono"],
+                      "headline-md": ["Inter"],
+                      "headline-sm": ["Inter"],
+                      "body-md": ["Inter"],
+                      "label-caps": ["JetBrains Mono"],
+                      "body-lg": ["Inter"],
+                      "display-lg-mobile": ["Inter"],
+                      "display-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "timer-numeric": ["20px", {"lineHeight": "24px", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "display-lg-mobile": ["36px", {"lineHeight": "42px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-container-lowest/80 backdrop-blur-md shadow-sm">
+<div class="flex justify-between items-center h-16 px-container-margin max-w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="language">language</span>
+<span class="font-display-lg text-primary dark:text-primary-fixed-dim font-extrabold text-[24px]">LuckyPick</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 transition-all duration-200 ease-in-out hover:bg-surface-variant/20 rounded-full">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="translate">translate</span>
+</button>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 max-w-[1200px] mx-auto px-container-margin">
+<!-- Page Header -->
+<div class="mb-stack-lg">
+<h1 class="font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-2">History</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Relive the winning moments and track your past participations.</p>
+</div>
+<!-- History Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- History Item 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm flex flex-col group transition-all duration-300 hover:shadow-lg hover:border-primary/20">
+<div class="relative h-64 overflow-hidden">
+<div class="absolute top-4 left-4 z-10">
+<span class="px-3 py-1 rounded-full bg-secondary text-on-secondary font-label-caps text-label-caps">SHIPPED</span>
+</div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="A high-end luxury mechanical watch with intricate silver detailing and a sapphire glass face, resting on a polished dark marble surface. The lighting is dramatic, with soft highlights emphasizing the premium craftsmanship and metallic textures. The overall aesthetic is sophisticated, reflecting a fintech luxury tone." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAy36nyymVeWB0kn0lFYNdD6hcYhWbHK0rk0_afBwMFocl28U5T_2mBUyStZ_2VaOiF_-UwfSdeJjjYMIZuH23yQ8N6rdv60ohEdL8x9sA_0XibP0luwC8KCDam3ch3i289N1lkDEr1KYPtKgOcsAHFeobAQGyUt3UHKyOLnx8qQmOn4j1c0_bG4dTrYx4h4L-pzTf6lwKnBlBaGReSvKmZqLOLjXR2GQIYOFUltV-bLRkAq81in0wsD5Kns5vm5imK5nvBASvNMJI')"></div>
+<div class="absolute bottom-0 w-full bg-primary/90 text-on-primary py-3 px-4 glass-effect">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps opacity-80 uppercase">Winner Announcement</span>
+<span class="font-timer-numeric text-timer-numeric">#DP-992</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex-grow flex flex-col">
+<h3 class="font-headline-sm text-headline-sm mb-4">Precision Chronograph Series X</h3>
+<div class="bg-surface-container-low rounded-lg p-4 mb-6 border border-primary/10">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-[18px]" data-icon="emoji_events" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+</div>
+<span class="font-headline-sm text-[16px] text-primary">Winner Identified</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-relaxed">
+                            박XX, majXXXX@gmail.com, 010-4XX4-XXX7
+                        </p>
+</div>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="groups">groups</span>
+<span class="font-label-caps text-label-caps">1,248 Participants</span>
+</div>
+<button class="flex items-center gap-1 text-primary font-label-caps text-label-caps hover:underline cursor-pointer" onclick="openModal('Precision Chronograph Series X')">
+                            VIEW LIST
+                            <span class="material-symbols-outlined text-[16px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- History Item 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm flex flex-col group transition-all duration-300 hover:shadow-lg hover:border-primary/20">
+<div class="relative h-64 overflow-hidden">
+<div class="absolute top-4 left-4 z-10">
+<span class="px-3 py-1 rounded-full bg-outline text-white font-label-caps text-label-caps">CLOSED</span>
+</div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="A sleek, minimalist graphite-colored ultrabook open on a clean wooden desk with a single succulent plant in the background. The scene is bright and airy with natural sunlight streaming in, creating a professional yet inviting atmosphere. High-end technology focus with corporate modern aesthetics." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCGcZ_wm_ZGRb8t7s1FMfKQgz_OHuAsmss4HPbw4DBr9IN3TGReIWq1mzPHUzj4CCcPNDlXx5_ylvTGW4qHS8VUfD-ALRy1VmeOAAMxpLuhxKE2so8COd5aR6gDMRI4pujJ3nlY-eON9kanIVh2v__dLjWTw8kSZuKd9dzeB-lsx1czWLYnZON43cWoV9AIP1Lt_r8awwlfhKFZ4gRD3Jz1SSZNpG3OSFttuQ3pHIP9fNoXbF1tttZ28F6YcpBgvF6OIIbHar84sFc')"></div>
+<div class="absolute bottom-0 w-full bg-primary/90 text-on-primary py-3 px-4 glass-effect">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps opacity-80 uppercase">Winner Announcement</span>
+<span class="font-timer-numeric text-timer-numeric">#LP-041</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex-grow flex flex-col">
+<h3 class="font-headline-sm text-headline-sm mb-4">EliteBook Pro 14" Titanium</h3>
+<div class="bg-surface-container-low rounded-lg p-4 mb-6 border border-primary/10">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-[18px]" data-icon="emoji_events" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+</div>
+<span class="font-headline-sm text-[16px] text-primary">Winner Identified</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-relaxed">
+                            김XX, dmsXXXX@naver.com, 010-8XX2-XXX1
+                        </p>
+</div>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="groups">groups</span>
+<span class="font-label-caps text-label-caps">856 Participants</span>
+</div>
+<button class="flex items-center gap-1 text-primary font-label-caps text-label-caps hover:underline cursor-pointer" onclick="openModal('EliteBook Pro 14 Titanium')">
+                            VIEW LIST
+                            <span class="material-symbols-outlined text-[16px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- History Item 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm flex flex-col group transition-all duration-300 hover:shadow-lg hover:border-primary/20">
+<div class="relative h-64 overflow-hidden">
+<div class="absolute top-4 left-4 z-10">
+<span class="px-3 py-1 rounded-full bg-secondary text-on-secondary font-label-caps text-label-caps">SHIPPED</span>
+</div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Premium wireless noise-canceling headphones in matte black, displayed against a soft gradient background of deep blues and purples. The studio lighting emphasizes the sleek curves and premium leather textures of the ear pads. A clean, high-tech vibe suitable for a premium electronics showcase." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQTrwiFFAeRGK5dxJs3TS3M281QWXzu_71jQYxzvSCScORQmkgi-6YogwhzExfd5MnLohnIuLYymaOtY8Kkesw5Z7XQLh_12-zLrNVxhS0UC-eKTuzBwvUtUrRw2zv0Q_gG4EWFb5Ujya7XEmN7kp8ovKkKJZuI8gHTmceNJpvmS3grIG_s4uYjQ3HGo_qb_XpBNnTWZmtqZQ3jAnucC6DIpjFH8OzZvt28YESKhNjFt8ZtRuiSXMWT4sxf-QkNaWdqBvBP2mADqo')"></div>
+<div class="absolute bottom-0 w-full bg-primary/90 text-on-primary py-3 px-4 glass-effect">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps opacity-80 uppercase">Winner Announcement</span>
+<span class="font-timer-numeric text-timer-numeric">#AU-219</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex-grow flex flex-col">
+<h3 class="font-headline-sm text-headline-sm mb-4">SonicFlow Studio Wireless</h3>
+<div class="bg-surface-container-low rounded-lg p-4 mb-6 border border-primary/10">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-[18px]" data-icon="emoji_events" style="font-variation-settings: 'FILL' 1;">emoji_events</span>
+</div>
+<span class="font-headline-sm text-[16px] text-primary">Winner Identified</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-relaxed">
+                            Lee XX, chXXXX@gmail.com, 010-3XX9-XXX4
+                        </p>
+</div>
+<div class="mt-auto flex items-center justify-between">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="groups">groups</span>
+<span class="font-label-caps text-label-caps">2,014 Participants</span>
+</div>
+<button class="flex items-center gap-1 text-primary font-label-caps text-label-caps hover:underline cursor-pointer" onclick="openModal('SonicFlow Studio Wireless')">
+                            VIEW LIST
+                            <span class="material-symbols-outlined text-[16px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 bg-surface/80 dark:bg-surface-container-lowest/80 backdrop-blur-md border-t border-outline-variant/30 shadow-lg md:hidden">
+<div class="flex justify-around items-center h-20 pb-safe px-4">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-transform scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="stadium">stadium</span>
+<span class="font-label-caps text-label-caps mt-1">Ongoing</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-5 py-1 transition-transform scale-95 active:scale-90 font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-label-caps text-label-caps mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-transform scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-caps text-label-caps mt-1">Profile</span>
+</a>
+</div>
+</nav>
+<!-- Participant Modal -->
+<div class="fixed inset-0 bg-on-surface/40 backdrop-blur-sm z-[100] hidden items-center justify-center p-4" id="modal-overlay">
+<div class="bg-surface-container-lowest w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[707px] transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
+<div class="p-6 border-b border-outline-variant/30 flex justify-between items-center bg-surface-bright">
+<div>
+<h2 class="font-headline-sm text-headline-sm" id="modal-title">Participants List</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1" id="modal-subtitle">Precision Chronograph Series X</p>
+</div>
+<button class="w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center" onclick="closeModal()">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<div class="overflow-y-auto p-4 space-y-2">
+<!-- Participant Rows -->
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-surface-variant border border-outline-variant/30 flex items-center justify-center font-label-caps text-primary">J</div>
+<div>
+<p class="font-body-md text-body-md font-semibold">J***n L.</p>
+<p class="text-[12px] text-on-surface-variant">0x4...3e2</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-surface-variant border border-outline-variant/30 flex items-center justify-center font-label-caps text-secondary">K</div>
+<div>
+<p class="font-body-md text-body-md font-semibold">K***m S.</p>
+<p class="text-[12px] text-on-surface-variant">0x1...7a5</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-tertiary/20 to-surface-variant border border-outline-variant/30 flex items-center justify-center font-label-caps text-tertiary">M</div>
+<div>
+<p class="font-body-md text-body-md font-semibold">M***a P.</p>
+<p class="text-[12px] text-on-surface-variant">0x9...4f1</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-surface-variant border border-outline-variant/30 flex items-center justify-center font-label-caps text-primary">A</div>
+<div>
+<p class="font-body-md text-body-md font-semibold">A***n K.</p>
+<p class="text-[12px] text-on-surface-variant">0x2...d8c</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-secondary/20 to-surface-variant border border-outline-variant/30 flex items-center justify-center font-label-caps text-secondary">T</div>
+<div>
+<p class="font-body-md text-body-md font-semibold">T***o H.</p>
+<p class="text-[12px] text-on-surface-variant">0x6...1b9</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-tertiary/20 to-surface-variant border border-outline-variant/30 flex items-center justify-center font-label-caps text-tertiary">S</div>
+<div>
+<p class="font-body-md text-body-md font-semibold">S***y W.</p>
+<p class="text-[12px] text-on-surface-variant">0x3...5e7</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="p-6 bg-surface-bright border-t border-outline-variant/30 text-center">
+<button class="w-full py-3 bg-primary text-on-primary rounded-full font-bold transition-transform active:scale-95 shadow-md" onclick="closeModal()">
+                    Close
+                </button>
+</div>
+</div>
+</div>
+<script>
+        function openModal(title) {
+            const overlay = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            const modalTitle = document.getElementById('modal-subtitle');
+            
+            modalTitle.textContent = title;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const overlay = document.getElementById('modal-overlay');
+            const content = document.getElementById('modal-content');
+            
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                overlay.classList.remove('flex');
+                overlay.classList.add('hidden');
+            }, 300);
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Close modal on outside click
+        document.getElementById('modal-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'modal-overlay') closeModal();
+        });
+    </script>
+</body></html>

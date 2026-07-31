@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LuckyPick | Checkout</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid #E2E8F0;
+        }
+        .payment-option input:checked + label {
+            border-color: #0058be;
+            background-color: #eff4ff;
+            box-shadow: 0 0 0 2px #0058be;
+        }
+        .step-active {
+            color: #0058be;
+            font-weight: 700;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-low": "#eff4ff",
+                    "secondary": "#855300",
+                    "surface-variant": "#d3e4fe",
+                    "surface-bright": "#f8f9ff",
+                    "inverse-primary": "#adc6ff",
+                    "outline": "#727785",
+                    "tertiary-fixed": "#6ffbbe",
+                    "surface-container-highest": "#d3e4fe",
+                    "secondary-container": "#fea619",
+                    "on-surface": "#0b1c30",
+                    "secondary-fixed": "#ffddb8",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#cbdbf5",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-tertiary-container": "#f5fff6",
+                    "on-error": "#ffffff",
+                    "outline-variant": "#c2c6d6",
+                    "on-tertiary": "#ffffff",
+                    "on-surface-variant": "#424754",
+                    "error-container": "#ffdad6",
+                    "primary-fixed-dim": "#adc6ff",
+                    "on-background": "#0b1c30",
+                    "primary-container": "#2170e4",
+                    "tertiary": "#006947",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#002113",
+                    "on-tertiary-fixed-variant": "#005236",
+                    "surface-container-high": "#dce9ff",
+                    "surface-tint": "#005ac2",
+                    "surface-container": "#e5eeff",
+                    "inverse-surface": "#213145",
+                    "background": "#f8f9ff",
+                    "on-secondary-container": "#684000",
+                    "on-primary-fixed": "#001a42",
+                    "inverse-on-surface": "#eaf1ff",
+                    "error": "#ba1a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-md": "24px",
+                    "container-margin": "24px",
+                    "stack-sm": "12px",
+                    "stack-lg": "48px",
+                    "gutter": "16px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "timer-numeric": ["JetBrains Mono"],
+                    "headline-md": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["JetBrains Mono"],
+                    "body-lg": ["Inter"],
+                    "display-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "timer-numeric": ["20px", {"lineHeight": "24px", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-20">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-container-lowest/80 backdrop-blur-md shadow-sm">
+<div class="flex justify-between items-center h-16 px-container-margin max-w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="language">language</span>
+<span class="font-display-lg text-primary font-extrabold text-[24px]">LuckyPick</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:bg-surface-variant/20 p-2 rounded-full transition-all duration-200">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="translate">translate</span>
+</button>
+</div>
+</div>
+</header>
+<main class="pt-24 px-4 max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Left Side: Order & Payment -->
+<div class="lg:col-span-7 flex flex-col gap-8">
+<!-- Step Progress -->
+<div class="flex items-center gap-4 font-label-caps text-label-caps text-outline">
+<span class="text-primary font-bold">01 LOGIN</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span>
+<span class="text-on-surface font-bold">02 PAYMENT</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span>
+<span class="">03 CONFIRM</span>
+</div>
+<!-- Login Section -->
+<section class="glass-card rounded-xl p-6 shadow-sm">
+<h2 class="font-headline-sm text-headline-sm mb-6 text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="person">person</span>
+                    Quick Access
+                </h2>
+<p class="text-on-surface-variant mb-6 font-body-md text-body-md">Login or continue as guest to complete your participation.</p>
+<div class="flex flex-col sm:flex-row gap-4">
+<button class="flex-1 flex items-center justify-center gap-3 bg-white border border-outline-variant px-6 py-3 rounded-full hover:bg-surface-bright transition-all font-body-md font-semibold text-on-surface shadow-sm">
+<img alt="Google Logo" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7GEOlFZWX1EfhobCBkaD3sh7U3Vg9ZOw25qZ0mx3962gK7gg-FM0WCKufmwD0M1LZ6ocfw1WgDAOpcy_tHJwrFMFcJwBcRm5dbi0Fo_HmOTNQGiXr1DexDugBab-rD74CElaXG19VoyG9liYC5D0Kj5hRdDf0yx-rpQtmNV0Xnrmih3ZgDUbgKwDf-tOkBvtP_gSfi5dJ2Z_iWbjA2NPmIxC7Ms_i9t0T1xpyCKWTxSQf9vuXupiju_KkRjh6Pn295XhNPzU471I">
+                        Continue with Google
+                    </button>
+<button class="flex-1 flex items-center justify-center gap-3 bg-black text-white px-6 py-3 rounded-full hover:opacity-90 transition-all font-body-md font-semibold shadow-md">
+<span class="material-symbols-outlined" data-icon="apple" style="font-variation-settings: 'FILL' 1;">file_download</span>
+                        Continue with Apple
+                    </button>
+</div>
+<div class="mt-6 pt-6 border-t border-outline-variant/30 text-center">
+<button class="text-primary font-bold font-body-md hover:underline">Continue as Guest</button>
+</div>
+</section>
+<!-- Payment Method Section -->
+<section class="glass-card rounded-xl p-6 shadow-sm">
+<h2 class="font-headline-sm text-headline-sm mb-6 text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="payments">payments</span>
+                    Payment Method
+                </h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<!-- Toss Pay -->
+<div class="payment-option relative">
+<input checked="" class="hidden" id="toss" name="payment" type="radio">
+<label class="flex flex-col items-center justify-center p-6 border-2 border-outline-variant rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-white" for="toss">
+<div class="h-12 flex items-center mb-4">
+<div class="bg-primary/10 rounded-lg p-2 mr-2">
+<span class="material-symbols-outlined text-primary text-[32px]" data-icon="account_balance_wallet" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+</div>
+<span class="font-display-lg text-[22px] font-extrabold tracking-tight">Toss Pay</span>
+</div>
+<span class="font-body-md text-on-surface-variant">Simple and fast</span>
+</label>
+</div>
+<!-- Kakao Pay -->
+<div class="payment-option relative">
+<input class="hidden" id="kakao" name="payment" type="radio">
+<label class="flex flex-col items-center justify-center p-6 border-2 border-outline-variant rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-white" for="kakao">
+<div class="h-12 flex items-center mb-4">
+<div class="bg-[#FAE100] rounded-lg p-2 mr-2">
+<span class="material-symbols-outlined text-on-surface text-[32px]" data-icon="chat_bubble" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+</div>
+<span class="font-display-lg text-[22px] font-extrabold tracking-tight">Kakao Pay</span>
+</div>
+<span class="font-body-md text-on-surface-variant">Secure mobile pay</span>
+</label>
+</div>
+</div>
+<div class="mt-8">
+<button class="w-full bg-primary text-on-primary font-headline-sm text-headline-sm py-5 rounded-full shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3">
+                        Pay Now
+                        <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<!-- Trust Badges -->
+<div class="mt-8 flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[20px]" data-icon="verified_user">verified_user</span>
+<span class="text-label-caps font-label-caps">SSL SECURE</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[20px]" data-icon="shield">shield</span>
+<span class="text-label-caps font-label-caps">DATA PROTECTED</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[20px]" data-icon="lock">lock</span>
+<span class="text-label-caps font-label-caps">ENCRYPTED</span>
+</div>
+</div>
+</section><!-- Winning History Section -->
+<section class="glass-card rounded-xl p-6 shadow-sm">
+    <h2 class="font-headline-sm text-headline-sm mb-6 text-on-surface flex items-center gap-2">
+        <span class="material-symbols-outlined text-tertiary" data-icon="emoji_events">emoji_events</span>
+        당첨 내역 (Winning History)
+    </h2>
+    <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 flex gap-4">
+        <div class="w-20 h-20 rounded-lg overflow-hidden shrink-0 shadow-sm">
+            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwQqPPcoIQBQoYrm3HqLEoWM9DHfHjdG6D5j2c-DzamsdzOXw_g5P1AHGtxnrrTPIFVFUruDsqRj7WBHGFNiDJ8Y2pezYT4RUNS6I-mhDXwCNFOECyHD7dR79L-EiLce7xClzEGVQ9bkCU2KuoZEzE2Duf6QFBm62tpBtnpghV9xkVrvrycvpAPyl7E_qr-EUqZOCDkNP5AEH-PqzDf6nsFH6tUYMqR2TwoypqqBbqCRVztQXuDWGVXVsl-cErc0WuYdPTaTpPmJA" alt="Master Chronograph XT-2000" class="w-full h-full object-cover">
+        </div>
+        <div class="flex flex-col justify-center">
+            <span class="font-label-caps text-[10px] text-tertiary uppercase mb-1">Winner Selected</span>
+            <h4 class="font-headline-sm text-[18px] text-on-surface leading-tight">Master Chronograph XT-2000</h4>
+            <p class="text-on-surface-variant font-body-md text-sm mt-1">Draw Date: 2023.10.15</p>
+        </div>
+    </div>
+</section>
+
+<!-- Recent Participations Section -->
+<section class="glass-card rounded-xl p-6 shadow-sm">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary" data-icon="history">history</span>
+            최근 참여 내역 (Recent Participations)
+        </h2>
+    </div>
+    <div class="space-y-4">
+        <div class="flex gap-4 p-3 border border-outline-variant/20 rounded-lg">
+            <div class="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwQqPPcoIQBQoYrm3HqLEoWM9DHfHjdG6D5j2c-DzamsdzOXw_g5P1AHGtxnrrTPIFVFUruDsqRj7WBHGFNiDJ8Y2pezYT4RUNS6I-mhDXwCNFOECyHD7dR79L-EiLce7xClzEGVQ9bkCU2KuoZEzE2Duf6QFBm62tpBtnpghV9xkVrvrycvpAPyl7E_qr-EUqZOCDkNP5AEH-PqzDf6nsFH6tUYMqR2TwoypqqBbqCRVztQXuDWGVXVsl-cErc0WuYdPTaTpPmJA" class="w-full h-full object-cover">
+            </div>
+            <div class="flex-1">
+                <div class="flex justify-between">
+                    <h4 class="font-semibold text-on-surface">Master Chronograph XT-2000</h4>
+                    <span class="text-[10px] font-bold text-primary">ONGOING</span>
+                </div>
+                <p class="text-xs text-on-surface-variant">Participated: 2 hours ago</p>
+            </div>
+        </div>
+    </div>
+    <p class="mt-4 text-[12px] text-outline font-body-md italic">* 종료 후 2달 동안 기록이 유지됩니다 (Records are available for 2 months after completion)</p>
+</section>
+<div class="glass-card rounded-xl overflow-hidden shadow-sm mt-8">
+    <div class="bg-surface-container-high p-6">
+        <h3 class="font-headline-sm text-headline-sm text-on-surface">Order Summary</h3>
+    </div>
+    <div class="p-6">
+        <div class="flex gap-4 mb-8">
+            <div class="w-24 h-24 rounded-lg overflow-hidden shrink-0 shadow-sm border border-outline-variant/20">
+                <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwQqPPcoIQBQoYrm3HqLEoWM9DHfHjdG6D5j2c-DzamsdzOXw_g5P1AHGtxnrrTPIFVFUruDsqRj7WBHGFNiDJ8Y2pezYT4RUNS6I-mhDXwCNFOECyHD7dR79L-EiLce7xClzEGVQ9bkCU2KuoZEzE2Duf6QFBm62tpBtnpghV9xkVrvrycvpAPyl7E_qr-EUqZOCDkNP5AEH-PqzDf6nsFH6tUYMqR2TwoypqqBbqCRVztQXuDWGVXVsl-cErc0WuYdPTaTpPmJA" alt="Master Chronograph XT-2000" class="w-full h-full object-cover">
+            </div>
+            <div class="flex flex-col justify-center">
+                <span class="font-label-caps text-[10px] text-on-surface-variant uppercase mb-1">Limited Series</span>
+                <h4 class="font-headline-sm text-[18px] text-on-surface leading-tight">Master Chronograph XT-2000</h4>
+                <p class="text-on-surface-variant font-body-md text-sm mt-1">1x Entry Ticket</p>
+            </div>
+        </div>
+        <div class="space-y-4 border-t border-outline-variant/30 pt-6 mb-8">
+            <div class="flex justify-between items-center text-on-surface-variant">
+                <span class="font-body-md text-body-md">Entry Price</span>
+                <span class="font-timer-numeric text-on-surface">₩ 50,000</span>
+            </div>
+            <div class="flex justify-between items-center text-on-surface-variant">
+                <span class="font-body-md text-body-md">Platform Fee</span>
+                <span class="font-timer-numeric text-on-surface">₩ 2,500</span>
+            </div>
+            <div class="flex justify-between items-center text-tertiary">
+                <span class="font-body-md text-body-md">Discount</span>
+                <span class="font-timer-numeric">- ₩ 0</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-low rounded-lg p-6 flex flex-col gap-1 border border-primary/10">
+            <div class="flex justify-between items-center">
+                <span class="font-headline-md text-headline-md text-on-surface">Total</span>
+                <span class="font-display-lg text-[28px] text-on-surface">₩ 52,500</span>
+            </div>
+            <p class="text-outline text-[12px] font-body-md text-right">VAT Included</p>
+        </div>
+    </div>
+</div></div>
+<!-- Right Side: Order Summary -->
+<aside class="lg:col-span-5">
+<div class="sticky top-24 space-y-6">
+<!-- Summary Card -->
+
+<!-- Urgency Notice -->
+<div class="bg-secondary-container/10 border border-secondary-container/20 rounded-xl p-4 flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary pt-1" data-icon="timer">timer</span>
+<div>
+<p class="font-body-md text-secondary font-bold text-sm">Draw Closing Soon</p>
+<p class="text-on-surface-variant text-sm font-body-md">The draw for this item closes in <span class="font-timer-numeric text-primary">02:45:12</span>. Complete your payment to secure your entry.</p>
+</div>
+</div>
+<!-- Recent Activity (Privacy List) -->
+
+</div>
+</aside>
+</main>
+<!-- Bottom Nav Shell (Mobile Only Suppression Logic Applied - showing for context but normally hidden in transactional flow) -->
+<!-- Navigation hidden per mandate for Transactional pages -->
+<script>
+        // Simple Interaction logic for payment selection
+        document.querySelectorAll('.payment-option input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                // Potential for haptic feedback or transition sound
+            });
+        });
+
+        // Countdown micro-interaction
+        function updateTimer() {
+            const timers = document.querySelectorAll('.font-timer-numeric');
+            // This is just a visual simulation for the UI
+        }
+        setInterval(updateTimer, 1000);
+    </script>
+</body></html>
