@@ -16,7 +16,7 @@ const DEMO_IMAGES = {
   scooter: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6BInNKjgO7u7uP6JW3JJhmHpDwhmBLDjL4sfi9hMzbclwxfgWx1-NA6ElPzpvSmCvbTigj4xkS-T7gVxhPp-7Itycm8uiLCA4tcDE0wQZHCdmF5Gekk75Zkpd7dCrYG2Fs6MOd8aEo588VSHMtBrOdzmlp5F-FWUk_XdcynkpBoYtZcC4zSCV5t2mHzHfhNPcIlk1_54vSJ2Z8ve2iZVwcmjfrvL0fmT9YZCURnZJVVG-hJTCTIboEE1IdP0QeIlprtAD0CRqqNQ',
 };
 
-const STORAGE_KEY_PRODUCTS = 'luckypick_active_products';
+const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v4';
 
 // --- Privacy Masking Helpers ---
 function maskName(name) {
@@ -82,6 +82,20 @@ function loadActiveProducts() {
   }
   const now = Date.now();
   const initial = [
+    {
+      id: 'prod_chanel_001',
+      title: '샤넬 립스틱',
+      description: '샤넬 루쥬 코코 립스틱 세트',
+      category: 'BEAUTY LUXE',
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
+      retailPrice: 10,
+      entryPrice: 1,
+      maxParticipants: 12,
+      currentParticipants: 2,
+      endTime: now + (55 * 60 + 30) * 1000,
+      status: 'active',
+      participants: getMockParticipants(2),
+    },
     {
       id: 'prod_001',
       title: 'iPhone 15 Pro',
