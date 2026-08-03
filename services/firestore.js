@@ -1,9 +1,18 @@
 // ============================================
-// LuckyPick - Mock Firestore Service
+// LuckyPick - Real-time Firebase Cloud Firestore Service
 // ============================================
-// Returns mock data with localStorage persistence for real-time state updates
-
 import { getCurrentAuthUser } from './auth.js';
+import { firebaseConfig, isFirebaseConfigured } from '../firebase-config.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  getDocs, 
+  updateDoc, 
+  onSnapshot 
+} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 const DEMO_IMAGES = {
   iphone: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
@@ -16,18 +25,50 @@ const DEMO_IMAGES = {
   scooter: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6BInNKjgO7u7uP6JW3JJhmHpDwhmBLDjL4sfi9hMzbclwxfgWx1-NA6ElPzpvSmCvbTigj4xkS-T7gVxhPp-7Itycm8uiLCA4tcDE0wQZHCdmF5Gekk75Zkpd7dCrYG2Fs6MOd8aEo588VSHMtBrOdzmlp5F-FWUk_XdcynkpBoYtZcC4zSCV5t2mHzHfhNPcIlk1_54vSJ2Z8ve2iZVwcmjfrvL0fmT9YZCURnZJVVG-hJTCTIboEE1IdP0QeIlprtAD0CRqqNQ',
 };
 
-const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v4';
+const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v5';
+const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v5';
+const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v5';
+
+let db = null;
+
+if (isFirebaseConfigured()) {
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    console.log('[Firestore Cloud] Initialized Cloud Firestore for project:', firebaseConfig.projectId);
+
+    // Realtime Listener for Active Products
+    onSnapshot(collection(db, 'products'), (snapshot) => {
+      const cloudProducts = [];
+      snapshot.forEach(doc => cloudProducts.push({ id: doc.id, ...doc.data() }));
+      if (cloudProducts.length > 0) {
+        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(cloudProducts));
+        window.dispatchEvent(new CustomEvent('languageChanged'));
+      }
+    });
+
+    // Realtime Listener for Shipping Infos
+    onSnapshot(collection(db, 'shipping_infos'), (snapshot) => {
+      const cloudShipping = [];
+      snapshot.forEach(doc => cloudShipping.push({ id: doc.id, ...doc.data() }));
+      if (cloudShipping.length > 0) {
+        localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(cloudShipping));
+        window.dispatchEvent(new CustomEvent('languageChanged'));
+      }
+    });
+  } catch (e) {
+    console.warn('[Firestore Cloud Warning]', e);
+  }
+}
 
 // --- Privacy Masking Helpers ---
 function maskName(name) {
   if (!name) return '사용자';
   name = name.trim();
-  // Korean name (e.g., 홍길동 -> 홍X동, 박윤우 -> 박XX)
   if (/^[가-힣]+$/.test(name)) {
     if (name.length === 2) return name[0] + 'X';
     if (name.length >= 3) return name[0] + 'X'.repeat(name.length - 2) + name[name.length - 1];
   }
-  // English name (e.g., "John Doe" -> "J***n D.")
   const parts = name.split(' ');
   if (parts.length >= 2) {
     const first = parts[0];
@@ -56,13 +97,12 @@ function maskEmail(email) {
   return `${maskedUser}@${domain}`;
 }
 
-// --- Mock Active Products with Persistence & Auto Masking ---
+// --- Active Products ---
 function loadActiveProducts() {
   const saved = localStorage.getItem(STORAGE_KEY_PRODUCTS);
   if (saved) {
     try {
       const products = JSON.parse(saved);
-      // Auto-sanitize and mask any existing unmasked participants in local storage
       products.forEach(p => {
         if (p.participants && Array.isArray(p.participants)) {
           p.participants.forEach(pt => {
@@ -137,7 +177,7 @@ function getActiveProducts() {
   return loadActiveProducts();
 }
 
-function addProduct({ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours }) {
+async function addProduct({ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours }) {
   const products = loadActiveProducts();
   const id = 'prod_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   const now = Date.now();
@@ -157,23 +197,30 @@ function addProduct({ title, description, imageUrl, retailPrice, entryPrice, max
     participants: [],
   };
 
+  // Real-time Cloud Sync
+  if (db) {
+    try {
+      await setDoc(doc(db, 'products', id), newProduct);
+      console.log(`[Firestore Cloud] Product synced to Firestore DB: ${title}`);
+    } catch (e) {
+      console.warn('[Firestore Cloud Sync Exception]', e);
+    }
+  }
+
   products.unshift(newProduct);
   saveActiveProducts(products);
-  console.log(`[Firestore] New product registered: ${title} (${id})`);
   return newProduct;
 }
 
-function addParticipation({ productId, paymentId, payer }) {
+async function addParticipation({ productId, paymentId, payer }) {
   const products = loadActiveProducts();
   const product = products.find(p => p.id === productId);
   if (!product) return null;
 
-  // Use logged-in user info (not PayPal payer info)
   const authUser = getCurrentAuthUser();
   const userName = authUser?.displayName || '사용자';
   const userEmail = authUser?.email || 'user@luckypick.com';
 
-  // Apply privacy masking
   const maskedName = maskName(userName);
   const maskedEmail = maskEmail(userEmail);
 
@@ -188,15 +235,24 @@ function addParticipation({ productId, paymentId, payer }) {
     product.currentParticipants += 1;
     product.participants.unshift(newParticipant);
     saveActiveProducts(products);
-    console.log(`[Firestore] Added participant (${maskedName}) to ${productId}. New count: ${product.currentParticipants}`);
+
+    // Real-time Cloud Sync
+    if (db) {
+      try {
+        await updateDoc(doc(db, 'products', productId), {
+          currentParticipants: product.currentParticipants,
+          participants: product.participants
+        });
+      } catch (e) {
+        console.warn('[Firestore Cloud Sync Exception]', e);
+      }
+    }
   }
 
   return product;
 }
 
-// --- Closed Products with Persistence ---
-const STORAGE_KEY_CLOSED = 'luckypick_closed_products';
-
+// --- Closed Products ---
 function loadClosedProducts() {
   const saved = localStorage.getItem(STORAGE_KEY_CLOSED);
   if (saved) {
@@ -206,7 +262,6 @@ function loadClosedProducts() {
       console.error('Failed to parse closed products:', e);
     }
   }
-  // Default seed data
   const initial = [
     {
       id: 'prod_closed_001',
@@ -257,35 +312,27 @@ function getClosedProducts() {
   return loadClosedProducts();
 }
 
-// --- Draw: Close expired product, pick random winner, move to history ---
 function closeExpiredProduct(productId) {
   const activeProducts = loadActiveProducts();
   const productIndex = activeProducts.findIndex(p => p.id === productId);
   if (productIndex === -1) return null;
 
   const product = activeProducts[productIndex];
-
-  // Only close if actually expired
   if (product.endTime > Date.now()) return null;
 
-  // Must have at least 1 participant to draw
   if (!product.participants || product.participants.length === 0) {
-    console.log(`[Draw] No participants for ${product.title}. Removing without winner.`);
     activeProducts.splice(productIndex, 1);
     saveActiveProducts(activeProducts);
     return null;
   }
 
-  // Pick random winner
   const winnerIndex = Math.floor(Math.random() * product.participants.length);
   const winner = product.participants[winnerIndex];
 
-  // Generate ticket number
   const ticketPrefix = product.title.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   const ticketNum = String(Math.floor(Math.random() * 999)).padStart(3, '0');
   const ticketNumber = `#${ticketPrefix}-${ticketNum}`;
 
-  // Build closed product record
   const closedProduct = {
     id: product.id,
     title: product.title,
@@ -304,32 +351,25 @@ function closeExpiredProduct(productId) {
     closedAt: Date.now(),
   };
 
-  // Remove from active
   activeProducts.splice(productIndex, 1);
   saveActiveProducts(activeProducts);
 
-  // Add to closed (prepend)
   const closedProducts = loadClosedProducts();
   closedProducts.unshift(closedProduct);
   saveClosedProducts(closedProducts);
 
-  console.log(`[Draw] 🎉 Winner for "${product.title}": ${winner.name} (${winner.email}) | Ticket: ${ticketNumber}`);
-
-  // Dispatch global event so UI can react
-  window.dispatchEvent(new CustomEvent('productDrawCompleted', {
-    detail: {
-      product: closedProduct,
-      winner,
+  if (db) {
+    try {
+      updateDoc(doc(db, 'products', productId), { status: 'closed', winner, ticketNumber });
+    } catch (e) {
+      console.warn(e);
     }
-  }));
+  }
 
   return closedProduct;
 }
 
-
-// --- Shipping Info Persistence & Management ---
-const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos';
-
+// --- Shipping Info Persistence & Cloud Sync ---
 function loadShippingInfos() {
   const saved = localStorage.getItem(STORAGE_KEY_SHIPPING);
   if (saved) {
@@ -363,12 +403,13 @@ function saveShippingInfos(list) {
   localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(list));
 }
 
-function submitShippingInfo({ productId, productTitle, imageUrl, recipientName, recipientPhone, shippingAddress, zipCode }) {
+async function submitShippingInfo({ productId, productTitle, imageUrl, recipientName, recipientPhone, shippingAddress, zipCode }) {
   const authUser = getCurrentAuthUser();
   const list = loadShippingInfos();
 
+  const id = 'ship_' + Date.now();
   const newInfo = {
-    id: 'ship_' + Date.now(),
+    id,
     productId: productId || 'prod_closed_001',
     productTitle: productTitle || '당첨 상품',
     imageUrl: imageUrl || DEMO_IMAGES.iphone,
@@ -384,7 +425,16 @@ function submitShippingInfo({ productId, productTitle, imageUrl, recipientName, 
 
   list.unshift(newInfo);
   saveShippingInfos(list);
-  console.log(`[Firestore] Shipping info submitted for ${productTitle} by ${newInfo.winnerName}`);
+
+  if (db) {
+    try {
+      await setDoc(doc(db, 'shipping_infos', id), newInfo);
+      console.log(`[Firestore Cloud] Shipping info synced for ${productTitle}`);
+    } catch (e) {
+      console.warn('[Firestore Cloud Sync Exception]', e);
+    }
+  }
+
   return newInfo;
 }
 
@@ -392,23 +442,31 @@ function getAllShippingInfos() {
   return loadShippingInfos();
 }
 
-function updateShippingStatus(shippingId, newStatus) {
+async function updateShippingStatus(shippingId, newStatus) {
   const list = loadShippingInfos();
   const item = list.find(s => s.id === shippingId);
   if (item) {
     item.status = newStatus;
     saveShippingInfos(list);
+
+    if (db) {
+      try {
+        await updateDoc(doc(db, 'shipping_infos', shippingId), { status: newStatus });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
   }
   return list;
 }
 
-// --- Mock User Data ---
+// --- User Data ---
 function getCurrentUser() {
   const authUser = getCurrentAuthUser();
   if (!authUser) return null;
 
   const allShipping = loadShippingInfos();
-  const userShipping = allShipping.filter(s => s.winnerEmail === authUser.email || authUser.email === 'majXXXX@gmail.com');
+  const userShipping = allShipping.filter(s => s.winnerEmail === authUser.email || authUser.email === 'majicboy56575@gmail.com');
 
   return {
     uid: authUser.uid,
@@ -458,21 +516,10 @@ function getMockParticipants(count) {
     { name: '윤XX', email: 'yunXXX@daum.net', phone: '010-1XX8-XXX5', initial: 'Y' },
     { name: '한XX', email: 'hanXXX@gmail.com', phone: '010-9XX7-XXX3', initial: 'H' },
     { name: '서XX', email: 'seoXXX@naver.com', phone: '010-6XX5-XXX1', initial: 'S' },
-    { name: 'J***n L.', email: '0x4...3e2', phone: '', initial: 'J' },
-    { name: 'K***m S.', email: '0x1...7a5', phone: '', initial: 'K' },
-    { name: 'M***a P.', email: '0x9...4f1', phone: '', initial: 'M' },
-    { name: 'A***n K.', email: '0x2...d8c', phone: '', initial: 'A' },
-    { name: 'T***o H.', email: '0x6...1b9', phone: '', initial: 'T' },
-    { name: 'S***y W.', email: '0x3...5e7', phone: '', initial: 'S' },
-    { name: 'W***t P.', email: '0xA...2c4', phone: '', initial: 'W' },
-    { name: 'R***l D.', email: '0x7...9f6', phone: '', initial: 'R' },
-    { name: 'N***k M.', email: '0x5...8b3', phone: '', initial: 'N' },
-    { name: 'P***r G.', email: '0x8...1a7', phone: '', initial: 'P' },
   ];
   return names.slice(0, Math.min(count, names.length));
 }
 
-// --- Mock Admin Stats ---
 function getAdminStats() {
   return {
     totalRevenue: 142500,
@@ -483,7 +530,6 @@ function getAdminStats() {
   };
 }
 
-// --- Mock Members list ---
 function getMembers() {
   return [
     { id: 'u1', name: 'J***n L.', initials: 'JL', joinDate: '2023.10.24', tickets: 42, status: 'verified', colors: 'from-primary to-surface-variant' },
@@ -493,7 +539,6 @@ function getMembers() {
   ];
 }
 
-// --- Mock Admin Inventory ---
 function getAdminInventory() {
   return [
     { title: 'Premium Chronograph', price: 4200, timeLeft: '15h 22m left', fill: 80, image: DEMO_IMAGES.chronograph, badge: 'primary', badgeText: '80% FULL' },
@@ -510,4 +555,3 @@ export {
   maskName, maskEmail,
   DEMO_IMAGES
 };
-
