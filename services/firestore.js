@@ -24,20 +24,18 @@ const DEMO_IMAGES = {
   scooter: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6BInNKjgO7u7uP6JW3JJhmHpDwhmBLDjL4sfi9hMzbclwxfgWx1-NA6ElPzpvSmCvbTigj4xkS-T7gVxhPp-7Itycm8uiLCA4tcDE0wQZHCdmF5Gekk75Zkpd7dCrYG2Fs6MOd8aEo588VSHMtBrOdzmlp5F-FWUk_XdcynkpBoYtZcC4zSCV5t2mHzHfhNPcIlk1_54vSJ2Z8ve2iZVwcmjfrvL0fmT9YZCURnZJVVG-hJTCTIboEE1IdP0QeIlprtAD0CRqqNQ',
 };
 
-const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_clean';
-const STORAGE_KEY_CLOSED = 'luckypick_closed_products_clean';
-const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_clean';
+const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v9';
+const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v9';
+const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v9';
 
-// Clear all legacy sample data from local storage
+// Wipe all old localStorage cache on page boot
 try {
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('luckypick_')) {
-      localStorage.removeItem(key);
-    }
-  });
+  localStorage.clear();
 } catch (e) {}
 
 let db = null;
+let cloudProductsCache = null;
+let cloudShippingCache = null;
 
 if (isFirebaseConfigured()) {
   try {
@@ -49,6 +47,7 @@ if (isFirebaseConfigured()) {
     onSnapshot(collection(db, 'products'), (snapshot) => {
       const cloudProducts = [];
       snapshot.forEach(doc => cloudProducts.push({ id: doc.id, ...doc.data() }));
+      cloudProductsCache = cloudProducts;
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(cloudProducts));
       window.dispatchEvent(new CustomEvent('languageChanged'));
     });
@@ -57,6 +56,7 @@ if (isFirebaseConfigured()) {
     onSnapshot(collection(db, 'shipping_infos'), (snapshot) => {
       const cloudShipping = [];
       snapshot.forEach(doc => cloudShipping.push({ id: doc.id, ...doc.data() }));
+      cloudShippingCache = cloudShipping;
       localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(cloudShipping));
       window.dispatchEvent(new CustomEvent('languageChanged'));
     });
@@ -103,6 +103,9 @@ function maskEmail(email) {
 
 // --- Active Products ---
 function loadActiveProducts() {
+  if (cloudProductsCache !== null) {
+    return cloudProductsCache;
+  }
   const saved = localStorage.getItem(STORAGE_KEY_PRODUCTS);
   if (saved) {
     try {
@@ -128,6 +131,7 @@ function loadActiveProducts() {
 }
 
 function saveActiveProducts(products) {
+  cloudProductsCache = products;
   localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
 }
 
@@ -136,7 +140,6 @@ function getActiveProducts() {
 }
 
 async function addProduct({ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours }) {
-  const products = loadActiveProducts();
   const id = 'prod_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   const now = Date.now();
 
@@ -164,6 +167,7 @@ async function addProduct({ title, description, imageUrl, retailPrice, entryPric
     }
   }
 
+  const products = loadActiveProducts();
   products.unshift(newProduct);
   saveActiveProducts(products);
   return newProduct;
@@ -288,6 +292,9 @@ function closeExpiredProduct(productId) {
 
 // --- Shipping Info Persistence & Cloud Sync ---
 function loadShippingInfos() {
+  if (cloudShippingCache !== null) {
+    return cloudShippingCache;
+  }
   const saved = localStorage.getItem(STORAGE_KEY_SHIPPING);
   if (saved) {
     try {
@@ -300,6 +307,7 @@ function loadShippingInfos() {
 }
 
 function saveShippingInfos(list) {
+  cloudShippingCache = list;
   localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(list));
 }
 
