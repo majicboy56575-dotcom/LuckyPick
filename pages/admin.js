@@ -608,7 +608,61 @@ export function init() {
     window.dispatchEvent(new CustomEvent('languageChanged'));
   };
 
-  console.log('[Admin] Upload handlers initialized successfully');
+  window.__registerProduct = async () => {
+    const name = document.getElementById('admin-product-name')?.value;
+    const desc = document.getElementById('admin-product-desc')?.value;
+    const price = document.getElementById('admin-product-price')?.value;
+    const ticket = document.getElementById('admin-product-ticket')?.value;
+    const max = document.getElementById('admin-product-max')?.value;
+    const timer = document.getElementById('admin-product-timer')?.value;
+    const imageUrl = window.__uploadedImageDataUrl || DEMO_IMAGES.iphone;
+
+    if (!name || !price || !ticket || !max || !timer) {
+      alert('모든 필수 항목을 입력해주세요.');
+      return;
+    }
+
+    const submitBtn = document.getElementById('admin-submit-btn');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Firebase DB 저장 중...';
+    }
+
+    try {
+      const newProd = await addProduct({
+        title: name,
+        description: desc || name,
+        imageUrl,
+        retailPrice: parseFloat(price),
+        entryPrice: parseFloat(ticket),
+        maxParticipants: parseInt(max),
+        timerHours: parseFloat(timer)
+      });
+
+      alert(`🎉 [${newProd.title}] 상품이 Firebase 데이터베이스에 성공적으로 등록되었습니다!\n전 세계 모든 핸드폰과 PC에 실시간으로 공유됩니다.`);
+
+      // Reset form
+      const form = document.getElementById('admin-register-form');
+      if (form) form.reset();
+      window.__uploadedImageDataUrl = null;
+      const preview = document.getElementById('admin-photo-preview');
+      const placeholder = document.getElementById('admin-photo-placeholder');
+      if (preview) preview.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'flex';
+
+      window.dispatchEvent(new CustomEvent('languageChanged'));
+    } catch (err) {
+      console.error('Failed to register product:', err);
+      alert('상품 등록 중 오류가 발생했습니다: ' + err.message);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = t('initializeLuckyPick');
+      }
+    }
+  };
+
+  console.log('[Admin] Upload and registration handlers initialized successfully');
 }
 
 export function cleanup() {
