@@ -162,7 +162,7 @@ export function render() {
             if (modalContainer) {
               if (isWinner) {
                 modalContainer.innerHTML = `
-                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)window.__closeDraw()">
+                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop">
                     <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
                       <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
                         <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
@@ -173,14 +173,14 @@ export function render() {
                         <p class="font-label-caps text-label-caps text-tertiary mb-1">티켓 번호</p>
                         <p class="font-timer-numeric text-xl font-bold text-primary">${result.ticketNumber}</p>
                       </div>
-                      <button onclick="window.location.hash='#profile'; window.__closeDraw()" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all">
+                      <button onclick="window.location.hash='#profile'; window.__closeDraw()" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
                         배송 정보 입력하러 가기
                       </button>
                     </div>
                   </div>`;
               } else if (isParticipant) {
                 modalContainer.innerHTML = `
-                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)window.__closeDraw()">
+                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop">
                     <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
                       <div class="w-20 h-20 rounded-full bg-error-container/30 flex items-center justify-center mx-auto mb-4">
                         <span class="material-symbols-outlined text-error text-5xl">sentiment_dissatisfied</span>
@@ -192,7 +192,7 @@ export function render() {
                         (당첨자: ${result.winner.name})<br>
                         다음 럭키드로우 기회에 다시 도전해보세요!
                       </p>
-                      <button onclick="window.__closeDraw()" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all">
+                      <button onclick="window.__closeDraw()" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
                         확인
                       </button>
                     </div>
