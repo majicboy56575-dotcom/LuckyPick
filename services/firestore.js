@@ -9,7 +9,6 @@ import {
   collection, 
   doc, 
   setDoc, 
-  getDocs, 
   updateDoc, 
   onSnapshot 
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
@@ -25,20 +24,88 @@ const DEMO_IMAGES = {
   scooter: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6BInNKjgO7u7uP6JW3JJhmHpDwhmBLDjL4sfi9hMzbclwxfgWx1-NA6ElPzpvSmCvbTigj4xkS-T7gVxhPp-7Itycm8uiLCA4tcDE0wQZHCdmF5Gekk75Zkpd7dCrYG2Fs6MOd8aEo588VSHMtBrOdzmlp5F-FWUk_XdcynkpBoYtZcC4zSCV5t2mHzHfhNPcIlk1_54vSJ2Z8ve2iZVwcmjfrvL0fmT9YZCURnZJVVG-hJTCTIboEE1IdP0QeIlprtAD0CRqqNQ',
 };
 
-const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v5';
-const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v5';
-const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v5';
+const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v6';
+const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v6';
+const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v6';
+
+// Wipe legacy local cache so devices force-sync to Firestore
+try {
+  ['luckypick_active_products', 'luckypick_active_products_v4', 'luckypick_active_products_v5'].forEach(k => localStorage.removeItem(k));
+} catch (e) {}
 
 let db = null;
+
+async function seedInitialProductsToFirestore() {
+  if (!db) return;
+  const now = Date.now();
+  const seedProducts = [
+    {
+      id: 'prod_chanel_001',
+      title: '샤넬 립스틱',
+      description: '샤넬 루쥬 코코 립스틱 세트',
+      category: 'BEAUTY LUXE',
+      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
+      retailPrice: 10,
+      entryPrice: 1,
+      maxParticipants: 12,
+      currentParticipants: 2,
+      endTime: now + (55 * 60 + 30) * 1000,
+      status: 'active',
+      participants: getMockParticipants(2),
+    },
+    {
+      id: 'prod_001',
+      title: 'iPhone 15 Pro',
+      description: 'Natural Titanium, 256GB',
+      category: 'TECH ELITE',
+      imageUrl: DEMO_IMAGES.iphone,
+      retailPrice: 999,
+      entryPrice: 50,
+      maxParticipants: 20,
+      currentParticipants: 15,
+      endTime: now + (62 * 3600 + 59 * 60 + 3) * 1000,
+      status: 'active',
+      participants: getMockParticipants(15),
+    },
+    {
+      id: 'prod_002',
+      title: 'MacBook Pro M3',
+      description: '14-inch, Space Black',
+      category: 'PRODUCTIVITY',
+      imageUrl: DEMO_IMAGES.macbook,
+      retailPrice: 1599,
+      entryPrice: 80,
+      maxParticipants: 20,
+      currentParticipants: 12,
+      endTime: now + (4 * 60 + 52) * 1000,
+      status: 'active',
+      participants: getMockParticipants(12),
+    },
+  ];
+
+  for (const p of seedProducts) {
+    try {
+      await setDoc(doc(db, 'products', p.id), p);
+      console.log(`[Firestore Seed] Seeded ${p.title} to Firestore DB`);
+    } catch (e) {
+      console.error('[Firestore Seed Error]', e);
+    }
+  }
+}
 
 if (isFirebaseConfigured()) {
   try {
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log('[Firestore Cloud] Initialized Cloud Firestore for project:', firebaseConfig.projectId);
+    console.log('[Firestore Cloud] Connected to Firestore project:', firebaseConfig.projectId);
 
     // Realtime Listener for Active Products
     onSnapshot(collection(db, 'products'), (snapshot) => {
+      if (snapshot.empty) {
+        console.log('[Firestore Cloud] Products collection empty. Seeding default products to Firestore DB...');
+        seedInitialProductsToFirestore();
+        return;
+      }
       const cloudProducts = [];
       snapshot.forEach(doc => cloudProducts.push({ id: doc.id, ...doc.data() }));
       if (cloudProducts.length > 0) {
@@ -197,7 +264,6 @@ async function addProduct({ title, description, imageUrl, retailPrice, entryPric
     participants: [],
   };
 
-  // Real-time Cloud Sync
   if (db) {
     try {
       await setDoc(doc(db, 'products', id), newProduct);
@@ -236,7 +302,6 @@ async function addParticipation({ productId, paymentId, payer }) {
     product.participants.unshift(newParticipant);
     saveActiveProducts(products);
 
-    // Real-time Cloud Sync
     if (db) {
       try {
         await updateDoc(doc(db, 'products', productId), {
