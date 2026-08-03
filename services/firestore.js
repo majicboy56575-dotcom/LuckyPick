@@ -24,74 +24,20 @@ const DEMO_IMAGES = {
   scooter: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6BInNKjgO7u7uP6JW3JJhmHpDwhmBLDjL4sfi9hMzbclwxfgWx1-NA6ElPzpvSmCvbTigj4xkS-T7gVxhPp-7Itycm8uiLCA4tcDE0wQZHCdmF5Gekk75Zkpd7dCrYG2Fs6MOd8aEo588VSHMtBrOdzmlp5F-FWUk_XdcynkpBoYtZcC4zSCV5t2mHzHfhNPcIlk1_54vSJ2Z8ve2iZVwcmjfrvL0fmT9YZCURnZJVVG-hJTCTIboEE1IdP0QeIlprtAD0CRqqNQ',
 };
 
-const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v6';
-const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v6';
-const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v6';
+const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_clean';
+const STORAGE_KEY_CLOSED = 'luckypick_closed_products_clean';
+const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_clean';
 
-// Wipe legacy local cache so devices force-sync to Firestore
+// Clear all legacy sample data from local storage
 try {
-  ['luckypick_active_products', 'luckypick_active_products_v4', 'luckypick_active_products_v5'].forEach(k => localStorage.removeItem(k));
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('luckypick_')) {
+      localStorage.removeItem(key);
+    }
+  });
 } catch (e) {}
 
 let db = null;
-
-async function seedInitialProductsToFirestore() {
-  if (!db) return;
-  const now = Date.now();
-  const seedProducts = [
-    {
-      id: 'prod_chanel_001',
-      title: '샤넬 립스틱',
-      description: '샤넬 루쥬 코코 립스틱 세트',
-      category: 'BEAUTY LUXE',
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
-      retailPrice: 10,
-      entryPrice: 1,
-      maxParticipants: 12,
-      currentParticipants: 2,
-      endTime: now + (55 * 60 + 30) * 1000,
-      status: 'active',
-      participants: getMockParticipants(2),
-    },
-    {
-      id: 'prod_001',
-      title: 'iPhone 15 Pro',
-      description: 'Natural Titanium, 256GB',
-      category: 'TECH ELITE',
-      imageUrl: DEMO_IMAGES.iphone,
-      retailPrice: 999,
-      entryPrice: 50,
-      maxParticipants: 20,
-      currentParticipants: 15,
-      endTime: now + (62 * 3600 + 59 * 60 + 3) * 1000,
-      status: 'active',
-      participants: getMockParticipants(15),
-    },
-    {
-      id: 'prod_002',
-      title: 'MacBook Pro M3',
-      description: '14-inch, Space Black',
-      category: 'PRODUCTIVITY',
-      imageUrl: DEMO_IMAGES.macbook,
-      retailPrice: 1599,
-      entryPrice: 80,
-      maxParticipants: 20,
-      currentParticipants: 12,
-      endTime: now + (4 * 60 + 52) * 1000,
-      status: 'active',
-      participants: getMockParticipants(12),
-    },
-  ];
-
-  for (const p of seedProducts) {
-    try {
-      await setDoc(doc(db, 'products', p.id), p);
-      console.log(`[Firestore Seed] Seeded ${p.title} to Firestore DB`);
-    } catch (e) {
-      console.error('[Firestore Seed Error]', e);
-    }
-  }
-}
 
 if (isFirebaseConfigured()) {
   try {
@@ -101,27 +47,18 @@ if (isFirebaseConfigured()) {
 
     // Realtime Listener for Active Products
     onSnapshot(collection(db, 'products'), (snapshot) => {
-      if (snapshot.empty) {
-        console.log('[Firestore Cloud] Products collection empty. Seeding default products to Firestore DB...');
-        seedInitialProductsToFirestore();
-        return;
-      }
       const cloudProducts = [];
       snapshot.forEach(doc => cloudProducts.push({ id: doc.id, ...doc.data() }));
-      if (cloudProducts.length > 0) {
-        localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(cloudProducts));
-        window.dispatchEvent(new CustomEvent('languageChanged'));
-      }
+      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(cloudProducts));
+      window.dispatchEvent(new CustomEvent('languageChanged'));
     });
 
     // Realtime Listener for Shipping Infos
     onSnapshot(collection(db, 'shipping_infos'), (snapshot) => {
       const cloudShipping = [];
       snapshot.forEach(doc => cloudShipping.push({ id: doc.id, ...doc.data() }));
-      if (cloudShipping.length > 0) {
-        localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(cloudShipping));
-        window.dispatchEvent(new CustomEvent('languageChanged'));
-      }
+      localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(cloudShipping));
+      window.dispatchEvent(new CustomEvent('languageChanged'));
     });
   } catch (e) {
     console.warn('[Firestore Cloud Warning]', e);
@@ -187,53 +124,7 @@ function loadActiveProducts() {
       console.error('Failed to parse saved products:', e);
     }
   }
-  const now = Date.now();
-  const initial = [
-    {
-      id: 'prod_chanel_001',
-      title: '샤넬 립스틱',
-      description: '샤넬 루쥬 코코 립스틱 세트',
-      category: 'BEAUTY LUXE',
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
-      retailPrice: 10,
-      entryPrice: 1,
-      maxParticipants: 12,
-      currentParticipants: 2,
-      endTime: now + (55 * 60 + 30) * 1000,
-      status: 'active',
-      participants: getMockParticipants(2),
-    },
-    {
-      id: 'prod_001',
-      title: 'iPhone 15 Pro',
-      description: 'Natural Titanium, 256GB',
-      category: 'TECH ELITE',
-      imageUrl: DEMO_IMAGES.iphone,
-      retailPrice: 999,
-      entryPrice: 50,
-      maxParticipants: 20,
-      currentParticipants: 15,
-      endTime: now + (62 * 3600 + 59 * 60 + 3) * 1000,
-      status: 'active',
-      participants: getMockParticipants(15),
-    },
-    {
-      id: 'prod_002',
-      title: 'MacBook Pro M3',
-      description: '14-inch, Space Black',
-      category: 'PRODUCTIVITY',
-      imageUrl: DEMO_IMAGES.macbook,
-      retailPrice: 1599,
-      entryPrice: 80,
-      maxParticipants: 20,
-      currentParticipants: 12,
-      endTime: now + (4 * 60 + 52) * 1000,
-      status: 'active',
-      participants: getMockParticipants(12),
-    },
-  ];
-  localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(initial));
-  return initial;
+  return [];
 }
 
 function saveActiveProducts(products) {
@@ -327,46 +218,7 @@ function loadClosedProducts() {
       console.error('Failed to parse closed products:', e);
     }
   }
-  const initial = [
-    {
-      id: 'prod_closed_001',
-      title: 'Precision Chronograph Series X',
-      imageUrl: DEMO_IMAGES.watch,
-      retailPrice: 4200,
-      entryPrice: 50,
-      status: 'shipped',
-      ticketNumber: '#DP-992',
-      totalParticipants: 1248,
-      winner: { name: '박XX', email: 'majXXXX@gmail.com', phone: '010-4XX4-XXX7' },
-      participants: getMockParticipants(20),
-    },
-    {
-      id: 'prod_closed_002',
-      title: 'EliteBook Pro 14" Titanium',
-      imageUrl: DEMO_IMAGES.laptop,
-      retailPrice: 2800,
-      entryPrice: 80,
-      status: 'closed',
-      ticketNumber: '#LP-041',
-      totalParticipants: 856,
-      winner: { name: '김XX', email: 'dmsXXXX@naver.com', phone: '010-8XX2-XXX1' },
-      participants: getMockParticipants(20),
-    },
-    {
-      id: 'prod_closed_003',
-      title: 'SonicFlow Studio Wireless',
-      imageUrl: DEMO_IMAGES.headphones,
-      retailPrice: 350,
-      entryPrice: 10,
-      status: 'shipped',
-      ticketNumber: '#AU-219',
-      totalParticipants: 2014,
-      winner: { name: 'Lee XX', email: 'chXXXX@gmail.com', phone: '010-3XX9-XXX4' },
-      participants: getMockParticipants(20),
-    },
-  ];
-  localStorage.setItem(STORAGE_KEY_CLOSED, JSON.stringify(initial));
-  return initial;
+  return [];
 }
 
 function saveClosedProducts(products) {
@@ -444,24 +296,7 @@ function loadShippingInfos() {
       console.error('Failed to parse shipping infos:', e);
     }
   }
-  const initial = [
-    {
-      id: 'ship_001',
-      productId: 'prod_closed_001',
-      productTitle: 'Precision Chronograph Series X',
-      imageUrl: DEMO_IMAGES.chronograph,
-      winnerName: '박윤우',
-      winnerEmail: 'majXXXX@gmail.com',
-      recipientName: '박윤우',
-      recipientPhone: '010-1234-5678',
-      shippingAddress: '서울특별시 강남구 테헤란로 123 럭키타워 4층',
-      zipCode: '06234',
-      status: 'pending',
-      submittedAt: Date.now() - 3600 * 1000,
-    }
-  ];
-  localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(initial));
-  return initial;
+  return [];
 }
 
 function saveShippingInfos(list) {
@@ -532,6 +367,31 @@ function getCurrentUser() {
 
   const allShipping = loadShippingInfos();
   const userShipping = allShipping.filter(s => s.winnerEmail === authUser.email || authUser.email === 'majicboy56575@gmail.com');
+  const closedProducts = loadClosedProducts();
+  const activeProducts = loadActiveProducts();
+
+  const wonProducts = closedProducts
+    .filter(p => p.winner && (p.winner.email === authUser.email || authUser.email === 'majicboy56575@gmail.com'))
+    .map(p => ({
+      id: p.id,
+      title: p.title,
+      imageUrl: p.imageUrl,
+      drawDate: new Date(p.closedAt || Date.now()).toLocaleDateString(),
+      shippingSubmitted: userShipping.some(s => s.productId === p.id),
+    }));
+
+  const participatedProducts = [];
+  activeProducts.forEach(p => {
+    if (p.participants && p.participants.some(pt => pt.email === authUser.email)) {
+      participatedProducts.push({
+        id: p.id,
+        title: p.title,
+        imageUrl: p.imageUrl,
+        status: 'active',
+        participatedAt: Date.now(),
+      });
+    }
+  });
 
   return {
     uid: authUser.uid,
@@ -539,78 +399,42 @@ function getCurrentUser() {
     email: authUser.email || 'user@luckypick.com',
     provider: authUser.provider || 'google',
     isAdmin: authUser.isAdmin === true,
-    wonProducts: [
-      {
-        id: 'prod_closed_001',
-        title: 'Precision Chronograph Series X',
-        imageUrl: DEMO_IMAGES.chronograph,
-        drawDate: '2026.08.03',
-        shippingSubmitted: userShipping.some(s => s.productId === 'prod_closed_001'),
-      }
-    ],
-    participatedProducts: [
-      {
-        id: 'prod_001',
-        title: 'iPhone 15 Pro',
-        imageUrl: DEMO_IMAGES.iphone,
-        status: 'active',
-        participatedAt: Date.now() - 2 * 3600 * 1000,
-      },
-      {
-        id: 'prod_closed_002',
-        title: 'EliteBook Pro 14" Titanium',
-        imageUrl: DEMO_IMAGES.laptop,
-        status: 'not_won',
-        resultMessage: 'EliteBook Pro 14" Titanium 상품 추첨 결과, 당첨되지 않았습니다.',
-        participatedAt: Date.now() - 24 * 3600 * 1000,
-      }
-    ],
+    wonProducts,
+    participatedProducts,
   };
 }
 
-// --- Mock Participants ---
 function getMockParticipants(count) {
-  const names = [
-    { name: '박XX', email: 'majXXXX@gmail.com', phone: '010-4XX4-XXX7', initial: 'P' },
-    { name: '정XX', email: 'yuhXXX@naver.com', phone: '010-4XX0-XXX4', initial: 'J' },
-    { name: '김XX', email: 'dmsXXXX@naver.com', phone: '010-8XX2-XXX1', initial: 'K' },
-    { name: 'Lee XX', email: 'chXXXX@gmail.com', phone: '010-3XX9-XXX4', initial: 'L' },
-    { name: '이XX', email: 'leeXXX@gmail.com', phone: '010-2XX1-XXX8', initial: 'L' },
-    { name: '최XX', email: 'choXXX@naver.com', phone: '010-5XX3-XXX9', initial: 'C' },
-    { name: '강XX', email: 'kanXXX@gmail.com', phone: '010-7XX6-XXX2', initial: 'K' },
-    { name: '윤XX', email: 'yunXXX@daum.net', phone: '010-1XX8-XXX5', initial: 'Y' },
-    { name: '한XX', email: 'hanXXX@gmail.com', phone: '010-9XX7-XXX3', initial: 'H' },
-    { name: '서XX', email: 'seoXXX@naver.com', phone: '010-6XX5-XXX1', initial: 'S' },
-  ];
-  return names.slice(0, Math.min(count, names.length));
+  return [];
 }
 
 function getAdminStats() {
+  const activeProducts = loadActiveProducts();
+  const members = getMembers();
   return {
-    totalRevenue: 142500,
-    activeDraws: 24,
-    activeCount: 8,
-    totalMembers: 1284,
-    newSignups: 24,
+    totalRevenue: activeProducts.reduce((sum, p) => sum + (p.currentParticipants * p.entryPrice), 0),
+    activeDraws: activeProducts.length,
+    activeCount: activeProducts.length,
+    totalMembers: members.length,
+    newSignups: 0,
   };
 }
 
 function getMembers() {
-  return [
-    { id: 'u1', name: 'J***n L.', initials: 'JL', joinDate: '2023.10.24', tickets: 42, status: 'verified', colors: 'from-primary to-surface-variant' },
-    { id: 'u2', name: '0x4...3e2', initials: '0X', joinDate: '2023.10.25', tickets: 118, status: 'verified', colors: 'from-secondary to-secondary-container' },
-    { id: 'u3', name: 'S***m K.', initials: 'SK', joinDate: '2023.10.25', tickets: 3, status: 'restricted', colors: 'from-outline to-outline-variant' },
-    { id: 'u4', name: 'W***t P.', initials: 'WP', joinDate: '2023.10.26', tickets: 12, status: 'verified', colors: 'from-primary-container to-surface-container-high' },
-  ];
+  return [];
 }
 
 function getAdminInventory() {
-  return [
-    { title: 'Premium Chronograph', price: 4200, timeLeft: '15h 22m left', fill: 80, image: DEMO_IMAGES.chronograph, badge: 'primary', badgeText: '80% FULL' },
-    { title: 'Ultra-Slim Laptop M3', price: 2800, timeLeft: '04m 12s left', fill: 95, image: DEMO_IMAGES.macbook, badge: 'secondary', badgeText: 'Closing Soon', urgent: true },
-    { title: 'Leather Travel Set', price: 1200, timeLeft: '2d 04h left', fill: 35, image: DEMO_IMAGES.bag, badge: 'tertiary', badgeText: 'Active' },
-    { title: 'Smart E-Scooter X', price: 950, timeLeft: 'Not Started', fill: 0, image: DEMO_IMAGES.scooter, badge: 'outline', badgeText: 'Draft' },
-  ];
+  const activeProducts = loadActiveProducts();
+  return activeProducts.map(p => ({
+    title: p.title,
+    price: p.retailPrice,
+    timeLeft: 'Active',
+    fill: Math.round((p.currentParticipants / p.maxParticipants) * 100),
+    image: p.imageUrl,
+    badge: 'primary',
+    badgeText: 'Active'
+  }));
 }
 
 export {
