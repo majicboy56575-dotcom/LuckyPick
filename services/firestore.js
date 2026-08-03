@@ -3,6 +3,8 @@
 // ============================================
 // Returns mock data with localStorage persistence for real-time state updates
 
+import { getCurrentAuthUser } from './auth.js';
+
 const DEMO_IMAGES = {
   iphone: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
   macbook: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCxUUfyWqhFIsZbUcBFd2JCg-NOyQRJyqyYwH9M8eLHclIkl2gH28CnfGU3GR5foFzd3NTw_PQRPMLgjfyH2ExaTvB4ISCfbInny9irRmimWOYwN-dsZFytzabb9q6D-dnwn79n3_5DxEs-zgTY0ygKbULxO9DdaNFo-Qc8wMHyhMAP0ziE-WVKVAofHXdkn030gEw69WNmQGS5yz4IbTFb_kxJJY90ZJ0e-xb3JA6WqhmUpjXH6cqqjRI1XkwSHfs1DIiU02uZFuQ',
@@ -152,42 +154,46 @@ function addParticipation({ productId, paymentId, payer }) {
   const product = products.find(p => p.id === productId);
   if (!product) return null;
 
-  let payerName = '박윤우 (PayPal)';
-  let payerEmail = 'majXXXX@gmail.com';
+  // Use logged-in user info (not PayPal payer info)
+  const authUser = getCurrentAuthUser();
+  const userName = authUser?.displayName || '사용자';
+  const userEmail = authUser?.email || 'user@luckypick.com';
 
-  if (payer) {
-    if (payer.name) {
-      const given = payer.name.given_name || '';
-      const surname = payer.name.surname || '';
-      if (given || surname) payerName = `${given} ${surname}`.trim();
-    }
-    if (payer.email_address) payerEmail = payer.email_address;
-  }
-
-  // Apply privacy masking to new participant
-  const maskedName = maskName(payerName);
-  const maskedEmail = maskEmail(payerEmail);
+  // Apply privacy masking
+  const maskedName = maskName(userName);
+  const maskedEmail = maskEmail(userEmail);
 
   const newParticipant = {
     name: maskedName,
     email: maskedEmail,
-    phone: '010-4XX4-XXX7',
-    initial: payerName ? payerName.charAt(0).toUpperCase() : 'P'
+    phone: '',
+    initial: userName ? userName.charAt(0).toUpperCase() : 'U'
   };
 
   if (product.currentParticipants < product.maxParticipants) {
     product.currentParticipants += 1;
     product.participants.unshift(newParticipant);
     saveActiveProducts(products);
-    console.log(`[Firestore] Added masked participant to ${productId}. New count: ${product.currentParticipants}`);
+    console.log(`[Firestore] Added participant (${maskedName}) to ${productId}. New count: ${product.currentParticipants}`);
   }
 
   return product;
 }
 
-// --- Mock Closed Products ---
-function getClosedProducts() {
-  return [
+// --- Closed Products with Persistence ---
+const STORAGE_KEY_CLOSED = 'luckypick_closed_products';
+
+function loadClosedProducts() {
+  const saved = localStorage.getItem(STORAGE_KEY_CLOSED);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to parse closed products:', e);
+    }
+  }
+  // Default seed data
+  const initial = [
     {
       id: 'prod_closed_001',
       title: 'Precision Chronograph Series X',
@@ -225,22 +231,184 @@ function getClosedProducts() {
       participants: getMockParticipants(20),
     },
   ];
+  localStorage.setItem(STORAGE_KEY_CLOSED, JSON.stringify(initial));
+  return initial;
+}
+
+function saveClosedProducts(products) {
+  localStorage.setItem(STORAGE_KEY_CLOSED, JSON.stringify(products));
+}
+
+function getClosedProducts() {
+  return loadClosedProducts();
+}
+
+// --- Draw: Close expired product, pick random winner, move to history ---
+function closeExpiredProduct(productId) {
+  const activeProducts = loadActiveProducts();
+  const productIndex = activeProducts.findIndex(p => p.id === productId);
+  if (productIndex === -1) return null;
+
+  const product = activeProducts[productIndex];
+
+  // Only close if actually expired
+  if (product.endTime > Date.now()) return null;
+
+  // Must have at least 1 participant to draw
+  if (!product.participants || product.participants.length === 0) {
+    console.log(`[Draw] No participants for ${product.title}. Removing without winner.`);
+    activeProducts.splice(productIndex, 1);
+    saveActiveProducts(activeProducts);
+    return null;
+  }
+
+  // Pick random winner
+  const winnerIndex = Math.floor(Math.random() * product.participants.length);
+  const winner = product.participants[winnerIndex];
+
+  // Generate ticket number
+  const ticketPrefix = product.title.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  const ticketNum = String(Math.floor(Math.random() * 999)).padStart(3, '0');
+  const ticketNumber = `#${ticketPrefix}-${ticketNum}`;
+
+  // Build closed product record
+  const closedProduct = {
+    id: product.id,
+    title: product.title,
+    imageUrl: product.imageUrl,
+    retailPrice: product.retailPrice,
+    entryPrice: product.entryPrice,
+    status: 'closed',
+    ticketNumber,
+    totalParticipants: product.currentParticipants,
+    winner: {
+      name: winner.name,
+      email: winner.email,
+      phone: winner.phone || '',
+    },
+    participants: product.participants,
+    closedAt: Date.now(),
+  };
+
+  // Remove from active
+  activeProducts.splice(productIndex, 1);
+  saveActiveProducts(activeProducts);
+
+  // Add to closed (prepend)
+  const closedProducts = loadClosedProducts();
+  closedProducts.unshift(closedProduct);
+  saveClosedProducts(closedProducts);
+
+  console.log(`[Draw] 🎉 Winner for "${product.title}": ${winner.name} (${winner.email}) | Ticket: ${ticketNumber}`);
+
+  // Dispatch global event so UI can react
+  window.dispatchEvent(new CustomEvent('productDrawCompleted', {
+    detail: {
+      product: closedProduct,
+      winner,
+    }
+  }));
+
+  return closedProduct;
+}
+
+
+// --- Shipping Info Persistence & Management ---
+const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos';
+
+function loadShippingInfos() {
+  const saved = localStorage.getItem(STORAGE_KEY_SHIPPING);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to parse shipping infos:', e);
+    }
+  }
+  const initial = [
+    {
+      id: 'ship_001',
+      productId: 'prod_closed_001',
+      productTitle: 'Precision Chronograph Series X',
+      imageUrl: DEMO_IMAGES.chronograph,
+      winnerName: '박윤우',
+      winnerEmail: 'majXXXX@gmail.com',
+      recipientName: '박윤우',
+      recipientPhone: '010-1234-5678',
+      shippingAddress: '서울특별시 강남구 테헤란로 123 럭키타워 4층',
+      zipCode: '06234',
+      status: 'pending',
+      submittedAt: Date.now() - 3600 * 1000,
+    }
+  ];
+  localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(initial));
+  return initial;
+}
+
+function saveShippingInfos(list) {
+  localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(list));
+}
+
+function submitShippingInfo({ productId, productTitle, imageUrl, recipientName, recipientPhone, shippingAddress, zipCode }) {
+  const authUser = getCurrentAuthUser();
+  const list = loadShippingInfos();
+
+  const newInfo = {
+    id: 'ship_' + Date.now(),
+    productId: productId || 'prod_closed_001',
+    productTitle: productTitle || '당첨 상품',
+    imageUrl: imageUrl || DEMO_IMAGES.iphone,
+    winnerName: authUser?.displayName || '당첨자',
+    winnerEmail: authUser?.email || 'winner@luckypick.com',
+    recipientName: recipientName || authUser?.displayName || '수령인',
+    recipientPhone: recipientPhone || '010-0000-0000',
+    shippingAddress: shippingAddress || '',
+    zipCode: zipCode || '',
+    status: 'pending',
+    submittedAt: Date.now(),
+  };
+
+  list.unshift(newInfo);
+  saveShippingInfos(list);
+  console.log(`[Firestore] Shipping info submitted for ${productTitle} by ${newInfo.winnerName}`);
+  return newInfo;
+}
+
+function getAllShippingInfos() {
+  return loadShippingInfos();
+}
+
+function updateShippingStatus(shippingId, newStatus) {
+  const list = loadShippingInfos();
+  const item = list.find(s => s.id === shippingId);
+  if (item) {
+    item.status = newStatus;
+    saveShippingInfos(list);
+  }
+  return list;
 }
 
 // --- Mock User Data ---
 function getCurrentUser() {
+  const authUser = getCurrentAuthUser();
+  if (!authUser) return null;
+
+  const allShipping = loadShippingInfos();
+  const userShipping = allShipping.filter(s => s.winnerEmail === authUser.email || authUser.email === 'majXXXX@gmail.com');
+
   return {
-    uid: 'user_mock_001',
-    name: '박윤우',
-    email: 'majXXXX@gmail.com',
-    isAdmin: true,
+    uid: authUser.uid,
+    name: authUser.displayName || '사용자',
+    email: authUser.email || 'user@luckypick.com',
+    provider: authUser.provider || 'google',
+    isAdmin: authUser.isAdmin === true,
     wonProducts: [
       {
         id: 'prod_closed_001',
         title: 'Precision Chronograph Series X',
         imageUrl: DEMO_IMAGES.chronograph,
-        drawDate: '2023.10.15',
-        shippingSubmitted: false,
+        drawDate: '2026.08.03',
+        shippingSubmitted: userShipping.some(s => s.productId === 'prod_closed_001'),
       }
     ],
     participatedProducts: [
@@ -250,6 +418,14 @@ function getCurrentUser() {
         imageUrl: DEMO_IMAGES.iphone,
         status: 'active',
         participatedAt: Date.now() - 2 * 3600 * 1000,
+      },
+      {
+        id: 'prod_closed_002',
+        title: 'EliteBook Pro 14" Titanium',
+        imageUrl: DEMO_IMAGES.laptop,
+        status: 'not_won',
+        resultMessage: 'EliteBook Pro 14" Titanium 상품 추첨 결과, 당첨되지 않았습니다.',
+        participatedAt: Date.now() - 24 * 3600 * 1000,
       }
     ],
   };
@@ -315,7 +491,9 @@ function getAdminInventory() {
 
 export {
   getActiveProducts, getClosedProducts, getCurrentUser,
-  addProduct, addParticipation, getMockParticipants, getAdminStats, getMembers, getAdminInventory,
+  addProduct, addParticipation, closeExpiredProduct, getMockParticipants, getAdminStats, getMembers, getAdminInventory,
+  submitShippingInfo, getAllShippingInfos, updateShippingStatus,
   maskName, maskEmail,
   DEMO_IMAGES
 };
+

@@ -1,8 +1,6 @@
-// ============================================
-// LuckyPick - Home Page (진행 중 상품)
-// ============================================
 import { t } from '../i18n.js';
-import { getActiveProducts } from '../services/firestore.js';
+import { getActiveProducts, closeExpiredProduct } from '../services/firestore.js';
+import { getCurrentAuthUser } from '../services/auth.js';
 
 let countdownIntervals = [];
 
@@ -114,7 +112,7 @@ function renderProductCard(product, index) {
             </div>
           </div>
         </div>
-        <button onclick="window.location.hash='#profile?product=${product.id}'" class="mt-auto w-full py-4 ${isUrgent ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-on-primary'} font-bold rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-md">
+        <button onclick="window.__participate('${product.id}')" class="mt-auto w-full py-4 ${isUrgent ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-on-primary'} font-bold rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-md">
           ${isUrgent ? t('hurryParticipate') : t('participateNow')}
           <span class="material-symbols-outlined">${isUrgent ? 'shopping_cart' : 'arrow_forward'}</span>
         </button>
@@ -152,6 +150,82 @@ export function render() {
         if (remaining <= 0) {
           el.textContent = '00:00:00';
           clearInterval(interval);
+
+          // Trigger automatic draw
+          const result = closeExpiredProduct(product.id);
+          if (result) {
+            const authUser = getCurrentAuthUser();
+            const isParticipant = authUser && product.participants.some(p => p.email === authUser.email || authUser.email === 'majXXXX@gmail.com');
+            const isWinner = authUser && result.winner.email === authUser.email;
+
+            const modalContainer = document.getElementById('modal-container');
+            if (modalContainer) {
+              if (isWinner) {
+                modalContainer.innerHTML = `
+                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)window.__closeDraw()">
+                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
+                      <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
+                        <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
+                      </div>
+                      <h2 class="font-headline-md text-headline-md text-on-surface mb-2">🎉 축하합니다! 당첨되었습니다!</h2>
+                      <p class="text-on-surface-variant mb-4"><strong>${result.title}</strong></p>
+                      <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
+                        <p class="font-label-caps text-label-caps text-tertiary mb-1">티켓 번호</p>
+                        <p class="font-timer-numeric text-xl font-bold text-primary">${result.ticketNumber}</p>
+                      </div>
+                      <button onclick="window.location.hash='#profile'; window.__closeDraw()" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all">
+                        배송 정보 입력하러 가기
+                      </button>
+                    </div>
+                  </div>`;
+              } else if (isParticipant) {
+                modalContainer.innerHTML = `
+                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)window.__closeDraw()">
+                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
+                      <div class="w-20 h-20 rounded-full bg-error-container/30 flex items-center justify-center mx-auto mb-4">
+                        <span class="material-symbols-outlined text-error text-5xl">sentiment_dissatisfied</span>
+                      </div>
+                      <h2 class="font-headline-md text-headline-md text-on-surface mb-2">😢 추첨 결과 안내</h2>
+                      <p class="text-error font-bold mb-2">[${result.title}] 당첨되지 않았습니다.</p>
+                      <p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
+                        아쉽지만 <strong>${result.title}</strong> 상품 추첨에서 당첨되지 않았습니다.<br>
+                        (당첨자: ${result.winner.name})<br>
+                        다음 럭키드로우 기회에 다시 도전해보세요!
+                      </p>
+                      <button onclick="window.__closeDraw()" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all">
+                        확인
+                      </button>
+                    </div>
+                  </div>`;
+              } else {
+                modalContainer.innerHTML = `
+                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)window.__closeDraw()">
+                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
+                      <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
+                        <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
+                      </div>
+                      <h2 class="font-headline-md text-headline-md text-on-surface mb-2">🎉 추첨 완료!</h2>
+                      <p class="text-on-surface-variant mb-4"><strong>${result.title}</strong></p>
+                      <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
+                        <p class="font-label-caps text-label-caps text-tertiary mb-1">당첨자</p>
+                        <p class="font-headline-sm text-on-surface">${result.winner.name}</p>
+                        <p class="text-sm text-on-surface-variant">${result.winner.email}</p>
+                        <p class="font-timer-numeric text-primary mt-2">${result.ticketNumber}</p>
+                      </div>
+                      <button onclick="window.__closeDraw()" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all">
+                        확인
+                      </button>
+                    </div>
+                  </div>`;
+              }
+            }
+            window.__closeDraw = () => {
+              const mc = document.getElementById('modal-container');
+              if (mc) mc.innerHTML = '';
+              // Re-render home page with updated product list
+              window.dispatchEvent(new CustomEvent('languageChanged'));
+            };
+          }
           return;
         }
         el.textContent = formatTime(remaining);
@@ -159,6 +233,16 @@ export function render() {
       countdownIntervals.push(interval);
     });
   }, 100);
+
+  window.__participate = (productId) => {
+    const user = getCurrentAuthUser();
+    if (!user) {
+      alert('로그인이 필요한 서비스입니다. 로그인 화면으로 이동합니다.');
+      window.location.hash = `#profile?product=${productId}`;
+      return;
+    }
+    window.location.hash = `#profile?product=${productId}`;
+  };
 
   // Modal handlers
   window.__showParticipants = (productId) => {
@@ -175,6 +259,8 @@ export function render() {
 
 export function cleanup() {
   clearTimers();
+  delete window.__participate;
   delete window.__showParticipants;
   delete window.__closeModal;
+  delete window.__closeDraw;
 }

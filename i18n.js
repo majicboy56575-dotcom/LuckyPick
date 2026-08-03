@@ -586,14 +586,52 @@ function getCurrentLanguage() {
 
 function getAvailableLanguages() {
   return [
-    { code: 'ko', label: 'KO' },
-    { code: 'en', label: 'EN' },
-    { code: 'th', label: 'TH' },
-    { code: 'es', label: 'ES' },
-    { code: 'vi', label: 'VI' },
-    { code: 'ru', label: 'RU' },
-    { code: 'id', label: 'ID' },
+    { code: 'ko', label: 'KO', name: '한국어', flag: '🇰🇷' },
+    { code: 'en', label: 'EN', name: 'English', flag: '🇺🇸' },
+    { code: 'th', label: 'TH', name: 'ไทย', flag: '🇹🇭' },
+    { code: 'es', label: 'ES', name: 'Español', flag: '🇪🇸' },
+    { code: 'vi', label: 'VI', name: 'Tiếng Việt', flag: '🇻🇳' },
+    { code: 'ru', label: 'RU', name: 'Русский', flag: '🇷🇺' },
+    { code: 'id', label: 'ID', name: 'Bahasa Indonesia', flag: '🇮🇩' },
   ];
 }
 
-export { t, setLanguage, getCurrentLanguage, getAvailableLanguages };
+function renderLanguageDropdown(containerId = 'lang-dropdown-wrapper') {
+  const langs = getAvailableLanguages();
+  const curLang = getCurrentLanguage();
+  const curLangObj = langs.find(l => l.code === curLang) || langs[0];
+
+  return `
+    <div class="relative" id="${containerId}">
+      <button id="${containerId}-btn" 
+              onclick="window.__toggleLangDropdown(event, '${containerId}')" 
+              class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container/90 hover:bg-surface-variant/40 text-on-surface transition-all border border-outline-variant/30 shadow-sm active:scale-95">
+        <span class="text-xs font-bold tracking-wide flex items-center gap-1.5">
+          <span>${curLangObj.flag}</span>
+          <span>${curLangObj.label}</span>
+        </span>
+        <div class="w-7 h-7 rounded-full bg-surface-variant/60 flex items-center justify-center text-on-surface-variant transition-transform duration-200 lang-chevron-icon">
+          <span class="material-symbols-outlined text-[18px]">expand_more</span>
+        </div>
+      </button>
+      <div id="${containerId}-menu" 
+           class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-inverse-surface rounded-2xl shadow-xl border border-outline-variant/30 py-2 z-[100] backdrop-blur-lg animate-in fade-in zoom-in-95 duration-150">
+        <div class="px-3 py-1 text-[10px] font-bold text-on-surface-variant/60 tracking-wider border-b border-outline-variant/15 mb-1">
+          SELECT LANGUAGE
+        </div>
+        ${langs.map(l => `
+          <button class="w-full flex items-center justify-between px-4 py-2 text-xs text-left hover:bg-surface-variant/20 transition-colors ${l.code === curLang ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface'}"
+                  onclick="window.__switchLang('${l.code}')">
+            <span class="flex items-center gap-2">
+              <span>${l.flag}</span>
+              <span>${l.name}</span>
+            </span>
+            <span class="text-[10px] text-on-surface-variant font-mono uppercase">${l.label}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+export { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown };
+

@@ -1,7 +1,8 @@
 // ============================================
 // LuckyPick - Main App (SPA Router)
 // ============================================
-import { t, setLanguage, getCurrentLanguage, getAvailableLanguages } from './i18n.js?v=2026073104';
+import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026073104';
+import { getCurrentAuthUser } from './services/auth.js';
 import * as homePage from './pages/home.js?v=2026073104';
 import * as historyPage from './pages/history.js?v=2026073104';
 import * as profilePage from './pages/profile.js?v=2026073104';
@@ -27,23 +28,18 @@ function getPageFromHash() {
 function renderHeader(pageName) {
   if (pageName === 'admin') return ''; // Admin has its own header
 
-  const langs = getAvailableLanguages();
-  const curLang = getCurrentLanguage();
-
   return `
     <header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm flex justify-between items-center h-16 px-container-margin max-w-full">
       <div class="flex items-center gap-2">
         <span class="material-symbols-outlined text-primary">language</span>
         <span class="font-display-lg text-primary font-extrabold text-[24px] cursor-pointer" onclick="window.location.hash='#home'">LuckyPick</span>
       </div>
-      <div class="flex bg-surface-container p-1 rounded-full text-label-caps overflow-x-auto hide-scrollbar gap-0.5">
-        ${langs.map(l => `
-          <button class="px-3 py-1 rounded-full transition-all whitespace-nowrap ${l.code === curLang ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-variant/20'}" onclick="window.__switchLang('${l.code}')">${l.label}</button>
-        `).join('')}
+      <div class="flex items-center gap-3">
+        ${renderLanguageDropdown('header-lang-dropdown')}
+        <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all" onclick="window.location.hash='#admin'" title="Admin">
+          <span class="material-symbols-outlined text-primary">admin_panel_settings</span>
+        </button>
       </div>
-      <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all" onclick="window.location.hash='#admin'" title="Admin">
-        <span class="material-symbols-outlined text-primary">admin_panel_settings</span>
-      </button>
     </header>`;
 }
 
@@ -97,6 +93,14 @@ function navigate() {
     return;
   }
 
+  // --- Protected Route Check ---
+  const user = getCurrentAuthUser();
+  if (!user && (pageName === 'history' || pageName === 'admin')) {
+    alert('로그인이 필요한 기능입니다. 로그인 화면으로 이동합니다.');
+    window.location.hash = `#profile?redirect=${pageName}`;
+    return;
+  }
+
   // Cleanup previous page
   if (currentCleanup) {
     currentCleanup();
@@ -126,13 +130,46 @@ function navigate() {
   window.scrollTo(0, 0);
 }
 
-// --- Language Switch ---
+// --- Language Switch & Dropdown ---
 window.__switchLang = (lang) => {
   setLanguage(lang);
   navigate(); // Re-render with new language
 };
 
+window.__toggleLangDropdown = (e, wrapperId = 'lang-dropdown-wrapper') => {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById(`${wrapperId}-menu`);
+  const btn = document.getElementById(`${wrapperId}-btn`);
+  if (menu && btn) {
+    const isHidden = menu.classList.contains('hidden');
+    
+    // Close any other open dropdowns
+    document.querySelectorAll('[id$="-menu"]').forEach(m => m.classList.add('hidden'));
+    document.querySelectorAll('.lang-chevron-icon').forEach(c => c.style.transform = 'rotate(0deg)');
+
+    if (isHidden) {
+      menu.classList.remove('hidden');
+      const chevron = btn.querySelector('.lang-chevron-icon');
+      if (chevron) chevron.style.transform = 'rotate(180deg)';
+    }
+  }
+};
+
+// Close dropdowns on outside click
+document.addEventListener('click', (e) => {
+  const openMenus = document.querySelectorAll('[id$="-menu"]:not(.hidden)');
+  openMenus.forEach(menu => {
+    const wrapper = menu.parentElement;
+    if (wrapper && !wrapper.contains(e.target)) {
+      menu.classList.add('hidden');
+      const chevron = wrapper.querySelector('.lang-chevron-icon');
+      if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+  });
+});
+
 // --- Event Listeners ---
 window.addEventListener('hashchange', navigate);
 window.addEventListener('DOMContentLoaded', navigate);
 window.addEventListener('languageChanged', navigate);
+

@@ -1,13 +1,14 @@
 // ============================================
 // LuckyPick - Admin Page (관리자 페이지)
 // ============================================
-import { t } from '../i18n.js';
-import { getAdminStats, getMembers, getAdminInventory, addProduct, DEMO_IMAGES } from '../services/firestore.js';
+import { t, renderLanguageDropdown } from '../i18n.js';
+import { getAdminStats, getMembers, getAdminInventory, addProduct, getAllShippingInfos, updateShippingStatus, DEMO_IMAGES } from '../services/firestore.js';
 
 export function render() {
   const stats = getAdminStats();
   const members = getMembers();
   const inventory = getAdminInventory();
+  const shippingList = getAllShippingInfos();
 
   const html = `
     <div class="flex h-screen overflow-hidden page-enter" id="admin-layout">
@@ -72,7 +73,8 @@ export function render() {
               ${t('operational')}
             </span>
           </div>
-          <div class="flex items-center gap-6">
+          <div class="flex items-center gap-3">
+            ${renderLanguageDropdown('admin-lang-dropdown')}
             <div class="relative">
               <button class="text-on-surface-variant hover:bg-surface-variant/20 p-2 rounded-full transition-all">
                 <span class="material-symbols-outlined">notifications</span>
@@ -255,6 +257,77 @@ export function render() {
                 </div>
               `).join('')}
             </div>
+          </div>
+
+          <!-- Shipping Info Review Card -->
+          <div class="glass-card p-8 rounded-xl" id="admin-shipping-section">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-primary">local_shipping</span>
+                <h3 class="font-headline-sm text-headline-sm text-on-surface">${t('shippingInfoReview')}</h3>
+              </div>
+              <span class="text-xs bg-primary-container/20 text-primary font-bold px-3 py-1 rounded-full">
+                총 ${shippingList.length}건
+              </span>
+            </div>
+            ${shippingList.length === 0 ? `
+              <div class="p-8 text-center bg-surface-bright rounded-xl border border-outline-variant/20">
+                <p class="text-on-surface-variant text-sm">제출된 배송 정보가 없습니다.</p>
+              </div>
+            ` : `
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-outline-variant">
+                      <th class="py-3 font-label-caps text-label-caps text-on-surface-variant">상품명</th>
+                      <th class="py-3 font-label-caps text-label-caps text-on-surface-variant">당첨자 계정</th>
+                      <th class="py-3 font-label-caps text-label-caps text-on-surface-variant">수령인 / 연락처</th>
+                      <th class="py-3 font-label-caps text-label-caps text-on-surface-variant">배송 주소 (우편번호)</th>
+                      <th class="py-3 font-label-caps text-label-caps text-on-surface-variant">상태</th>
+                      <th class="py-3 font-label-caps text-label-caps text-on-surface-variant">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-outline-variant/30">
+                    ${shippingList.map(s => `
+                      <tr class="hover:bg-surface-variant/10 transition-colors">
+                        <td class="py-4">
+                          <div class="flex items-center gap-3">
+                            <img src="${s.imageUrl}" class="w-10 h-10 rounded-lg object-contain bg-white border border-outline-variant/20">
+                            <span class="font-semibold text-on-surface text-sm">${s.productTitle}</span>
+                          </div>
+                        </td>
+                        <td class="py-4">
+                          <p class="font-bold text-sm text-on-surface">${s.winnerName}</p>
+                          <p class="text-xs text-on-surface-variant font-mono">${s.winnerEmail}</p>
+                        </td>
+                        <td class="py-4">
+                          <p class="font-semibold text-sm text-on-surface">${s.recipientName}</p>
+                          <p class="text-xs font-mono text-on-surface-variant">${s.recipientPhone}</p>
+                        </td>
+                        <td class="py-4">
+                          <p class="text-sm text-on-surface">${s.shippingAddress}</p>
+                          <p class="text-xs font-mono text-on-surface-variant">[${s.zipCode}]</p>
+                        </td>
+                        <td class="py-4">
+                          <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${s.status === 'shipped' ? 'bg-tertiary-container/20 text-tertiary' : 'bg-secondary-container/20 text-secondary'}">
+                            ${s.status === 'shipped' ? '배송 완료' : '배송 대기'}
+                          </span>
+                        </td>
+                        <td class="py-4">
+                          ${s.status === 'shipped' ? `
+                            <span class="text-xs text-outline font-bold">완료됨</span>
+                          ` : `
+                            <button onclick="window.__markShipped('${s.id}')" class="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary-container transition-all shadow-sm">
+                              배송 완료 처리
+                            </button>
+                          `}
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
           </div>
         </div>
       </main>
@@ -529,6 +602,12 @@ export function init() {
     }
   });
 
+  window.__markShipped = (shippingId) => {
+    updateShippingStatus(shippingId, 'shipped');
+    alert('배송 상태가 [배송 완료]로 변경되었습니다.');
+    window.dispatchEvent(new CustomEvent('languageChanged'));
+  };
+
   console.log('[Admin] Upload handlers initialized successfully');
 }
 
@@ -536,4 +615,5 @@ export function cleanup() {
   delete window.__toggleAdminSidebar;
   delete window.__registerProduct;
   delete window.__uploadedImageDataUrl;
+  delete window.__markShipped;
 }
