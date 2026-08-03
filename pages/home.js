@@ -198,25 +198,24 @@ export function render() {
                     </div>
                   </div>`;
               } else {
-                modalContainer.innerHTML = `
-                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)window.__closeDraw()">
-                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
-                      <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
-                        <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
+                // Public announcement toast for non-participants (avoids confusing modal popup)
+                const modalContainer = document.getElementById('modal-container');
+                if (modalContainer) {
+                  modalContainer.innerHTML = `
+                    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4 toast" id="public-draw-toast">
+                      <div class="bg-surface-bright border border-primary/20 text-on-surface rounded-2xl p-4 shadow-2xl flex items-center gap-3">
+                        <span class="material-symbols-outlined text-primary text-3xl">campaign</span>
+                        <div class="flex-1">
+                          <p class="font-bold text-xs text-primary font-label-caps">📢 전체 추첨 완료 공지</p>
+                          <p class="font-bold text-sm text-on-surface">${result.title}</p>
+                          <p class="text-xs text-on-surface-variant">당첨자: <strong>${result.winner.name}</strong> (${result.winner.email})</p>
+                        </div>
+                        <button class="px-3 py-1 bg-primary text-on-primary rounded-full text-xs font-bold hover:bg-primary-container transition-all" onclick="document.getElementById('public-draw-toast')?.remove(); window.dispatchEvent(new CustomEvent('languageChanged'))">
+                          확인
+                        </button>
                       </div>
-                      <h2 class="font-headline-md text-headline-md text-on-surface mb-2">🎉 추첨 완료!</h2>
-                      <p class="text-on-surface-variant mb-4"><strong>${result.title}</strong></p>
-                      <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
-                        <p class="font-label-caps text-label-caps text-tertiary mb-1">당첨자</p>
-                        <p class="font-headline-sm text-on-surface">${result.winner.name}</p>
-                        <p class="text-sm text-on-surface-variant">${result.winner.email}</p>
-                        <p class="font-timer-numeric text-primary mt-2">${result.ticketNumber}</p>
-                      </div>
-                      <button onclick="window.__closeDraw()" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all">
-                        확인
-                      </button>
-                    </div>
-                  </div>`;
+                    </div>`;
+                }
               }
             }
             window.__closeDraw = () => {
