@@ -150,26 +150,42 @@ const DEFAULT_DEMO_PRODUCTS = [
 
 function loadActiveProducts() {
   if (cloudProductsCache !== null) {
-    return cloudProductsCache;
+    const now = Date.now();
+    return cloudProductsCache.filter(p => p.endTime > now);
   }
   const saved = localStorage.getItem(STORAGE_KEY_PRODUCTS);
   if (saved !== null) {
     try {
       const products = JSON.parse(saved);
       if (Array.isArray(products)) {
+        const now = Date.now();
+        const active = [];
+        const expired = [];
         products.forEach(p => {
-          if (p.participants && Array.isArray(p.participants)) {
-            p.participants.forEach(pt => {
-              if (pt.name && !pt.name.includes('*') && !pt.name.includes('X')) {
-                pt.name = maskName(pt.name);
-              }
-              if (pt.email && !pt.email.includes('****') && !pt.email.includes('XXXX')) {
-                pt.email = maskEmail(pt.email);
-              }
-            });
+          if (p.endTime && p.endTime <= now) {
+            expired.push(p);
+          } else {
+            if (p.participants && Array.isArray(p.participants)) {
+              p.participants.forEach(pt => {
+                if (pt.name && !pt.name.includes('*') && !pt.name.includes('X')) {
+                  pt.name = maskName(pt.name);
+                }
+                if (pt.email && !pt.email.includes('****') && !pt.email.includes('XXXX')) {
+                  pt.email = maskEmail(pt.email);
+                }
+              });
+            }
+            active.push(p);
           }
         });
-        return products;
+
+        if (expired.length > 0) {
+          setTimeout(() => {
+            expired.forEach(p => closeExpiredProduct(p.id));
+          }, 0);
+        }
+
+        return active;
       }
     } catch (e) {
       console.error('Failed to parse saved products:', e);

@@ -20,6 +20,7 @@ function formatTime(ms) {
 
 function getTimerClasses(ms) {
   const totalSec = Math.floor(ms / 1000);
+  if (totalSec <= 0) return { bg: 'bg-surface-variant/80', text: 'text-on-surface-variant', pulse: false };
   if (totalSec <= 300) return { bg: 'bg-secondary-container', text: 'text-on-secondary-container', pulse: true };
   if (totalSec <= 3600) return { bg: 'bg-white/80 backdrop-blur-md', text: 'text-primary', pulse: false };
   return { bg: 'bg-white/80 backdrop-blur-md', text: 'text-on-surface-variant', pulse: false };
@@ -225,6 +226,9 @@ export function render() {
               window.dispatchEvent(new CustomEvent('languageChanged'));
             };
           }
+
+          // Instantly re-render home page to remove completed product from active list
+          window.dispatchEvent(new CustomEvent('languageChanged'));
           return;
         }
         el.textContent = formatTime(remaining);
