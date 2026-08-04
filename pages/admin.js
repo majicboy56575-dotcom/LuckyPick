@@ -158,14 +158,30 @@ export function render() {
                     <input id="admin-product-ticket" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="1.00" type="number" step="0.01" min="0" required>
                   </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div class="space-y-2">
                     <label class="font-label-caps text-label-caps text-on-surface-variant">${t('maxParticipants')}</label>
                     <input id="admin-product-max" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="100" type="number" min="1" required>
                   </div>
                   <div class="space-y-2">
                     <label class="font-label-caps text-label-caps text-on-surface-variant">${t('timerHours')}</label>
-                    <input id="admin-product-timer" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="24" type="number" min="1" required>
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 relative">
+                        <input id="admin-product-timer-hours" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary pl-3 pr-10 py-3 outline-none border font-mono text-sm" placeholder="24" type="number" min="0" value="24" required>
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-on-surface-variant font-bold pointer-events-none">${t('timerHoursLabel')}</span>
+                      </div>
+                      <div class="flex-1 relative">
+                        <input id="admin-product-timer-minutes" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary pl-3 pr-10 py-3 outline-none border font-mono text-sm" placeholder="0" type="number" min="0" max="59" value="0" required>
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-on-surface-variant font-bold pointer-events-none">${t('timerMinutesLabel')}</span>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 pt-1">
+                      <button type="button" class="px-2.5 py-1 text-xs bg-surface-variant/40 hover:bg-primary/10 hover:text-primary rounded-lg font-semibold text-on-surface-variant transition-colors border border-outline-variant/30" onclick="window.__setAdminTimerPreset(0, 10)">+10분</button>
+                      <button type="button" class="px-2.5 py-1 text-xs bg-surface-variant/40 hover:bg-primary/10 hover:text-primary rounded-lg font-semibold text-on-surface-variant transition-colors border border-outline-variant/30" onclick="window.__setAdminTimerPreset(0, 30)">+30분</button>
+                      <button type="button" class="px-2.5 py-1 text-xs bg-surface-variant/40 hover:bg-primary/10 hover:text-primary rounded-lg font-semibold text-on-surface-variant transition-colors border border-outline-variant/30" onclick="window.__setAdminTimerPreset(1, 0)">1시간</button>
+                      <button type="button" class="px-2.5 py-1 text-xs bg-surface-variant/40 hover:bg-primary/10 hover:text-primary rounded-lg font-semibold text-on-surface-variant transition-colors border border-outline-variant/30" onclick="window.__setAdminTimerPreset(6, 0)">6시간</button>
+                      <button type="button" class="px-2.5 py-1 text-xs bg-surface-variant/40 hover:bg-primary/10 hover:text-primary rounded-lg font-semibold text-on-surface-variant transition-colors border border-outline-variant/30" onclick="window.__setAdminTimerPreset(24, 0)">24시간</button>
+                    </div>
                   </div>
                 </div>
                 <button class="w-full bg-primary text-on-primary font-bold py-4 rounded-full shadow-lg hover:shadow-primary/20 active:scale-95 transition-all mt-4" type="submit" id="admin-submit-btn">
@@ -406,6 +422,13 @@ export function render() {
     console.log('[Admin] Upload handlers initialized');
   }
 
+  window.__setAdminTimerPreset = (h, m) => {
+    const hInput = document.getElementById('admin-product-timer-hours');
+    const mInput = document.getElementById('admin-product-timer-minutes');
+    if (hInput) hInput.value = h;
+    if (mInput) mInput.value = m;
+  };
+
   // Product registration handler
   window.__registerProduct = () => {
     const name = document.getElementById('admin-product-name')?.value?.trim();
@@ -413,7 +436,10 @@ export function render() {
     const price = document.getElementById('admin-product-price')?.value;
     const ticket = document.getElementById('admin-product-ticket')?.value;
     const max = document.getElementById('admin-product-max')?.value;
-    const timer = document.getElementById('admin-product-timer')?.value;
+    const hoursVal = document.getElementById('admin-product-timer-hours')?.value;
+    const minsVal = document.getElementById('admin-product-timer-minutes')?.value;
+    const hours = parseFloat(hoursVal) || 0;
+    const minutes = parseFloat(minsVal) || 0;
 
     // Validation
     if (!name) {
@@ -432,8 +458,9 @@ export function render() {
       document.getElementById('admin-product-max')?.focus();
       return;
     }
-    if (!timer || parseFloat(timer) <= 0) {
-      document.getElementById('admin-product-timer')?.focus();
+    if (hours <= 0 && minutes <= 0) {
+      alert('제한 시간(시 또는 분)을 1분 이상 설정해주세요.');
+      document.getElementById('admin-product-timer-minutes')?.focus();
       return;
     }
 
@@ -445,7 +472,8 @@ export function render() {
       retailPrice: price,
       entryPrice: ticket,
       maxParticipants: max,
-      timerHours: timer,
+      timerHours: hours,
+      timerMinutes: minutes,
     });
 
     // Show success toast
@@ -608,17 +636,27 @@ export function init() {
     window.dispatchEvent(new CustomEvent('languageChanged'));
   };
 
+  window.__setAdminTimerPreset = (h, m) => {
+    const hInput = document.getElementById('admin-product-timer-hours');
+    const mInput = document.getElementById('admin-product-timer-minutes');
+    if (hInput) hInput.value = h;
+    if (mInput) mInput.value = m;
+  };
+
   window.__registerProduct = async () => {
     const name = document.getElementById('admin-product-name')?.value;
     const desc = document.getElementById('admin-product-desc')?.value;
     const price = document.getElementById('admin-product-price')?.value;
     const ticket = document.getElementById('admin-product-ticket')?.value;
     const max = document.getElementById('admin-product-max')?.value;
-    const timer = document.getElementById('admin-product-timer')?.value;
+    const hoursVal = document.getElementById('admin-product-timer-hours')?.value;
+    const minsVal = document.getElementById('admin-product-timer-minutes')?.value;
+    const hours = parseFloat(hoursVal) || 0;
+    const minutes = parseFloat(minsVal) || 0;
     const imageUrl = window.__uploadedImageDataUrl || DEMO_IMAGES.iphone;
 
-    if (!name || !price || !ticket || !max || !timer) {
-      alert('모든 필수 항목을 입력해주세요.');
+    if (!name || !price || !ticket || !max || (hours <= 0 && minutes <= 0)) {
+      alert('모든 필수 항목을 입력해주세요 (제한시간 1분 이상).');
       return;
     }
 
@@ -636,10 +674,16 @@ export function init() {
         retailPrice: parseFloat(price),
         entryPrice: parseFloat(ticket),
         maxParticipants: parseInt(max),
-        timerHours: parseFloat(timer)
+        timerHours: hours,
+        timerMinutes: minutes,
       });
 
-      alert(`🎉 [${newProd.title}] 상품이 Firebase 데이터베이스에 성공적으로 등록되었습니다!\n전 세계 모든 핸드폰과 PC에 실시간으로 공유됩니다.`);
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const msg = isLocal
+        ? `🎉 [${newProd.title}] 상품이 로컬 저장소(LocalStorage)에 등록되었습니다!\n(로컬 테스트 모드가 적용되어 실제 배포된 웹사이트에는 동기화되지 않습니다.)`
+        : `🎉 [${newProd.title}] 상품이 Firebase 클라우드 데이터베이스에 성공적으로 등록되었습니다!`;
+
+      alert(msg);
 
       // Reset form
       const form = document.getElementById('admin-register-form');
@@ -668,6 +712,7 @@ export function init() {
 export function cleanup() {
   delete window.__toggleAdminSidebar;
   delete window.__registerProduct;
+  delete window.__setAdminTimerPreset;
   delete window.__uploadedImageDataUrl;
   delete window.__markShipped;
 }

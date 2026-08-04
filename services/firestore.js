@@ -28,11 +28,6 @@ const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v9';
 const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v9';
 const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v9';
 
-// Wipe all old localStorage cache on page boot
-try {
-  localStorage.clear();
-} catch (e) {}
-
 let db = null;
 let cloudProductsCache = null;
 let cloudShippingCache = null;
@@ -101,33 +96,87 @@ function maskEmail(email) {
   return `${maskedUser}@${domain}`;
 }
 
-// --- Active Products ---
+const DEFAULT_DEMO_PRODUCTS = [
+  {
+    id: 'prod_demo_iphone',
+    title: 'iPhone 15 Pro 256GB',
+    description: 'Natural Titanium, 256GB',
+    category: 'TECH',
+    imageUrl: DEMO_IMAGES.iphone,
+    retailPrice: 1199,
+    entryPrice: 1,
+    maxParticipants: 100,
+    currentParticipants: 84,
+    endTime: Date.now() + 3600000 * 48,
+    status: 'active',
+    participants: [
+      { name: '김*민', email: 'maj****@gmail.com', phone: '010-4XX4-XXX7', initial: 'K' },
+      { name: '이*우', email: 'yuh****@naver.com', phone: '010-4XX0-XXX4', initial: 'L' }
+    ]
+  },
+  {
+    id: 'prod_demo_macbook',
+    title: 'MacBook Pro 16" M3 Max',
+    description: 'Space Black, 36GB RAM, 1TB SSD',
+    category: 'TECH',
+    imageUrl: DEMO_IMAGES.macbook,
+    retailPrice: 3499,
+    entryPrice: 5,
+    maxParticipants: 50,
+    currentParticipants: 42,
+    endTime: Date.now() + 3600000 * 24,
+    status: 'active',
+    participants: [
+      { name: '박*준', email: 'par****@gmail.com', phone: '010-2XX3-XXX9', initial: 'P' }
+    ]
+  },
+  {
+    id: 'prod_demo_watch',
+    title: 'Apple Watch Ultra 2',
+    description: 'Titanium Case with Trail Loop',
+    category: 'LUXURY',
+    imageUrl: DEMO_IMAGES.watch,
+    retailPrice: 799,
+    entryPrice: 1,
+    maxParticipants: 200,
+    currentParticipants: 195,
+    endTime: Date.now() + 3600000 * 12,
+    status: 'active',
+    participants: [
+      { name: '최*서', email: 'cho****@kakao.com', phone: '010-8XX1-XXX2', initial: 'C' }
+    ]
+  }
+];
+
 function loadActiveProducts() {
   if (cloudProductsCache !== null) {
     return cloudProductsCache;
   }
   const saved = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-  if (saved) {
+  if (saved !== null) {
     try {
       const products = JSON.parse(saved);
-      products.forEach(p => {
-        if (p.participants && Array.isArray(p.participants)) {
-          p.participants.forEach(pt => {
-            if (pt.name && !pt.name.includes('*') && !pt.name.includes('X')) {
-              pt.name = maskName(pt.name);
-            }
-            if (pt.email && !pt.email.includes('****') && !pt.email.includes('XXXX')) {
-              pt.email = maskEmail(pt.email);
-            }
-          });
-        }
-      });
-      return products;
+      if (Array.isArray(products)) {
+        products.forEach(p => {
+          if (p.participants && Array.isArray(p.participants)) {
+            p.participants.forEach(pt => {
+              if (pt.name && !pt.name.includes('*') && !pt.name.includes('X')) {
+                pt.name = maskName(pt.name);
+              }
+              if (pt.email && !pt.email.includes('****') && !pt.email.includes('XXXX')) {
+                pt.email = maskEmail(pt.email);
+              }
+            });
+          }
+        });
+        return products;
+      }
     } catch (e) {
       console.error('Failed to parse saved products:', e);
     }
   }
-  return [];
+  saveActiveProducts(DEFAULT_DEMO_PRODUCTS);
+  return DEFAULT_DEMO_PRODUCTS;
 }
 
 function saveActiveProducts(products) {
@@ -139,9 +188,16 @@ function getActiveProducts() {
   return loadActiveProducts();
 }
 
-async function addProduct({ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours }) {
+async function addProduct({ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours, timerMinutes }) {
   const id = 'prod_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
   const now = Date.now();
+
+  const hours = parseFloat(timerHours) || 0;
+  const minutes = parseFloat(timerMinutes) || 0;
+  let durationMs = (hours * 3600 + minutes * 60) * 1000;
+  if (durationMs <= 0) {
+    durationMs = 24 * 3600 * 1000; // fallback to 24 hours
+  }
 
   const newProduct = {
     id,
@@ -153,7 +209,9 @@ async function addProduct({ title, description, imageUrl, retailPrice, entryPric
     entryPrice: parseFloat(entryPrice) || 1,
     maxParticipants: parseInt(maxParticipants) || 100,
     currentParticipants: 0,
-    endTime: now + (parseFloat(timerHours) || 24) * 3600 * 1000,
+    endTime: now + durationMs,
+    timerHours: hours + minutes / 60,
+    timerMinutes: minutes,
     status: 'active',
     participants: [],
   };
@@ -242,9 +300,31 @@ function closeExpiredProduct(productId) {
   if (product.endTime > Date.now()) return null;
 
   if (!product.participants || product.participants.length === 0) {
+    const closedProduct = {
+      id: product.id,
+      title: product.title,
+      imageUrl: product.imageUrl,
+      retailPrice: product.retailPrice,
+      entryPrice: product.entryPrice,
+      status: 'closed',
+      ticketNumber: '#NONE',
+      totalParticipants: 0,
+      winner: {
+        name: '미당첨 (참여자 없음)',
+        email: '-',
+        phone: '-',
+      },
+      participants: [],
+      closedAt: Date.now(),
+    };
     activeProducts.splice(productIndex, 1);
     saveActiveProducts(activeProducts);
-    return null;
+
+    const closedProducts = loadClosedProducts();
+    closedProducts.unshift(closedProduct);
+    saveClosedProducts(closedProducts);
+
+    return closedProduct;
   }
 
   const winnerIndex = Math.floor(Math.random() * product.participants.length);
