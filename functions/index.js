@@ -271,7 +271,6 @@ exports.checkExpiredProducts = onSchedule(
     const now = Date.now();
     const productsSnap = await db
       .collection("products")
-      .where("status", "==", "active")
       .where("endTime", "<=", now)
       .get();
 
