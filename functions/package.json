@@ -2,7 +2,7 @@
   "name": "luckypick-functions",
   "description": "LuckyPick Cloud Functions Backend",
   "engines": {
-    "node": "18"
+    "node": "20"
   },
   "main": "index.js",
   "dependencies": {
