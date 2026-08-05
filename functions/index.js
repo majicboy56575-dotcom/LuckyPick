@@ -4,7 +4,6 @@
 // ============================================
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { beforeUserCreated } = require("firebase-functions/v2/identity");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -363,33 +362,31 @@ exports.checkExpiredProducts = onSchedule(
 );
 
 // ============================================
-// 6. onUserCreated (Auth Trigger)
-//    Automatically creates user document in Firestore
+// 6. onUserCreated (Auth Trigger - 1st Gen)
+//    Automatically creates user document in Firestore on new user signup
 // ============================================
-exports.onUserCreated = beforeUserCreated(
-  { region: "asia-northeast3" },
-  async (event) => {
-    const user = event.data;
-    const uid = user.uid;
-    const email = user.email || "";
-    const displayName = user.displayName || email.split("@")[0] || "사용자";
-    const provider =
-      user.providerData && user.providerData.length > 0
-        ? user.providerData[0].providerId
-        : "email";
+const functionsV1 = require("firebase-functions");
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .set({
-        uid,
-        displayName,
-        email,
-        provider,
-        isAdmin: email === ADMIN_EMAIL,
-        createdAt: Date.now(),
-      });
+exports.onUserCreated = functionsV1.region("asia-northeast3").auth.user().onCreate(async (user) => {
+  const uid = user.uid;
+  const email = user.email || "";
+  const displayName = user.displayName || email.split("@")[0] || "사용자";
+  const provider =
+    user.providerData && user.providerData.length > 0
+      ? user.providerData[0].providerId
+      : "email";
 
-    console.log(`[Auth] New user created: ${displayName} (${email})`);
-  }
-);
+  await db
+    .collection("users")
+    .doc(uid)
+    .set({
+      uid,
+      displayName,
+      email,
+      provider,
+      isAdmin: email === ADMIN_EMAIL,
+      createdAt: Date.now(),
+    });
+
+  console.log(`[Auth] New user created: ${displayName} (${email})`);
+});
