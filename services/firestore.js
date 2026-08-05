@@ -170,9 +170,7 @@ const DEFAULT_DEMO_PRODUCTS = [
 
 function getActiveProducts() {
   const now = Date.now();
-  const valid = activeProductsCache.filter((p) => p.endTime > now);
-  if (valid.length > 0) return valid;
-  return DEFAULT_DEMO_PRODUCTS;
+  return activeProductsCache.filter((p) => p.endTime > now);
 }
 
 function getClosedProducts() {

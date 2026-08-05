@@ -140,9 +140,17 @@ export function render() {
           </div>
         </div>
       </section>
-      <section class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-        ${products.map((p, i) => renderProductCard(p, i)).join('')}
-      </section>
+      ${products.length === 0 ? `
+        <div class="glass-card rounded-3xl p-12 text-center border border-outline-variant/30 bg-white">
+          <span class="material-symbols-outlined text-outline text-6xl mb-4 animate-pulse">hourglass_empty</span>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">현재 진행 중인 럭키드로우가 없습니다</h3>
+          <p class="text-on-surface-variant text-sm">새로운 프리미엄 상품이 등록될 예정이니 잠시만 기다려 주세요!</p>
+        </div>
+      ` : `
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+          ${products.map((p, i) => renderProductCard(p, i)).join('')}
+        </section>
+      `}
     </main>
     <div id="modal-container"></div>`;
 

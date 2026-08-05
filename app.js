@@ -1,13 +1,13 @@
 // ============================================
 // LuckyPick - Main App (SPA Router)
 // ============================================
-import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026080516';
-import { getCurrentAuthUser } from './services/auth.js?v=2026080516';
-import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=2026080516';
-import * as homePage from './pages/home.js?v=2026080516';
-import * as historyPage from './pages/history.js?v=2026080516';
-import * as profilePage from './pages/profile.js?v=2026080516';
-import * as adminPage from './pages/admin.js?v=2026080516';
+import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026080517';
+import { getCurrentAuthUser } from './services/auth.js?v=2026080517';
+import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=2026080517';
+import * as homePage from './pages/home.js?v=2026080517';
+import * as historyPage from './pages/history.js?v=2026080517';
+import * as profilePage from './pages/profile.js?v=2026080517';
+import * as adminPage from './pages/admin.js?v=2026080517';
 
 // --- State ---
 let currentPage = null;
