@@ -362,24 +362,22 @@ exports.checkExpiredProducts = onSchedule(
 );
 
 // ============================================
-// 6. onUserCreated (Auth Trigger - 1st Gen)
-//    Automatically creates user document in Firestore on new user signup
+// 6. createUserProfile (Callable) - Authenticated Users
+//    Ensures user document exists in Firestore on login/signup
 // ============================================
-const functionsV1 = require("firebase-functions");
+exports.createUserProfile = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const email = request.auth.token.email || "";
+  const displayName = request.auth.token.name || email.split("@")[0] || "사용자";
+  const provider = request.auth.token.firebase?.sign_in_provider || "email";
 
-exports.onUserCreated = functionsV1.region("asia-northeast3").auth.user().onCreate(async (user) => {
-  const uid = user.uid;
-  const email = user.email || "";
-  const displayName = user.displayName || email.split("@")[0] || "사용자";
-  const provider =
-    user.providerData && user.providerData.length > 0
-      ? user.providerData[0].providerId
-      : "email";
-
-  await db
-    .collection("users")
-    .doc(uid)
-    .set({
+  const userRef = db.collection("users").doc(uid);
+  const docSnap = await userRef.get();
+  if (!docSnap.exists) {
+    await userRef.set({
       uid,
       displayName,
       email,
@@ -387,6 +385,7 @@ exports.onUserCreated = functionsV1.region("asia-northeast3").auth.user().onCrea
       isAdmin: email === ADMIN_EMAIL,
       createdAt: Date.now(),
     });
-
-  console.log(`[Auth] New user created: ${displayName} (${email})`);
+    console.log(`[Auth] Created user profile: ${displayName} (${email})`);
+  }
+  return { success: true };
 });

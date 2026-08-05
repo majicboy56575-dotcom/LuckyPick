@@ -2,6 +2,7 @@
 // LuckyPick - Auth Service (Firebase Auth)
 // Uses real Firebase Auth only - no local mocks
 // ============================================
+import { createUserProfile } from './firestore.js';
 import { firebaseConfig, isFirebaseConfigured, isLocalDev } from '../firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import {
@@ -47,6 +48,7 @@ if (isFirebaseConfigured()) {
           provider: fbUser.providerData?.[0]?.providerId || 'email',
           isAdmin: fbUser.email === ADMIN_EMAIL,
         };
+        createUserProfile();
       } else {
         currentUser = null;
       }

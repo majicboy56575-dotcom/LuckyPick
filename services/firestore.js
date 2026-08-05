@@ -253,6 +253,16 @@ function getMockParticipants() {
 // ============================================
 // WRITE Functions (via Cloud Functions callable)
 // ============================================
+async function createUserProfile() {
+  if (!functions) return;
+  try {
+    const callable = httpsCallable(functions, 'createUserProfile');
+    await callable();
+  } catch (e) {
+    console.warn('[Firestore] Failed to sync user profile:', e);
+  }
+}
+
 async function addProduct(data) {
   if (!functions) throw new Error('Firebase Functions not initialized');
   const callable = httpsCallable(functions, 'addProduct');
@@ -322,6 +332,7 @@ export {
   getActiveProducts,
   getClosedProducts,
   getCurrentUser,
+  createUserProfile,
   addProduct,
   addParticipation,
   getMockParticipants,
