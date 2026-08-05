@@ -97,38 +97,38 @@ if (isFirebaseConfigured()) {
       }
     );
 
-    // ==========================================
-    // Real-time Listener: Shipping Infos
-    // ==========================================
-    onSnapshot(
-      collection(db, 'shipping_infos'),
-      (snapshot) => {
-        const infos = [];
-        snapshot.forEach((doc) => infos.push({ id: doc.id, ...doc.data() }));
-        infos.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
-        shippingCache = infos;
-        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-      },
-      (error) => {
-        console.warn('[Firestore] Shipping listener error:', error.message);
-      }
-    );
+    // Real-time Listener: Shipping Infos (Auth required)
+    window.addEventListener('authStateChanged', (e) => {
+      const user = e.detail?.user;
+      if (user && db) {
+        onSnapshot(
+          collection(db, 'shipping_infos'),
+          (snapshot) => {
+            const infos = [];
+            snapshot.forEach((doc) => infos.push({ id: doc.id, ...doc.data() }));
+            infos.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+            shippingCache = infos;
+            window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+          },
+          (error) => {
+            console.warn('[Firestore] Shipping listener warning:', error.message);
+          }
+        );
 
-    // ==========================================
-    // Real-time Listener: Users
-    // ==========================================
-    onSnapshot(
-      collection(db, 'users'),
-      (snapshot) => {
-        const users = [];
-        snapshot.forEach((doc) => users.push({ id: doc.id, ...doc.data() }));
-        usersCache = users;
-        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-      },
-      (error) => {
-        console.warn('[Firestore] Users listener error:', error.message);
+        onSnapshot(
+          collection(db, 'users'),
+          (snapshot) => {
+            const users = [];
+            snapshot.forEach((doc) => users.push({ id: doc.id, ...doc.data() }));
+            usersCache = users;
+            window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+          },
+          (error) => {
+            console.warn('[Firestore] Users listener warning:', error.message);
+          }
+        );
       }
-    );
+    });
   } catch (e) {
     console.warn('[Firestore Cloud Warning]', e);
   }

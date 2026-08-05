@@ -190,16 +190,18 @@ export function render() {
     targetProductId = hash.split('?product=')[1].split('&')[0];
   }
 
-  const selectedProduct = (activeProducts && activeProducts.length > 0)
+  const foundProduct = (activeProducts && activeProducts.length > 0)
     ? (activeProducts.find(p => p.id === targetProductId) || activeProducts[0])
-    : {
-        id: 'none',
-        title: '선택된 상품 없음',
-        category: 'NOTICE',
-        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
-        entryPrice: 0
-      };
-  const entryPrice = parseFloat(selectedProduct?.entryPrice) || 0;
+    : null;
+
+  const selectedProduct = foundProduct || {
+    id: 'none',
+    title: '선택된 상품 없음',
+    category: 'NOTICE',
+    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
+    entryPrice: 0
+  };
+  const entryPrice = parseFloat(selectedProduct.entryPrice) || 0;
   const fee = entryPrice > 0 ? 2.50 : 0;
   const totalAmount = (entryPrice + fee).toFixed(2);
 
