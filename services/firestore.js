@@ -1,18 +1,30 @@
 // ============================================
-// LuckyPick - Real-time Firebase Cloud Firestore Service
+// LuckyPick - Firestore Service (View-Only)
+// Frontend reads data via onSnapshot (real-time)
+// All writes go through Cloud Functions (httpsCallable)
 // ============================================
 import { getCurrentAuthUser } from './auth.js';
-import { firebaseConfig, isFirebaseConfigured } from '../firebase-config.js';
+import { firebaseConfig, isFirebaseConfigured, isLocalDev } from '../firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  onSnapshot 
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  connectFirestoreEmulator,
+  getDocs,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import {
+  getFunctions,
+  httpsCallable,
+  connectFunctionsEmulator,
+} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
+// ============================================
+// Demo fallback images
+// ============================================
 const DEMO_IMAGES = {
   iphone: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
   macbook: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCxUUfyWqhFIsZbUcBFd2JCg-NOyQRJyqyYwH9M8eLHclIkl2gH28CnfGU3GR5foFzd3NTw_PQRPMLgjfyH2ExaTvB4ISCfbInny9irRmimWOYwN-dsZFytzabb9q6D-dnwn79n3_5DxEs-zgTY0ygKbULxO9DdaNFo-Qc8wMHyhMAP0ziE-WVKVAofHXdkn030gEw69WNmQGS5yz4IbTFb_kxJJY90ZJ0e-xb3JA6WqhmUpjXH6cqqjRI1XkwSHfs1DIiU02uZFuQ',
@@ -24,469 +36,166 @@ const DEMO_IMAGES = {
   scooter: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA6BInNKjgO7u7uP6JW3JJhmHpDwhmBLDjL4sfi9hMzbclwxfgWx1-NA6ElPzpvSmCvbTigj4xkS-T7gVxhPp-7Itycm8uiLCA4tcDE0wQZHCdmF5Gekk75Zkpd7dCrYG2Fs6MOd8aEo588VSHMtBrOdzmlp5F-FWUk_XdcynkpBoYtZcC4zSCV5t2mHzHfhNPcIlk1_54vSJ2Z8ve2iZVwcmjfrvL0fmT9YZCURnZJVVG-hJTCTIboEE1IdP0QeIlprtAD0CRqqNQ',
 };
 
-const STORAGE_KEY_PRODUCTS = 'luckypick_active_products_v9';
-const STORAGE_KEY_CLOSED = 'luckypick_closed_products_v9';
-const STORAGE_KEY_SHIPPING = 'luckypick_shipping_infos_v9';
-
+// ============================================
+// Firebase initialization
+// ============================================
 let db = null;
-let cloudProductsCache = null;
-let cloudShippingCache = null;
+let functions = null;
+
+// Real-time caches (populated by onSnapshot listeners)
+let activeProductsCache = [];
+let closedProductsCache = [];
+let shippingCache = [];
+let usersCache = [];
 
 if (isFirebaseConfigured()) {
   try {
     const app = initializeApp(firebaseConfig);
     db = getFirestore(app);
-    console.log('[Firestore Cloud] Connected to Firestore project:', firebaseConfig.projectId);
+    functions = getFunctions(app, 'asia-northeast3');
 
-    // Realtime Listener for Active Products
-    onSnapshot(collection(db, 'products'), (snapshot) => {
-      const cloudProducts = [];
-      snapshot.forEach(doc => cloudProducts.push({ id: doc.id, ...doc.data() }));
-      cloudProductsCache = cloudProducts;
-      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(cloudProducts));
-      window.dispatchEvent(new CustomEvent('languageChanged'));
-    });
+    // Connect to emulators on localhost
+    if (isLocalDev()) {
+      connectFirestoreEmulator(db, '127.0.0.1', 8181);
+      connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+      console.log('[Firestore] Connected to LOCAL EMULATORS');
+    } else {
+      console.log('[Firestore] Connected to PRODUCTION');
+    }
 
-    // Realtime Listener for Shipping Infos
-    onSnapshot(collection(db, 'shipping_infos'), (snapshot) => {
-      const cloudShipping = [];
-      snapshot.forEach(doc => cloudShipping.push({ id: doc.id, ...doc.data() }));
-      cloudShippingCache = cloudShipping;
-      localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(cloudShipping));
-      window.dispatchEvent(new CustomEvent('languageChanged'));
-    });
+    // ==========================================
+    // Real-time Listener: Active Products
+    // ==========================================
+    onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const products = [];
+        snapshot.forEach((doc) => products.push({ id: doc.id, ...doc.data() }));
+        activeProductsCache = products;
+        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+      },
+      (error) => {
+        console.warn('[Firestore] Products listener error:', error.message);
+      }
+    );
+
+    // ==========================================
+    // Real-time Listener: Closed Products
+    // ==========================================
+    onSnapshot(
+      collection(db, 'closed_products'),
+      (snapshot) => {
+        const products = [];
+        snapshot.forEach((doc) => products.push({ id: doc.id, ...doc.data() }));
+        // Sort by closedAt descending
+        products.sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
+        closedProductsCache = products;
+        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+      },
+      (error) => {
+        console.warn('[Firestore] Closed products listener error:', error.message);
+      }
+    );
+
+    // ==========================================
+    // Real-time Listener: Shipping Infos
+    // ==========================================
+    onSnapshot(
+      collection(db, 'shipping_infos'),
+      (snapshot) => {
+        const infos = [];
+        snapshot.forEach((doc) => infos.push({ id: doc.id, ...doc.data() }));
+        infos.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        shippingCache = infos;
+        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+      },
+      (error) => {
+        console.warn('[Firestore] Shipping listener error:', error.message);
+      }
+    );
+
+    // ==========================================
+    // Real-time Listener: Users
+    // ==========================================
+    onSnapshot(
+      collection(db, 'users'),
+      (snapshot) => {
+        const users = [];
+        snapshot.forEach((doc) => users.push({ id: doc.id, ...doc.data() }));
+        usersCache = users;
+        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+      },
+      (error) => {
+        console.warn('[Firestore] Users listener error:', error.message);
+      }
+    );
   } catch (e) {
     console.warn('[Firestore Cloud Warning]', e);
   }
 }
 
-// --- Privacy Masking Helpers ---
-function maskName(name) {
-  if (!name) return '사용자';
-  name = name.trim();
-  if (/^[가-힣]+$/.test(name)) {
-    if (name.length === 2) return name[0] + 'X';
-    if (name.length >= 3) return name[0] + 'X'.repeat(name.length - 2) + name[name.length - 1];
-  }
-  const parts = name.split(' ');
-  if (parts.length >= 2) {
-    const first = parts[0];
-    const last = parts[parts.length - 1];
-    const maskedFirst = first.length > 2 ? first[0] + '***' + first[first.length - 1] : first[0] + '*';
-    const maskedLast = last[0] + '.';
-    return `${maskedFirst} ${maskedLast}`;
-  } else {
-    return name.length > 2 ? name[0] + '***' + name[name.length - 1] : name[0] + '*';
-  }
-}
-
-function maskEmail(email) {
-  if (!email) return 'usr****@example.com';
-  const parts = email.split('@');
-  if (parts.length < 2) return email;
-  const user = parts[0];
-  const domain = parts[1];
-  
-  let maskedUser = '';
-  if (user.length <= 3) {
-    maskedUser = user[0] + '***';
-  } else {
-    maskedUser = user.slice(0, 2) + '****' + user.slice(-1);
-  }
-  return `${maskedUser}@${domain}`;
-}
-
-const DEFAULT_DEMO_PRODUCTS = [
-  {
-    id: 'prod_demo_iphone',
-    title: 'iPhone 15 Pro 256GB',
-    description: 'Natural Titanium, 256GB',
-    category: 'TECH',
-    imageUrl: DEMO_IMAGES.iphone,
-    retailPrice: 1199,
-    entryPrice: 1,
-    maxParticipants: 100,
-    currentParticipants: 84,
-    endTime: Date.now() + 3600000 * 48,
-    status: 'active',
-    participants: [
-      { name: '김*민', email: 'maj****@gmail.com', phone: '010-4XX4-XXX7', initial: 'K' },
-      { name: '이*우', email: 'yuh****@naver.com', phone: '010-4XX0-XXX4', initial: 'L' }
-    ]
-  },
-  {
-    id: 'prod_demo_macbook',
-    title: 'MacBook Pro 16" M3 Max',
-    description: 'Space Black, 36GB RAM, 1TB SSD',
-    category: 'TECH',
-    imageUrl: DEMO_IMAGES.macbook,
-    retailPrice: 3499,
-    entryPrice: 5,
-    maxParticipants: 50,
-    currentParticipants: 42,
-    endTime: Date.now() + 3600000 * 24,
-    status: 'active',
-    participants: [
-      { name: '박*준', email: 'par****@gmail.com', phone: '010-2XX3-XXX9', initial: 'P' }
-    ]
-  },
-  {
-    id: 'prod_demo_watch',
-    title: 'Apple Watch Ultra 2',
-    description: 'Titanium Case with Trail Loop',
-    category: 'LUXURY',
-    imageUrl: DEMO_IMAGES.watch,
-    retailPrice: 799,
-    entryPrice: 1,
-    maxParticipants: 200,
-    currentParticipants: 195,
-    endTime: Date.now() + 3600000 * 12,
-    status: 'active',
-    participants: [
-      { name: '최*서', email: 'cho****@kakao.com', phone: '010-8XX1-XXX2', initial: 'C' }
-    ]
-  }
-];
-
-function loadActiveProducts() {
-  if (cloudProductsCache !== null) {
-    const now = Date.now();
-    return cloudProductsCache.filter(p => p.endTime > now);
-  }
-  const saved = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-  if (saved !== null) {
-    try {
-      const products = JSON.parse(saved);
-      if (Array.isArray(products)) {
-        const now = Date.now();
-        const active = [];
-        const expired = [];
-        products.forEach(p => {
-          if (p.endTime && p.endTime <= now) {
-            expired.push(p);
-          } else {
-            if (p.participants && Array.isArray(p.participants)) {
-              p.participants.forEach(pt => {
-                if (pt.name && !pt.name.includes('*') && !pt.name.includes('X')) {
-                  pt.name = maskName(pt.name);
-                }
-                if (pt.email && !pt.email.includes('****') && !pt.email.includes('XXXX')) {
-                  pt.email = maskEmail(pt.email);
-                }
-              });
-            }
-            active.push(p);
-          }
-        });
-
-        if (expired.length > 0) {
-          setTimeout(() => {
-            expired.forEach(p => closeExpiredProduct(p.id));
-          }, 0);
-        }
-
-        return active;
-      }
-    } catch (e) {
-      console.error('Failed to parse saved products:', e);
-    }
-  }
-  saveActiveProducts(DEFAULT_DEMO_PRODUCTS);
-  return DEFAULT_DEMO_PRODUCTS;
-}
-
-function saveActiveProducts(products) {
-  cloudProductsCache = products;
-  localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
-}
-
+// ============================================
+// READ Functions (from real-time cache)
+// ============================================
 function getActiveProducts() {
-  return loadActiveProducts();
-}
-
-async function addProduct({ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours, timerMinutes }) {
-  const id = 'prod_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  // Filter to only show products with endTime in the future
   const now = Date.now();
-
-  const hours = parseFloat(timerHours) || 0;
-  const minutes = parseFloat(timerMinutes) || 0;
-  let durationMs = (hours * 3600 + minutes * 60) * 1000;
-  if (durationMs <= 0) {
-    durationMs = 24 * 3600 * 1000; // fallback to 24 hours
-  }
-
-  const newProduct = {
-    id,
-    title,
-    description,
-    category: 'NEW',
-    imageUrl: imageUrl || DEMO_IMAGES.iphone,
-    retailPrice: parseFloat(retailPrice) || 0,
-    entryPrice: parseFloat(entryPrice) || 1,
-    maxParticipants: parseInt(maxParticipants) || 100,
-    currentParticipants: 0,
-    endTime: now + durationMs,
-    timerHours: hours + minutes / 60,
-    timerMinutes: minutes,
-    status: 'active',
-    participants: [],
-  };
-
-  if (db) {
-    try {
-      await setDoc(doc(db, 'products', id), newProduct);
-      console.log(`[Firestore Cloud] Product synced to Firestore DB: ${title}`);
-    } catch (e) {
-      console.warn('[Firestore Cloud Sync Exception]', e);
-    }
-  }
-
-  const products = loadActiveProducts();
-  products.unshift(newProduct);
-  saveActiveProducts(products);
-  return newProduct;
-}
-
-async function addParticipation({ productId, paymentId, payer }) {
-  const products = loadActiveProducts();
-  const product = products.find(p => p.id === productId);
-  if (!product) return null;
-
-  const authUser = getCurrentAuthUser();
-  const userName = authUser?.displayName || '사용자';
-  const userEmail = authUser?.email || 'user@luckypick.com';
-
-  const maskedName = maskName(userName);
-  const maskedEmail = maskEmail(userEmail);
-
-  const newParticipant = {
-    name: maskedName,
-    email: maskedEmail,
-    phone: '',
-    initial: userName ? userName.charAt(0).toUpperCase() : 'U'
-  };
-
-  if (product.currentParticipants < product.maxParticipants) {
-    product.currentParticipants += 1;
-    product.participants.unshift(newParticipant);
-    saveActiveProducts(products);
-
-    if (db) {
-      try {
-        await updateDoc(doc(db, 'products', productId), {
-          currentParticipants: product.currentParticipants,
-          participants: product.participants
-        });
-      } catch (e) {
-        console.warn('[Firestore Cloud Sync Exception]', e);
-      }
-    }
-  }
-
-  return product;
-}
-
-// --- Closed Products ---
-function loadClosedProducts() {
-  const saved = localStorage.getItem(STORAGE_KEY_CLOSED);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to parse closed products:', e);
-    }
-  }
-  return [];
-}
-
-function saveClosedProducts(products) {
-  localStorage.setItem(STORAGE_KEY_CLOSED, JSON.stringify(products));
+  return activeProductsCache.filter((p) => p.endTime > now);
 }
 
 function getClosedProducts() {
-  return loadClosedProducts();
-}
-
-function closeExpiredProduct(productId) {
-  const activeProducts = loadActiveProducts();
-  const productIndex = activeProducts.findIndex(p => p.id === productId);
-  if (productIndex === -1) return null;
-
-  const product = activeProducts[productIndex];
-  if (product.endTime > Date.now()) return null;
-
-  if (!product.participants || product.participants.length === 0) {
-    const closedProduct = {
-      id: product.id,
-      title: product.title,
-      imageUrl: product.imageUrl,
-      retailPrice: product.retailPrice,
-      entryPrice: product.entryPrice,
-      status: 'closed',
-      ticketNumber: '#NONE',
-      totalParticipants: 0,
-      winner: {
-        name: '미당첨 (참여자 없음)',
-        email: '-',
-        phone: '-',
-      },
-      participants: [],
-      closedAt: Date.now(),
-    };
-    activeProducts.splice(productIndex, 1);
-    saveActiveProducts(activeProducts);
-
-    const closedProducts = loadClosedProducts();
-    closedProducts.unshift(closedProduct);
-    saveClosedProducts(closedProducts);
-
-    return closedProduct;
-  }
-
-  const winnerIndex = Math.floor(Math.random() * product.participants.length);
-  const winner = product.participants[winnerIndex];
-
-  const ticketPrefix = product.title.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-  const ticketNum = String(Math.floor(Math.random() * 999)).padStart(3, '0');
-  const ticketNumber = `#${ticketPrefix}-${ticketNum}`;
-
-  const closedProduct = {
-    id: product.id,
-    title: product.title,
-    imageUrl: product.imageUrl,
-    retailPrice: product.retailPrice,
-    entryPrice: product.entryPrice,
-    status: 'closed',
-    ticketNumber,
-    totalParticipants: product.currentParticipants,
-    winner: {
-      name: winner.name,
-      email: winner.email,
-      phone: winner.phone || '',
-    },
-    participants: product.participants,
-    closedAt: Date.now(),
-  };
-
-  activeProducts.splice(productIndex, 1);
-  saveActiveProducts(activeProducts);
-
-  const closedProducts = loadClosedProducts();
-  closedProducts.unshift(closedProduct);
-  saveClosedProducts(closedProducts);
-
-  if (db) {
-    try {
-      updateDoc(doc(db, 'products', productId), { status: 'closed', winner, ticketNumber });
-    } catch (e) {
-      console.warn(e);
-    }
-  }
-
-  return closedProduct;
-}
-
-// --- Shipping Info Persistence & Cloud Sync ---
-function loadShippingInfos() {
-  if (cloudShippingCache !== null) {
-    return cloudShippingCache;
-  }
-  const saved = localStorage.getItem(STORAGE_KEY_SHIPPING);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      console.error('Failed to parse shipping infos:', e);
-    }
-  }
-  return [];
-}
-
-function saveShippingInfos(list) {
-  cloudShippingCache = list;
-  localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(list));
-}
-
-async function submitShippingInfo({ productId, productTitle, imageUrl, recipientName, recipientPhone, shippingAddress, zipCode }) {
-  const authUser = getCurrentAuthUser();
-  const list = loadShippingInfos();
-
-  const id = 'ship_' + Date.now();
-  const newInfo = {
-    id,
-    productId: productId || 'prod_closed_001',
-    productTitle: productTitle || '당첨 상품',
-    imageUrl: imageUrl || DEMO_IMAGES.iphone,
-    winnerName: authUser?.displayName || '당첨자',
-    winnerEmail: authUser?.email || 'winner@luckypick.com',
-    recipientName: recipientName || authUser?.displayName || '수령인',
-    recipientPhone: recipientPhone || '010-0000-0000',
-    shippingAddress: shippingAddress || '',
-    zipCode: zipCode || '',
-    status: 'pending',
-    submittedAt: Date.now(),
-  };
-
-  list.unshift(newInfo);
-  saveShippingInfos(list);
-
-  if (db) {
-    try {
-      await setDoc(doc(db, 'shipping_infos', id), newInfo);
-      console.log(`[Firestore Cloud] Shipping info synced for ${productTitle}`);
-    } catch (e) {
-      console.warn('[Firestore Cloud Sync Exception]', e);
-    }
-  }
-
-  return newInfo;
+  return closedProductsCache;
 }
 
 function getAllShippingInfos() {
-  return loadShippingInfos();
+  return shippingCache;
 }
 
-async function updateShippingStatus(shippingId, newStatus) {
-  const list = loadShippingInfos();
-  const item = list.find(s => s.id === shippingId);
-  if (item) {
-    item.status = newStatus;
-    saveShippingInfos(list);
-
-    if (db) {
-      try {
-        await updateDoc(doc(db, 'shipping_infos', shippingId), { status: newStatus });
-      } catch (e) {
-        console.warn(e);
-      }
-    }
-  }
-  return list;
+function getMembers() {
+  return usersCache.map((u) => ({
+    uid: u.uid,
+    name: u.displayName || '사용자',
+    email: u.email,
+    initials: (u.displayName || 'U').charAt(0).toUpperCase(),
+    joinDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-',
+    tickets: 0,
+    status: 'verified',
+    colors: 'from-primary to-primary-container',
+  }));
 }
 
-// --- User Data ---
 function getCurrentUser() {
   const authUser = getCurrentAuthUser();
   if (!authUser) return null;
 
-  const allShipping = loadShippingInfos();
-  const userShipping = allShipping.filter(s => s.winnerEmail === authUser.email || authUser.email === 'majicboy56575@gmail.com');
-  const closedProducts = loadClosedProducts();
-  const activeProducts = loadActiveProducts();
+  const callerEmail = authUser.email || '';
 
-  const wonProducts = closedProducts
-    .filter(p => p.winner && (p.winner.email === authUser.email || authUser.email === 'majicboy56575@gmail.com'))
-    .map(p => ({
+  // Won products from closed_products
+  const wonProducts = closedProductsCache
+    .filter(
+      (p) =>
+        p.winner &&
+        (p.winner.uid === authUser.uid ||
+          p.winner.email === callerEmail ||
+          callerEmail === 'majicboy56575@gmail.com')
+    )
+    .map((p) => ({
       id: p.id,
       title: p.title,
       imageUrl: p.imageUrl,
       drawDate: new Date(p.closedAt || Date.now()).toLocaleDateString(),
-      shippingSubmitted: userShipping.some(s => s.productId === p.id),
+      shippingSubmitted: shippingCache.some(
+        (s) => s.productId === p.id
+      ),
     }));
 
+  // Active products user participated in
   const participatedProducts = [];
-  activeProducts.forEach(p => {
-    if (p.participants && p.participants.some(pt => pt.email === authUser.email)) {
+  activeProductsCache.forEach((p) => {
+    if (
+      p.participants &&
+      p.participants.some((pt) => pt.uid === authUser.uid)
+    ) {
       participatedProducts.push({
         id: p.id,
         title: p.title,
@@ -508,43 +217,121 @@ function getCurrentUser() {
   };
 }
 
-function getMockParticipants(count) {
-  return [];
-}
-
 function getAdminStats() {
-  const activeProducts = loadActiveProducts();
-  const members = getMembers();
+  const activeProducts = getActiveProducts();
   return {
-    totalRevenue: activeProducts.reduce((sum, p) => sum + (p.currentParticipants * p.entryPrice), 0),
+    totalRevenue: activeProducts.reduce(
+      (sum, p) => sum + (p.currentParticipants || 0) * (p.entryPrice || 0),
+      0
+    ),
     activeDraws: activeProducts.length,
     activeCount: activeProducts.length,
-    totalMembers: members.length,
+    totalMembers: usersCache.length,
     newSignups: 0,
   };
 }
 
-function getMembers() {
-  return [];
-}
-
 function getAdminInventory() {
-  const activeProducts = loadActiveProducts();
-  return activeProducts.map(p => ({
+  const activeProducts = getActiveProducts();
+  return activeProducts.map((p) => ({
     title: p.title,
-    price: p.retailPrice,
+    price: p.retailPrice || 0,
     timeLeft: 'Active',
-    fill: Math.round((p.currentParticipants / p.maxParticipants) * 100),
+    fill: Math.round(
+      ((p.currentParticipants || 0) / (p.maxParticipants || 1)) * 100
+    ),
     image: p.imageUrl,
     badge: 'primary',
-    badgeText: 'Active'
+    badgeText: 'Active',
   }));
 }
 
+function getMockParticipants() {
+  return [];
+}
+
+// ============================================
+// WRITE Functions (via Cloud Functions callable)
+// ============================================
+async function addProduct(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'addProduct');
+  const result = await callable(data);
+  return result.data.product;
+}
+
+async function addParticipation(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'addParticipation');
+  const result = await callable(data);
+  return result.data;
+}
+
+async function submitShippingInfo(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'submitShippingInfo');
+  const result = await callable(data);
+  return result.data.shippingInfo;
+}
+
+async function updateShippingStatus(shippingId, newStatus) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'updateShippingStatus');
+  const result = await callable({ shippingId, newStatus });
+  return result.data;
+}
+
+// Privacy helpers (kept for display formatting)
+function maskName(name) {
+  if (!name) return '사용자';
+  name = name.trim();
+  if (/^[가-힣]+$/.test(name)) {
+    if (name.length === 2) return name[0] + 'X';
+    if (name.length >= 3)
+      return name[0] + 'X'.repeat(name.length - 2) + name[name.length - 1];
+  }
+  const parts = name.split(' ');
+  if (parts.length >= 2) {
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    const maskedFirst =
+      first.length > 2 ? first[0] + '***' + first[first.length - 1] : first[0] + '*';
+    const maskedLast = last[0] + '.';
+    return `${maskedFirst} ${maskedLast}`;
+  }
+  return name.length > 2
+    ? name[0] + '***' + name[name.length - 1]
+    : name[0] + '*';
+}
+
+function maskEmail(email) {
+  if (!email) return 'usr****@example.com';
+  const parts = email.split('@');
+  if (parts.length < 2) return email;
+  const user = parts[0];
+  const domain = parts[1];
+  let maskedUser =
+    user.length <= 3 ? user[0] + '***' : user.slice(0, 2) + '****' + user.slice(-1);
+  return `${maskedUser}@${domain}`;
+}
+
+// ============================================
+// Exports
+// ============================================
 export {
-  getActiveProducts, getClosedProducts, getCurrentUser,
-  addProduct, addParticipation, closeExpiredProduct, getMockParticipants, getAdminStats, getMembers, getAdminInventory,
-  submitShippingInfo, getAllShippingInfos, updateShippingStatus,
-  maskName, maskEmail,
-  DEMO_IMAGES
+  getActiveProducts,
+  getClosedProducts,
+  getCurrentUser,
+  addProduct,
+  addParticipation,
+  getMockParticipants,
+  getAdminStats,
+  getMembers,
+  getAdminInventory,
+  submitShippingInfo,
+  getAllShippingInfos,
+  updateShippingStatus,
+  maskName,
+  maskEmail,
+  DEMO_IMAGES,
 };

@@ -1,5 +1,6 @@
 // ============================================
 // LuckyPick - History Page (마감 상품 기록)
+// Reads from Firestore closed_products collection
 // ============================================
 import { t } from '../i18n.js';
 import { getClosedProducts } from '../services/firestore.js';
@@ -18,13 +19,13 @@ function renderParticipantsModal(product) {
           </button>
         </div>
         <div class="overflow-y-auto p-4 space-y-2">
-          ${product.participants.map((p, i) => {
+          ${(product.participants || []).map((p, i) => {
             const gradients = ['from-primary/20 to-surface-variant text-primary', 'from-secondary/20 to-surface-variant text-secondary', 'from-tertiary/20 to-surface-variant text-tertiary'];
             const gradient = gradients[i % 3];
             return `
               <div class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-low transition-colors group">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-full bg-gradient-to-br ${gradient} border border-outline-variant/30 flex items-center justify-center font-label-caps">${p.initial}</div>
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br ${gradient} border border-outline-variant/30 flex items-center justify-center font-label-caps">${p.initial || 'U'}</div>
                   <div>
                     <p class="font-body-md text-body-md font-semibold">${p.name}</p>
                     <p class="text-[12px] text-on-surface-variant">${p.email}</p>
@@ -54,7 +55,7 @@ function renderHistoryCard(product) {
         <div class="absolute bottom-0 w-full bg-primary/90 text-on-primary py-3 px-4 glass-panel">
           <div class="flex items-center justify-between">
             <span class="font-label-caps text-label-caps opacity-80 uppercase">${t('winnerAnnouncement')}</span>
-            <span class="font-timer-numeric text-timer-numeric">${product.ticketNumber}</span>
+            <span class="font-timer-numeric text-timer-numeric">${product.ticketNumber || '#---'}</span>
           </div>
         </div>
       </div>
@@ -68,13 +69,13 @@ function renderHistoryCard(product) {
             <span class="font-headline-sm text-[16px] text-primary">${t('winnerIdentified')}</span>
           </div>
           <p class="font-body-md text-body-md text-on-surface leading-relaxed">
-            ${product.winner.name}, ${product.winner.email}, ${product.winner.phone}
+            ${product.winner?.name || '미정'}, ${product.winner?.email || '-'}, ${product.winner?.phone || '-'}
           </p>
         </div>
         <div class="mt-auto flex items-center justify-between">
           <div class="flex items-center gap-2 text-on-surface-variant">
             <span class="material-symbols-outlined text-[20px]">groups</span>
-            <span class="font-label-caps text-label-caps">${product.totalParticipants.toLocaleString()} ${t('participants')}</span>
+            <span class="font-label-caps text-label-caps">${(product.totalParticipants || 0).toLocaleString()} ${t('participants')}</span>
           </div>
           <button class="flex items-center gap-1 text-primary font-label-caps text-label-caps hover:underline cursor-pointer" onclick="window.__showHistoryParticipants('${product.id}')">
             ${t('viewList')}
@@ -94,14 +95,22 @@ export function render() {
         <h1 class="font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-2">${t('historyTitle')}</h1>
         <p class="font-body-lg text-body-lg text-on-surface-variant">${t('historySubtitle')}</p>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-        ${products.map(p => renderHistoryCard(p)).join('')}
-      </div>
+      ${products.length === 0 ? `
+        <div class="glass-card rounded-2xl p-12 text-center">
+          <span class="material-symbols-outlined text-outline text-6xl mb-4">history</span>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">아직 마감된 상품이 없습니다</h3>
+          <p class="text-on-surface-variant">상품 타이머가 종료되면 자동으로 당첨자가 추첨되고 여기에 표시됩니다.</p>
+        </div>
+      ` : `
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+          ${products.map(p => renderHistoryCard(p)).join('')}
+        </div>
+      `}
     </main>
     <div id="history-modal-container"></div>`;
 
   window.__showHistoryParticipants = (productId) => {
-    const product = products.find(p => p.id === productId);
+    const product = products.find((p) => p.id === productId);
     if (!product) return;
     document.getElementById('history-modal-container').innerHTML = renderParticipantsModal(product);
   };

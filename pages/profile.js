@@ -190,9 +190,18 @@ export function render() {
     targetProductId = hash.split('?product=')[1].split('&')[0];
   }
 
-  const selectedProduct = activeProducts.find(p => p.id === targetProductId) || activeProducts[0];
-  const fee = 2.50;
-  const totalAmount = (selectedProduct.entryPrice + fee).toFixed(2);
+  const selectedProduct = (activeProducts && activeProducts.length > 0)
+    ? (activeProducts.find(p => p.id === targetProductId) || activeProducts[0])
+    : {
+        id: 'none',
+        title: '선택된 상품 없음',
+        category: 'NOTICE',
+        imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDInImRq6nHkc5sQlW8mTRqlVCDlvHkXGQ5Q2SMhcMfsfL3EbPadFp5hMs_43gK7EuuknOLhxoGyQ54x3QQn6-TMJ1yczkGdlg8F78qUmV74V5NBNG3swH45-CO1KMNpZHM1L4YW5ONFlk955abW7Hr36dojBQgBayXYl8kUovUK0gM6BrRAt6zsSn1pFTmBZl7s5ympvKZxStQmkpljld4JJs7LlmPcLO6WDHpdcE5hjy-oa0lzWcZdOgIY8kp2aOrQM7EzR7VHxw',
+        entryPrice: 0
+      };
+  const entryPrice = parseFloat(selectedProduct?.entryPrice) || 0;
+  const fee = entryPrice > 0 ? 2.50 : 0;
+  const totalAmount = (entryPrice + fee).toFixed(2);
 
   const html = `
     <main class="pt-24 px-4 max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-32 page-enter">
@@ -422,18 +431,22 @@ export function render() {
     renderPayPalButtons('paypal-button-container', {
       amount: parseFloat(totalAmount),
       orderName: `LuckyPick ${selectedProduct.title} Ticket`,
-      onSuccess: (payment) => {
-        const updatedProduct = addParticipation({
-          productId: selectedProduct.id,
-          paymentId: payment.paymentId,
-          payer: payment.payer
-        });
+      onSuccess: async (payment) => {
+        try {
+          const result = await addParticipation({
+            productId: selectedProduct.id,
+            paymentId: payment.paymentId,
+          });
 
-        const countText = updatedProduct ? `${updatedProduct.currentParticipants}/${updatedProduct.maxParticipants}` : '';
+          const countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
 
-        alert(`🎉 PayPal Sandbox 결제 성공!\n\nTransaction ID: ${payment.paymentId}\nStatus: ${payment.status}\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
+          alert(`🎉 PayPal Sandbox 결제 성공!\n\nTransaction ID: ${payment.paymentId}\nStatus: ${payment.status}\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
 
-        window.location.hash = '#home';
+          window.location.hash = '#home';
+        } catch (err) {
+          console.error('Participation error:', err);
+          alert(`참여 등록 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+        }
       },
       onError: (err) => {
         console.error('PayPal Error:', err);
@@ -456,17 +469,21 @@ export function render() {
     }
   };
 
-  window.__triggerStandardPay = () => {
-    const updatedProduct = addParticipation({
-      productId: selectedProduct.id,
-      paymentId: 'mock_' + Date.now(),
-      payer: null
-    });
+  window.__triggerStandardPay = async () => {
+    try {
+      const result = await addParticipation({
+        productId: selectedProduct.id,
+        paymentId: 'pay_' + Date.now(),
+      });
 
-    const countText = updatedProduct ? `${updatedProduct.currentParticipants}/${updatedProduct.maxParticipants}` : '';
-    alert(`🎉 결제가 완료되었습니다! (Mock Payment Success)\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
+      const countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
+      alert(`🎉 결제가 완료되었습니다!\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
 
-    window.location.hash = '#home';
+      window.location.hash = '#home';
+    } catch (err) {
+      console.error('Participation error:', err);
+      alert(`참여 등록 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+    }
   };
 
   window.__openShippingModal = (productId) => {
@@ -476,7 +493,7 @@ export function render() {
   window.__closeShippingModal = () => {
     document.getElementById('shipping-modal-container').innerHTML = '';
   };
-  window.__submitShipping = (productId, productTitle, imageUrl) => {
+  window.__submitShipping = async (productId, productTitle, imageUrl) => {
     const recipientName = document.getElementById('ship-name')?.value.trim();
     const recipientPhone = document.getElementById('ship-phone')?.value.trim();
     const shippingAddress = document.getElementById('ship-address')?.value.trim();
@@ -487,19 +504,23 @@ export function render() {
       return;
     }
 
-    submitShippingInfo({
-      productId: productId || 'prod_closed_001',
-      productTitle: productTitle || '당첨 상품',
-      imageUrl: imageUrl || '',
-      recipientName,
-      recipientPhone,
-      shippingAddress,
-      zipCode,
-    });
+    try {
+      await submitShippingInfo({
+        productId: productId || '',
+        productTitle: productTitle || '당첨 상품',
+        imageUrl: imageUrl || '',
+        recipientName,
+        recipientPhone,
+        shippingAddress,
+        zipCode,
+      });
 
-    alert('🎉 배송 정보가 성공적으로 제출되었습니다!\n관리자 페이지로 정보가 전달되어 관리자가 확인 후 배송을 진행합니다.');
-    window.__closeShippingModal();
-    window.dispatchEvent(new CustomEvent('languageChanged'));
+      alert('🎉 배송 정보가 성공적으로 제출되었습니다!\n관리자 페이지로 정보가 전달되어 관리자가 확인 후 배송을 진행합니다.');
+      window.__closeShippingModal();
+    } catch (err) {
+      console.error('Shipping submission error:', err);
+      alert(`배송 정보 제출 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+    }
   };
 
   return html;

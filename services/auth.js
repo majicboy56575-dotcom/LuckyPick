@@ -1,177 +1,135 @@
 // ============================================
-// LuckyPick - Auth Service (Firebase Enabled)
+// LuckyPick - Auth Service (Firebase Auth)
+// Uses real Firebase Auth only - no local mocks
 // ============================================
-import { firebaseConfig, isFirebaseConfigured } from '../firebase-config.js';
+import { firebaseConfig, isFirebaseConfigured, isLocalDev } from '../firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut as firebaseSignOut 
+import {
+  getAuth,
+  signInWithPopup,
+  GoogleAuthProvider,
+  OAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  signOut as firebaseSignOut,
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  connectAuthEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 
-const AUTH_STORAGE_KEY = 'luckypick_auth_user';
+const ADMIN_EMAIL = 'majicboy56575@gmail.com';
 
 let firebaseApp = null;
 let firebaseAuth = null;
+let currentUser = null;
 
 if (isFirebaseConfigured()) {
   try {
     firebaseApp = initializeApp(firebaseConfig);
     firebaseAuth = getAuth(firebaseApp);
-    console.log('[Firebase] Real SDK Initialized with project:', firebaseConfig.projectId);
+
+    // Connect to Auth Emulator on localhost
+    if (isLocalDev()) {
+      connectAuthEmulator(firebaseAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      console.log('[Firebase Auth] Connected to LOCAL EMULATOR (port 9099)');
+    } else {
+      console.log('[Firebase Auth] Connected to PRODUCTION');
+    }
+
+    // Listen for real-time auth state changes
+    firebaseOnAuthStateChanged(firebaseAuth, (fbUser) => {
+      if (fbUser) {
+        currentUser = {
+          uid: fbUser.uid,
+          displayName: fbUser.displayName || fbUser.email?.split('@')[0] || '사용자',
+          email: fbUser.email || '',
+          photoURL: fbUser.photoURL,
+          provider: fbUser.providerData?.[0]?.providerId || 'email',
+          isAdmin: fbUser.email === ADMIN_EMAIL,
+        };
+      } else {
+        currentUser = null;
+      }
+      window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { user: currentUser } }));
+      window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+    });
   } catch (e) {
     console.error('[Firebase] SDK Initialization error:', e);
   }
 }
 
-function getStoredUser() {
-  try {
-    const data = localStorage.getItem(AUTH_STORAGE_KEY);
-    return data ? JSON.parse(data) : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-let currentUser = getStoredUser();
-
-function saveUser(user) {
-  currentUser = user;
-  if (user) {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  }
-  window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { user } }));
-}
-
 // --- Email Auth Functions ---
 async function signUpWithEmail(email, password, displayName) {
-  if (firebaseAuth) {
-    try {
-      const res = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      const fbUser = res.user;
-      const user = {
-        uid: fbUser.uid,
-        displayName: displayName || fbUser.email.split('@')[0],
-        email: fbUser.email,
-        photoURL: null,
-        provider: 'email',
-        isAdmin: fbUser.email === 'majicboy56575@gmail.com',
-      };
-      saveUser(user);
-      return user;
-    } catch (err) {
-      console.warn('Firebase Email Sign-Up Notice:', err.code, err.message);
-      if (err.code === 'auth/email-already-in-use') {
-        throw new Error('이미 가입된 이메일 주소입니다. 로그인해주세요.');
-      }
-      if (err.code === 'auth/weak-password') {
-        throw new Error('비밀번호는 6자리 이상이어야 합니다.');
-      }
-      // If API key restriction or invalid key error, fallback to local user creation for seamless testing
-      console.log('[Auth Fallback] Creating local user account for testing:', email);
-    }
+  if (!firebaseAuth) throw new Error('Firebase Auth not initialized');
+
+  const res = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+  if (displayName) {
+    await updateProfile(res.user, { displayName });
   }
-  const user = {
-    uid: 'user_email_' + Date.now(),
+
+  currentUser = {
+    uid: res.user.uid,
     displayName: displayName || email.split('@')[0],
-    email: email,
+    email: res.user.email,
     photoURL: null,
     provider: 'email',
-    isAdmin: email.includes('admin') || email === 'majicboy56575@gmail.com',
+    isAdmin: res.user.email === ADMIN_EMAIL,
   };
-  saveUser(user);
-  return user;
+  return currentUser;
 }
 
 async function signInWithEmail(email, password) {
-  if (firebaseAuth) {
-    try {
-      const res = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      const fbUser = res.user;
-      const user = {
-        uid: fbUser.uid,
-        displayName: fbUser.displayName || fbUser.email.split('@')[0],
-        email: fbUser.email,
-        photoURL: fbUser.photoURL,
-        provider: 'email',
-        isAdmin: fbUser.email === 'majicboy56575@gmail.com',
-      };
-      saveUser(user);
-      return user;
-    } catch (err) {
-      console.warn('Firebase Email Login Notice:', err.code, err.message);
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
-      }
-      // Fallback to local auth for testing if API Key is restricted
-      console.log('[Auth Fallback] Logging in local user for testing:', email);
-    }
-  }
-  const user = {
-    uid: 'user_email_' + Date.now(),
-    displayName: email.split('@')[0],
-    email: email,
-    photoURL: null,
+  if (!firebaseAuth) throw new Error('Firebase Auth not initialized');
+
+  const res = await signInWithEmailAndPassword(firebaseAuth, email, password);
+  currentUser = {
+    uid: res.user.uid,
+    displayName: res.user.displayName || res.user.email.split('@')[0],
+    email: res.user.email,
+    photoURL: res.user.photoURL,
     provider: 'email',
-    isAdmin: email.includes('admin') || email === 'majicboy56575@gmail.com',
+    isAdmin: res.user.email === ADMIN_EMAIL,
   };
-  saveUser(user);
-  return user;
+  return currentUser;
 }
 
-// --- Social & Guest Auth ---
+// --- Social Auth ---
 async function signInWithGoogle() {
-  if (firebaseAuth) {
-    try {
-      const provider = new GoogleAuthProvider();
-      const res = await signInWithPopup(firebaseAuth, provider);
-      const fbUser = res.user;
-      const user = {
-        uid: fbUser.uid,
-        displayName: fbUser.displayName || 'Google 사용자',
-        email: fbUser.email,
-        photoURL: fbUser.photoURL,
-        provider: 'google',
-        isAdmin: fbUser.email === 'majicboy56575@gmail.com',
-      };
-      saveUser(user);
-      return user;
-    } catch (err) {
-      console.warn('Firebase Google Login error / fallback to mock:', err);
-    }
-  }
-  const user = {
-    uid: 'user_google_' + Date.now(),
-    displayName: '박윤우',
-    email: 'majicboy56575@gmail.com',
-    photoURL: null,
+  if (!firebaseAuth) throw new Error('Firebase Auth not initialized');
+
+  const provider = new GoogleAuthProvider();
+  const res = await signInWithPopup(firebaseAuth, provider);
+  currentUser = {
+    uid: res.user.uid,
+    displayName: res.user.displayName || 'Google 사용자',
+    email: res.user.email,
+    photoURL: res.user.photoURL,
     provider: 'google',
-    isAdmin: true,
+    isAdmin: res.user.email === ADMIN_EMAIL,
   };
-  saveUser(user);
-  return user;
+  return currentUser;
 }
 
 async function signInWithApple() {
-  const user = {
-    uid: 'user_apple_' + Date.now(),
-    displayName: '박윤우 (Apple)',
-    email: 'majicboy56575@apple.com',
-    photoURL: null,
+  if (!firebaseAuth) throw new Error('Firebase Auth not initialized');
+
+  const provider = new OAuthProvider('apple.com');
+  const res = await signInWithPopup(firebaseAuth, provider);
+  currentUser = {
+    uid: res.user.uid,
+    displayName: res.user.displayName || 'Apple 사용자',
+    email: res.user.email,
+    photoURL: res.user.photoURL,
     provider: 'apple',
-    isAdmin: false,
+    isAdmin: res.user.email === ADMIN_EMAIL,
   };
-  saveUser(user);
-  return user;
+  return currentUser;
 }
 
 async function continueAsGuest() {
-  const user = {
+  // Guest mode: create anonymous-style local object (no Firebase anonymous auth to avoid cluttering)
+  // Note: Guests cannot participate in draws (requires real auth for Cloud Functions calls)
+  currentUser = {
     uid: 'guest_' + Date.now(),
     displayName: '게스트 사용자',
     email: 'guest@luckypick.com',
@@ -179,8 +137,9 @@ async function continueAsGuest() {
     provider: 'guest',
     isAdmin: false,
   };
-  saveUser(user);
-  return user;
+  window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { user: currentUser } }));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  return currentUser;
 }
 
 async function signOut() {
@@ -191,7 +150,9 @@ async function signOut() {
       console.error('Firebase Sign-out error:', e);
     }
   }
-  saveUser(null);
+  currentUser = null;
+  window.dispatchEvent(new CustomEvent('authStateChanged', { detail: { user: null } }));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
 }
 
 function getCurrentAuthUser() {

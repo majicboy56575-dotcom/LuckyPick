@@ -75,3 +75,174 @@
 ### 다국어 토글 (Multi-language Toggle)
 - 헤더에 중첩되거나 플로팅 형태의 세그먼트 컨트롤
 - KO, EN, TH 간 자연스러운 슬라이드 애니메이션과 대비 높은 선택 상태 제공
+
+---
+
+## 시스템 아키텍처 (Architecture)
+
+본 앱은 **프론트엔드(View) / 백엔드(Cloud Functions)** 분리 구조를 따릅니다.
+
+```
+┌─────────────────────────────────────┐
+│  Frontend (Firebase Hosting)        │
+│  - HTML/CSS/JS (SPA)                │
+│  - Firestore onSnapshot (읽기 전용) │
+│  - Cloud Functions httpsCallable    │
+│    (쓰기 요청)                       │
+└──────────────┬──────────────────────┘
+               │ HTTPS
+┌──────────────▼──────────────────────┐
+│  Backend (Firebase Cloud Functions)  │
+│  - addProduct (관리자 전용)           │
+│  - addParticipation (회원 전용)       │
+│  - submitShippingInfo (당첨자)        │
+│  - updateShippingStatus (관리자)      │
+│  - checkExpiredProducts (매 1분 자동) │
+│  - onUserCreated (회원가입 트리거)    │
+└──────────────┬──────────────────────┘
+               │ Admin SDK
+┌──────────────▼──────────────────────┐
+│  Database (Cloud Firestore)          │
+│  - products (진행 중 상품)            │
+│  - closed_products (마감 상품)        │
+│  - shipping_infos (배송 정보)         │
+│  - users (회원 정보)                  │
+└─────────────────────────────────────┘
+```
+
+### 핵심 원칙
+- **프론트엔드는 화면 렌더링만** 담당 (Firestore 실시간 구독으로 데이터 수신)
+- **모든 데이터 쓰기는 Cloud Functions를 통해** 서버에서 처리
+- **클라이언트의 직접 Firestore 쓰기는 Security Rules로 완전 차단**
+- **타이머 만료 및 당첨자 추첨은 서버 Scheduled Function이 자동 수행** (브라우저를 닫아도 실행됨)
+
+---
+
+## Cloud Functions API 명세
+
+### 1. `addProduct` (HTTPS Callable)
+- **권한**: 관리자(ADMIN_EMAIL)만 호출 가능
+- **입력**: `{ title, description, imageUrl, retailPrice, entryPrice, maxParticipants, timerHours, timerMinutes }`
+- **처리**: 입력 검증 → `products` 컬렉션에 `status: 'active'`로 저장
+- **출력**: `{ success: true, product: {...} }`
+
+### 2. `addParticipation` (HTTPS Callable)
+- **권한**: 인증된 사용자만 호출 가능
+- **입력**: `{ productId, paymentId }`
+- **처리**: Firestore Transaction으로 중복 참여 검증, 인원 초과 검증, 마감 여부 확인 후 참여 등록
+- **출력**: `{ success: true, currentParticipants, maxParticipants }`
+
+### 3. `submitShippingInfo` (HTTPS Callable)
+- **권한**: 인증된 사용자만 호출 가능
+- **입력**: `{ productId, productTitle, imageUrl, recipientName, recipientPhone, shippingAddress, zipCode }`
+- **처리**: 서버에서 입력 검증 후 `shipping_infos` 컬렉션에 저장
+- **출력**: `{ success: true, shippingInfo: {...} }`
+
+### 4. `updateShippingStatus` (HTTPS Callable)
+- **권한**: 관리자만 호출 가능
+- **입력**: `{ shippingId, newStatus }`
+- **처리**: 관리자 권한 검증 후 배송 상태 업데이트
+- **출력**: `{ success: true }`
+
+### 5. `checkExpiredProducts` (Scheduled - 매 1분)
+- **트리거**: Cloud Scheduler에 의해 매 1분 자동 실행
+- **처리**: `products` 컬렉션에서 `status == 'active'` & `endTime <= now`인 상품 탐색 → 참여자 중 무작위 당첨자 선정 → `closed_products` 컬렉션으로 이동 → 원본 삭제
+- **출력**: 콘솔 로그
+
+### 6. `onUserCreated` (Auth Trigger)
+- **트리거**: Firebase Auth에 새 사용자 생성 시 자동 실행
+- **처리**: `users` 컬렉션에 사용자 프로필 문서 자동 생성
+
+---
+
+## Firestore 데이터 구조
+
+### `products` (진행 중 상품)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | string | 상품 고유 ID |
+| title | string | 상품명 |
+| description | string | 설명 |
+| category | string | 카테고리 |
+| imageUrl | string | 상품 이미지 URL |
+| retailPrice | number | 정가 (USD) |
+| entryPrice | number | 참여 티켓 가격 (USD) |
+| maxParticipants | number | 최대 참여 인원 |
+| currentParticipants | number | 현재 참여 인원 |
+| endTime | number | 마감 시각 (Unix ms) |
+| status | string | 상태 (`'active'`) |
+| participants | array | 참여자 배열 `[{uid, name, email, initial, joinedAt}]` |
+| createdAt | number | 생성 시각 (Unix ms) |
+
+### `closed_products` (마감 상품)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | string | 상품 고유 ID |
+| title | string | 상품명 |
+| imageUrl | string | 상품 이미지 URL |
+| retailPrice | number | 정가 (USD) |
+| entryPrice | number | 참여 티켓 가격 (USD) |
+| status | string | 상태 (`'closed'`) |
+| ticketNumber | string | 당첨 티켓 번호 (예: `#IP-042`) |
+| totalParticipants | number | 총 참여 인원 |
+| winner | object | 당첨자 `{name, email, phone, uid}` |
+| participants | array | 참여자 전체 배열 |
+| closedAt | number | 마감 처리 시각 (Unix ms) |
+
+### `shipping_infos` (배송 정보)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | string | 배송 정보 고유 ID |
+| productId | string | 연결 상품 ID |
+| productTitle | string | 상품명 |
+| winnerUid | string | 당첨자 UID |
+| winnerName | string | 당첨자 이름 |
+| winnerEmail | string | 당첨자 이메일 |
+| recipientName | string | 수령인 이름 |
+| recipientPhone | string | 수령인 연락처 |
+| shippingAddress | string | 배송 주소 |
+| zipCode | string | 우편번호 |
+| status | string | 상태 (`'pending'` / `'shipped'`) |
+| submittedAt | number | 제출 시각 (Unix ms) |
+
+### `users` (회원 정보)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| uid | string | Firebase Auth UID |
+| displayName | string | 표시 이름 |
+| email | string | 이메일 |
+| provider | string | 인증 제공자 (`'google'`, `'email'`, `'apple'`) |
+| isAdmin | boolean | 관리자 여부 |
+| createdAt | number | 가입 시각 (Unix ms) |
+
+---
+
+## Firestore Security Rules
+
+```
+- products: 읽기 전체 허용, 쓰기 차단 (Cloud Functions Admin SDK만 가능)
+- closed_products: 읽기 전체 허용, 쓰기 차단
+- shipping_infos: 인증 사용자만 읽기, 쓰기 차단
+- users: 본인 또는 관리자만 읽기, 쓰기 차단
+```
+
+---
+
+## 화면별 데이터 흐름
+
+### 홈 (진행 중 상품)
+`Firestore products (onSnapshot)` → 프론트 캐시 → 카드 렌더링 + 타이머 표시
+- 타이머 0 도달 시: 화면만 갱신 (서버가 자동 마감 처리)
+
+### 지난 기록 (마감 상품)
+`Firestore closed_products (onSnapshot)` → 프론트 캐시 → 카드 렌더링
+- 서버가 매분 만료 상품을 자동으로 이 컬렉션에 이동
+
+### 프로필/결제
+- 참여 등록: `httpsCallable('addParticipation')` → 서버 Transaction
+- 배송 정보: `httpsCallable('submitShippingInfo')` → 서버 검증 후 저장
+
+### 관리자 페이지
+- 상품 등록: `httpsCallable('addProduct')` → 서버에서 관리자 권한 검증
+- 배송 관리: `httpsCallable('updateShippingStatus')` → 서버에서 관리자 권한 검증
+- 통계/회원: `Firestore products, users (onSnapshot)` → 실시간 데이터 기반 계산

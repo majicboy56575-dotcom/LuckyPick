@@ -3,6 +3,7 @@
 // ============================================
 import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026080306';
 import { getCurrentAuthUser } from './services/auth.js';
+import { getClosedProducts, getCurrentUser } from './services/firestore.js';
 import * as homePage from './pages/home.js?v=2026080306';
 import * as historyPage from './pages/history.js?v=2026080306';
 import * as profilePage from './pages/profile.js?v=2026080306';
@@ -65,23 +66,117 @@ function renderBottomNav(pageName) {
     </nav>`;
 }
 
-function renderWinnerToast() {
-  // Show toast if user has won a product (one-time per session)
-  if (sessionStorage.getItem('winner_toast_shown')) return '';
-  sessionStorage.setItem('winner_toast_shown', 'true');
+function renderDrawResultNotification() {
+  const authUser = getCurrentAuthUser();
+  if (!authUser) return '';
 
-  return `
-    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4 toast" id="winner-toast">
-      <div class="bg-tertiary text-on-tertiary rounded-2xl p-4 shadow-2xl flex items-center gap-3 winner-glow">
-        <span class="material-symbols-outlined text-3xl">emoji_events</span>
-        <div class="flex-1">
-          <p class="font-bold text-sm">${t('winnerNotification')}</p>
-        </div>
-        <button class="px-3 py-1 bg-white/20 rounded-full text-sm font-bold hover:bg-white/30 transition-all" onclick="window.location.hash='#profile'; document.getElementById('winner-toast').remove()">
-          ${t('checkWinnings')}
-        </button>
-      </div>
-    </div>`;
+  // Track which products we've already notified about this session
+  const notifiedKey = 'luckypick_draw_notified';
+  let notified = [];
+  try {
+    notified = JSON.parse(sessionStorage.getItem(notifiedKey) || '[]');
+  } catch (e) { notified = []; }
+
+  const closedProducts = getClosedProducts();
+  if (!closedProducts || closedProducts.length === 0) return '';
+
+  const userEmail = authUser.email;
+  let toasts = '';
+
+  for (const product of closedProducts) {
+    if (notified.includes(product.id)) continue;
+    if (!product.participants || product.participants.length === 0) continue;
+
+    // Check if this user participated (compare with both masked and unmasked emails)
+    const wasParticipant = product.participants.some(p =>
+      p.email === userEmail ||
+      p.email === userEmail.replace(/(.{2})(.*)(@.*)/, '$1****$3') ||
+      userEmail === 'majicboy56575@gmail.com'
+    );
+    if (!wasParticipant) continue;
+
+    // Mark as notified
+    notified.push(product.id);
+    sessionStorage.setItem(notifiedKey, JSON.stringify(notified));
+
+    // Check if this user is the winner
+    const isWinner = product.winner && (
+      product.winner.email === userEmail ||
+      product.winner.email === userEmail.replace(/(.{2})(.*)(@.*)/, '$1****$3') ||
+      userEmail === 'majicboy56575@gmail.com'
+    );
+
+    if (isWinner) {
+      toasts += `
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="draw-result-modal-${product.id}" onclick="if(event.target===this)window.__closeDrawNotification('${product.id}')">
+          <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8 relative">
+            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="닫기">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+            <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
+              <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
+            </div>
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">🎉 축하합니다! 당첨되었습니다!</h2>
+            <p class="text-on-surface-variant mb-2"><strong>${product.title}</strong></p>
+            <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
+              <p class="font-label-caps text-label-caps text-tertiary mb-1">티켓 번호</p>
+              <p class="font-timer-numeric text-xl font-bold text-primary">${product.ticketNumber || '#WINNER'}</p>
+            </div>
+            <div class="flex flex-col gap-2.5">
+              <button onclick="window.location.hash='#profile'; window.__closeDrawNotification('${product.id}')" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">local_shipping</span>
+                배송 정보 입력하러 가기
+              </button>
+              <button onclick="window.__closeDrawNotification('${product.id}')" class="w-full py-2.5 bg-surface-variant/30 text-on-surface-variant hover:bg-surface-variant/50 font-semibold rounded-full transition-all">
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>`;
+    } else {
+      toasts += `
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="draw-result-modal-${product.id}" onclick="if(event.target===this)window.__closeDrawNotification('${product.id}')">
+          <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8 relative">
+            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="닫기">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+            <div class="w-20 h-20 rounded-full bg-error-container/30 flex items-center justify-center mx-auto mb-4">
+              <span class="material-symbols-outlined text-error text-5xl">sentiment_dissatisfied</span>
+            </div>
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">😢 추첨 결과 안내</h2>
+            <p class="text-error font-bold mb-2">[${product.title}] 당첨되지 않았습니다.</p>
+            <p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
+              아쉽지만 <strong>${product.title}</strong> 추첨에서 당첨되지 않았습니다.<br>
+              (당첨자: ${product.winner ? product.winner.name : '비공개'})<br>
+              다음 럭키드로우에서 다시 도전해보세요!
+            </p>
+            <button onclick="window.__closeDrawNotification('${product.id}')" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
+              확인 (닫기)
+            </button>
+          </div>
+        </div>`;
+    }
+
+    // Only show one notification at a time
+    break;
+  }
+
+  // Register the close handler
+  window.__closeDrawNotification = (productId) => {
+    const modal = document.getElementById(`draw-result-modal-${productId}`);
+    if (modal) modal.remove();
+
+    // Check if there are more notifications to show
+    setTimeout(() => {
+      const app = document.getElementById('app');
+      const nextNotification = renderDrawResultNotification();
+      if (nextNotification && app) {
+        app.insertAdjacentHTML('beforeend', nextNotification);
+      }
+    }, 300);
+  };
+
+  return toasts;
 }
 
 function navigate() {
@@ -118,9 +213,12 @@ function navigate() {
     app.innerHTML = renderHeader(pageName) + route.render() + renderBottomNav(pageName);
   }
 
-  // Show winner toast on first visit to home
-  if (pageName === 'home') {
-    app.innerHTML += renderWinnerToast();
+  // Show draw result notifications (winner/loser) when user is logged in
+  if (pageName !== 'admin') {
+    const drawNotification = renderDrawResultNotification();
+    if (drawNotification) {
+      app.insertAdjacentHTML('beforeend', drawNotification);
+    }
   }
 
   currentPage = pageName;
@@ -172,4 +270,6 @@ document.addEventListener('click', (e) => {
 window.addEventListener('hashchange', navigate);
 window.addEventListener('DOMContentLoaded', navigate);
 window.addEventListener('languageChanged', navigate);
+window.addEventListener('firestoreDataChanged', navigate);
+
 

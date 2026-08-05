@@ -1,11 +1,16 @@
+// ============================================
+// LuckyPick - Home Page (진행 중 상품 홈)
+// Frontend: View-only. Timer display only.
+// Backend handles expiration & winner selection.
+// ============================================
 import { t } from '../i18n.js';
-import { getActiveProducts, closeExpiredProduct } from '../services/firestore.js';
+import { getActiveProducts } from '../services/firestore.js';
 import { getCurrentAuthUser } from '../services/auth.js';
 
 let countdownIntervals = [];
 
 function clearTimers() {
-  countdownIntervals.forEach(id => clearInterval(id));
+  countdownIntervals.forEach((id) => clearInterval(id));
   countdownIntervals = [];
 }
 
@@ -15,7 +20,7 @@ function formatTime(ms) {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function getTimerClasses(ms) {
@@ -40,12 +45,12 @@ function renderParticipantsModal(product) {
           </button>
         </div>
         <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          ${product.participants.map((p, i) => {
+          ${(product.participants || []).map((p, i) => {
             const colors = ['bg-primary-container text-on-primary-container', 'bg-secondary-container text-on-secondary-container', 'bg-tertiary-container text-on-tertiary-container'];
             const color = colors[i % 3];
             return `
               <div class="flex items-center gap-4 p-4 rounded-2xl bg-white border border-outline-variant/10 shadow-sm">
-                <div class="w-12 h-12 rounded-full ${color} flex items-center justify-center font-bold">${p.initial}</div>
+                <div class="w-12 h-12 rounded-full ${color} flex items-center justify-center font-bold">${p.initial || 'U'}</div>
                 <div class="flex-grow">
                   <div class="flex justify-between items-center">
                     <span class="font-bold text-on-surface">${p.name}</span>
@@ -69,7 +74,7 @@ function renderParticipantsModal(product) {
 
 function renderProductCard(product, index) {
   const remaining = product.endTime - Date.now();
-  const fillPercent = Math.round((product.currentParticipants / product.maxParticipants) * 100);
+  const fillPercent = Math.round(((product.currentParticipants || 0) / (product.maxParticipants || 1)) * 100);
   const timerClasses = getTimerClasses(remaining);
   const isUrgent = remaining <= 300000;
 
@@ -78,7 +83,7 @@ function renderProductCard(product, index) {
       <div class="relative h-64 w-full">
         <img class="w-full h-full object-contain bg-white" src="${product.imageUrl}" alt="${product.title}">
         <div class="absolute top-4 left-4 flex gap-2">
-          <span class="bg-secondary-container text-on-secondary-container font-label-caps text-label-caps px-3 py-1 rounded-full shadow-sm">${product.category}</span>
+          <span class="bg-secondary-container text-on-secondary-container font-label-caps text-label-caps px-3 py-1 rounded-full shadow-sm">${product.category || 'NEW'}</span>
           <span class="${timerClasses.bg} ${timerClasses.text} font-label-caps text-label-caps px-3 py-1 rounded-full flex items-center gap-1 ${timerClasses.pulse ? 'timer-pulse' : ''}">
             <span class="material-symbols-outlined text-[14px]">${isUrgent ? 'bolt' : 'timer'}</span>
             <span class="font-timer-numeric text-timer-numeric text-[14px]" id="timer-${index}">${formatTime(remaining)}</span>
@@ -89,13 +94,13 @@ function renderProductCard(product, index) {
         <div class="flex justify-between items-start mb-2">
           <div>
             <h2 class="font-headline-sm text-headline-sm text-on-surface">${product.title}</h2>
-            <p class="text-on-surface-variant font-body-md">${product.description}</p>
+            <p class="text-on-surface-variant font-body-md">${product.description || ''}</p>
           </div>
           <div class="flex flex-col items-end">
-            <span class="text-xs text-on-surface-variant line-through">${t('retail')}: $${product.retailPrice.toLocaleString()}</span>
+            <span class="text-xs text-on-surface-variant line-through">${t('retail')}: $${(product.retailPrice || 0).toLocaleString()}</span>
             <div class="flex flex-col items-end">
               <span class="text-label-caps text-[10px] text-primary uppercase tracking-widest">${t('entryPrice')}</span>
-              <span class="font-headline-sm text-headline-sm text-primary">$${product.entryPrice}</span>
+              <span class="font-headline-sm text-headline-sm text-primary">$${product.entryPrice || 0}</span>
             </div>
           </div>
         </div>
@@ -103,7 +108,7 @@ function renderProductCard(product, index) {
           <div class="flex justify-between items-end mb-2">
             <button class="font-label-caps text-label-caps text-primary hover:underline flex items-center gap-1 cursor-pointer" onclick="window.__showParticipants('${product.id}')">
               <span class="material-symbols-outlined text-[16px]">group</span>
-              ${t('participants')} (${product.currentParticipants}/${product.maxParticipants})
+              ${t('participants')} (${product.currentParticipants || 0}/${product.maxParticipants || 0})
             </button>
             <span class="font-label-caps text-label-caps text-on-surface-variant">${fillPercent}% ${t('filled')}</span>
           </div>
@@ -141,7 +146,7 @@ export function render() {
     </main>
     <div id="modal-container"></div>`;
 
-  // Setup timers after render
+  // Setup countdown timers (display only - no expiration logic)
   setTimeout(() => {
     products.forEach((product, index) => {
       const el = document.getElementById(`timer-${index}`);
@@ -151,84 +156,8 @@ export function render() {
         if (remaining <= 0) {
           el.textContent = '00:00:00';
           clearInterval(interval);
-
-          // Trigger automatic draw
-          const result = closeExpiredProduct(product.id);
-          if (result) {
-            const authUser = getCurrentAuthUser();
-            const isParticipant = authUser && product.participants.some(p => p.email === authUser.email || authUser.email === 'majXXXX@gmail.com');
-            const isWinner = authUser && result.winner.email === authUser.email;
-
-            const modalContainer = document.getElementById('modal-container');
-            if (modalContainer) {
-              if (isWinner) {
-                modalContainer.innerHTML = `
-                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop">
-                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
-                      <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
-                        <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
-                      </div>
-                      <h2 class="font-headline-md text-headline-md text-on-surface mb-2">🎉 축하합니다! 당첨되었습니다!</h2>
-                      <p class="text-on-surface-variant mb-4"><strong>${result.title}</strong></p>
-                      <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
-                        <p class="font-label-caps text-label-caps text-tertiary mb-1">티켓 번호</p>
-                        <p class="font-timer-numeric text-xl font-bold text-primary">${result.ticketNumber}</p>
-                      </div>
-                      <button onclick="window.location.hash='#profile'; window.__closeDraw()" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
-                        배송 정보 입력하러 가기
-                      </button>
-                    </div>
-                  </div>`;
-              } else if (isParticipant) {
-                modalContainer.innerHTML = `
-                  <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 modal-backdrop">
-                    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8">
-                      <div class="w-20 h-20 rounded-full bg-error-container/30 flex items-center justify-center mx-auto mb-4">
-                        <span class="material-symbols-outlined text-error text-5xl">sentiment_dissatisfied</span>
-                      </div>
-                      <h2 class="font-headline-md text-headline-md text-on-surface mb-2">😢 추첨 결과 안내</h2>
-                      <p class="text-error font-bold mb-2">[${result.title}] 당첨되지 않았습니다.</p>
-                      <p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
-                        아쉽지만 <strong>${result.title}</strong> 상품 추첨에서 당첨되지 않았습니다.<br>
-                        (당첨자: ${result.winner.name})<br>
-                        다음 럭키드로우 기회에 다시 도전해보세요!
-                      </p>
-                      <button onclick="window.__closeDraw()" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
-                        확인
-                      </button>
-                    </div>
-                  </div>`;
-              } else {
-                // Public announcement toast for non-participants (avoids confusing modal popup)
-                const modalContainer = document.getElementById('modal-container');
-                if (modalContainer) {
-                  modalContainer.innerHTML = `
-                    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4 toast" id="public-draw-toast">
-                      <div class="bg-surface-bright border border-primary/20 text-on-surface rounded-2xl p-4 shadow-2xl flex items-center gap-3">
-                        <span class="material-symbols-outlined text-primary text-3xl">campaign</span>
-                        <div class="flex-1">
-                          <p class="font-bold text-xs text-primary font-label-caps">📢 전체 추첨 완료 공지</p>
-                          <p class="font-bold text-sm text-on-surface">${result.title}</p>
-                          <p class="text-xs text-on-surface-variant">당첨자: <strong>${result.winner.name}</strong> (${result.winner.email})</p>
-                        </div>
-                        <button class="px-3 py-1 bg-primary text-on-primary rounded-full text-xs font-bold hover:bg-primary-container transition-all" onclick="document.getElementById('public-draw-toast')?.remove(); window.dispatchEvent(new CustomEvent('languageChanged'))">
-                          확인
-                        </button>
-                      </div>
-                    </div>`;
-                }
-              }
-            }
-            window.__closeDraw = () => {
-              const mc = document.getElementById('modal-container');
-              if (mc) mc.innerHTML = '';
-              // Re-render home page with updated product list
-              window.dispatchEvent(new CustomEvent('languageChanged'));
-            };
-          }
-
-          // Instantly re-render home page to remove completed product from active list
-          window.dispatchEvent(new CustomEvent('languageChanged'));
+          // Server handles expiration automatically via scheduled function
+          // Just display "마감" state - Firestore listener will update the UI
           return;
         }
         el.textContent = formatTime(remaining);
@@ -249,7 +178,7 @@ export function render() {
 
   // Modal handlers
   window.__showParticipants = (productId) => {
-    const product = products.find(p => p.id === productId);
+    const product = products.find((p) => p.id === productId);
     if (!product) return;
     document.getElementById('modal-container').innerHTML = renderParticipantsModal(product);
   };
@@ -265,5 +194,4 @@ export function cleanup() {
   delete window.__participate;
   delete window.__showParticipants;
   delete window.__closeModal;
-  delete window.__closeDraw;
 }

@@ -14,14 +14,12 @@ const firebaseConfig = {
 
 // Check if real Firebase credentials are set
 const isFirebaseConfigured = () => {
-  // Option 1: Local Storage Sandbox mode for local development
-  // Prevents local test products from syncing to the live production database.
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocalhost) {
-    console.log('[LuckyPick] Option 1: Running in Local Storage Sandbox mode on localhost.');
-    return false;
-  }
   return firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.apiKey.startsWith("AIzaSy");
 };
 
-export { firebaseConfig, isFirebaseConfigured };
+// Check if running on localhost (for emulator connection)
+const isLocalDev = () => {
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+};
+
+export { firebaseConfig, isFirebaseConfigured, isLocalDev };

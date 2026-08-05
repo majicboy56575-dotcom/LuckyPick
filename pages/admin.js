@@ -630,10 +630,14 @@ export function init() {
     }
   });
 
-  window.__markShipped = (shippingId) => {
-    updateShippingStatus(shippingId, 'shipped');
-    alert('배송 상태가 [배송 완료]로 변경되었습니다.');
-    window.dispatchEvent(new CustomEvent('languageChanged'));
+  window.__markShipped = async (shippingId) => {
+    try {
+      await updateShippingStatus(shippingId, 'shipped');
+      alert('배송 상태가 [배송 완료]로 변경되었습니다.');
+    } catch (err) {
+      console.error('Shipping status update error:', err);
+      alert(`배송 상태 변경 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+    }
   };
 
   window.__setAdminTimerPreset = (h, m) => {
@@ -663,7 +667,7 @@ export function init() {
     const submitBtn = document.getElementById('admin-submit-btn');
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerText = 'Firebase DB 저장 중...';
+      submitBtn.innerText = 'Firebase 서버 등록 중...';
     }
 
     try {
@@ -678,12 +682,7 @@ export function init() {
         timerMinutes: minutes,
       });
 
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const msg = isLocal
-        ? `🎉 [${newProd.title}] 상품이 로컬 저장소(LocalStorage)에 등록되었습니다!\n(로컬 테스트 모드가 적용되어 실제 배포된 웹사이트에는 동기화되지 않습니다.)`
-        : `🎉 [${newProd.title}] 상품이 Firebase 클라우드 데이터베이스에 성공적으로 등록되었습니다!`;
-
-      alert(msg);
+      alert(`🎉 [${newProd.title}] 상품이 Firebase 서버에 성공적으로 등록되었습니다!`);
 
       // Reset form
       const form = document.getElementById('admin-register-form');
@@ -693,11 +692,9 @@ export function init() {
       const placeholder = document.getElementById('admin-photo-placeholder');
       if (preview) preview.style.display = 'none';
       if (placeholder) placeholder.style.display = 'flex';
-
-      window.dispatchEvent(new CustomEvent('languageChanged'));
     } catch (err) {
       console.error('Failed to register product:', err);
-      alert('상품 등록 중 오류가 발생했습니다: ' + err.message);
+      alert(`상품 등록 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
