@@ -3,7 +3,7 @@
 // ============================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCNL3_b-IOq04_Sdq3-N7Ei3CxtSG0ztNs",
+  apiKey: "AIzaSyCNL3_b-IoQ04_Sdq3-N7Ei3CxtSG0ztNs",
   authDomain: "luckypick-ec4cf.firebaseapp.com",
   projectId: "luckypick-ec4cf",
   storageBucket: "luckypick-ec4cf.firebasestorage.app",
