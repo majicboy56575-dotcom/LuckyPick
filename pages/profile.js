@@ -393,7 +393,7 @@ export function render() {
               <div class="space-y-4 border-t border-outline-variant/30 pt-6 mb-8">
                 <div class="flex justify-between items-center text-on-surface-variant">
                   <span class="font-body-md text-body-md">${t('entryPrice')}</span>
-                  <span class="font-timer-numeric text-on-surface">$${selectedProduct.entryPrice.toFixed(2)}</span>
+                  <span class="font-timer-numeric text-on-surface">$${entryPrice.toFixed(2)}</span>
                 </div>
                 <div class="flex justify-between items-center text-on-surface-variant">
                   <span class="font-body-md text-body-md">${t('platformFee')}</span>

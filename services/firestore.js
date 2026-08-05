@@ -137,10 +137,42 @@ if (isFirebaseConfigured()) {
 // ============================================
 // READ Functions (from real-time cache)
 // ============================================
+const DEFAULT_DEMO_PRODUCTS = [
+  {
+    id: 'prod_001',
+    title: 'iPhone 15 Pro Max',
+    description: 'Natural Titanium 256GB, Unlocked',
+    category: 'TECH',
+    imageUrl: DEMO_IMAGES.iphone,
+    retailPrice: 1199,
+    entryPrice: 1.00,
+    maxParticipants: 1000,
+    currentParticipants: 842,
+    endTime: Date.now() + 3600000 * 24,
+    status: 'active',
+    participants: [],
+  },
+  {
+    id: 'prod_002',
+    title: 'MacBook Pro 16" M3 Max',
+    description: 'Space Black, 36GB RAM, 1TB SSD',
+    category: 'PREMIUM',
+    imageUrl: DEMO_IMAGES.macbook,
+    retailPrice: 3499,
+    entryPrice: 5.00,
+    maxParticipants: 700,
+    currentParticipants: 698,
+    endTime: Date.now() + 180000,
+    status: 'active',
+    participants: [],
+  },
+];
+
 function getActiveProducts() {
-  // Filter to only show products with endTime in the future
   const now = Date.now();
-  return activeProductsCache.filter((p) => p.endTime > now);
+  const valid = activeProductsCache.filter((p) => p.endTime > now);
+  if (valid.length > 0) return valid;
+  return DEFAULT_DEMO_PRODUCTS;
 }
 
 function getClosedProducts() {
