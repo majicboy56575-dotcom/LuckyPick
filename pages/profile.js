@@ -164,16 +164,27 @@ export function render() {
 
   // Global login/logout handlers
   window.__doLogin = async (provider) => {
-    if (provider === 'google') await signInWithGoogle();
-    else if (provider === 'apple') await signInWithApple();
-    else await continueAsGuest();
+    try {
+      if (provider === 'google') await signInWithGoogle();
+      else if (provider === 'apple') await signInWithApple();
+      else await continueAsGuest();
 
-    const hash = window.location.hash;
-    if (hash.includes('redirect=')) {
-      const target = hash.split('redirect=')[1].split('&')[0];
-      window.location.hash = `#${target}`;
-    } else {
-      window.dispatchEvent(new CustomEvent('languageChanged'));
+      const hash = window.location.hash;
+      if (hash.includes('redirect=')) {
+        const target = hash.split('redirect=')[1].split('&')[0];
+        window.location.hash = `#${target}`;
+      } else {
+        window.dispatchEvent(new CustomEvent('languageChanged'));
+      }
+    } catch (err) {
+      console.error('Social login error:', err);
+      if (err.code === 'auth/operation-not-allowed') {
+        alert('⚠️ Firebase Console에서 Google/Apple 로그인이 아직 활성화되지 않았습니다.\nFirebase 콘솔 > Authentication > Sign-in method에서 Google 로그인을 [사용 설정] 해주셔야 합니다.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        // User closed popup, no error needed
+      } else {
+        alert(`로그인 실패: ${err.message || '소셜 로그인을 진행할 수 없습니다.'}`);
+      }
     }
   };
 
