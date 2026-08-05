@@ -150,7 +150,19 @@ export function render() {
         window.dispatchEvent(new CustomEvent('languageChanged'));
       }
     } catch (err) {
-      alert(`인증 실패: ${err.message || '이메일 또는 비밀번호를 확인해주세요.'}`);
+      console.error('Auth error:', err);
+      const isNotFound = err.code === 'auth/user-not-found' || 
+                         err.code === 'auth/invalid-credential' || 
+                         (err.message && (err.message.includes('user-not-found') || err.message.includes('invalid-credential')));
+
+      if (!isSignUpMode && isNotFound) {
+        alert('⚠️ 회원가입이 필요합니다.\n\n해당 계정이 존재하지 않거나 정보가 올바르지 않습니다. 회원가입 화면으로 전환합니다.');
+        if (typeof window.__toggleAuthMode === 'function') {
+          window.__toggleAuthMode();
+        }
+      } else {
+        alert(`인증 실패: ${err.message || '이메일 또는 비밀번호를 확인해주세요.'}`);
+      }
     }
   };
 
