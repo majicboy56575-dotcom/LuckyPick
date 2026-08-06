@@ -66,31 +66,31 @@ function renderLoginSection() {
 
         <div class="relative my-4">
           <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-outline-variant/30"></div></div>
-          <div class="relative flex justify-center text-xs text-on-surface-variant bg-white px-3"><span class="bg-surface-bright px-2 py-0.5 rounded-full">또는 이메일로 계속하기</span></div>
+          <div class="relative flex justify-center text-xs text-on-surface-variant bg-white px-3"><span class="bg-surface-bright px-2 py-0.5 rounded-full">${t('orContinueWithEmail')}</span></div>
         </div>
 
         <!-- Email Auth Form -->
         <form id="email-auth-form" onsubmit="event.preventDefault(); window.__submitEmailAuth();" class="space-y-3 text-left">
           <div id="signup-name-field" class="space-y-1 hidden">
-            <label class="text-xs font-bold text-on-surface-variant">이름</label>
+            <label class="text-xs font-bold text-on-surface-variant">${t('name')}</label>
             <input type="text" id="auth-name-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="홍길동">
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-bold text-on-surface-variant">이메일 주소</label>
+            <label class="text-xs font-bold text-on-surface-variant">${t('emailAddress')}</label>
             <input type="email" id="auth-email-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="user@example.com" required>
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-bold text-on-surface-variant">비밀번호</label>
+            <label class="text-xs font-bold text-on-surface-variant">${t('password')}</label>
             <input type="password" id="auth-pw-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="6자 이상 입력" minlength="6" required>
           </div>
           <button type="submit" id="email-submit-btn" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:bg-primary-container transition-all active:scale-95 text-sm shadow-md mt-2">
-            이메일 로그인
+            ${t('emailLogin')}
           </button>
         </form>
 
         <div class="flex justify-between items-center text-xs pt-1">
           <button onclick="window.__toggleAuthMode()" id="toggle-auth-btn" class="text-primary font-bold hover:underline">
-            아직 계정이 없으신가요? 회원가입
+            ${t('noAccountSignup')}
           </button>
           <button onclick="window.__doLogin('guest')" class="text-on-surface-variant font-medium hover:underline">
             ${t('continueGuest')}
@@ -100,7 +100,7 @@ function renderLoginSection() {
         <div class="p-3 bg-surface-container-low rounded-xl text-left border border-primary/10">
           <p class="text-xs text-on-surface-variant leading-relaxed flex items-start gap-2">
             <span class="material-symbols-outlined text-primary text-[18px]">shield</span>
-            <span>로그인하시면 상품 참여, 결제 진행, 당첨 확인 및 과거 참여 내역을 이용하실 수 있습니다.</span>
+            <span>${t('loginForServicesNotice')}</span>
           </p>
         </div>
       </div>
@@ -118,12 +118,12 @@ export function render() {
 
     if (isSignUpMode) {
       if (nameField) nameField.classList.remove('hidden');
-      if (submitBtn) submitBtn.textContent = '이메일 회원가입';
-      if (toggleBtn) toggleBtn.textContent = '이미 계정이 있으신가요? 로그인';
+      if (submitBtn) submitBtn.textContent = t('emailSignup');
+      if (toggleBtn) toggleBtn.textContent = t('alreadyHaveAccount');
     } else {
       if (nameField) nameField.classList.add('hidden');
-      if (submitBtn) submitBtn.textContent = '이메일 로그인';
-      if (toggleBtn) toggleBtn.textContent = '아직 계정이 없으신가요? 회원가입';
+      if (submitBtn) submitBtn.textContent = t('emailLogin');
+      if (toggleBtn) toggleBtn.textContent = t('noAccountSignup');
     }
   };
 
@@ -342,7 +342,7 @@ export function render() {
               ${wp.shippingSubmitted ? `
                 <span class="self-center px-4 py-2 bg-surface-variant text-on-surface-variant rounded-full text-xs font-bold shrink-0 flex items-center gap-1">
                   <span class="material-symbols-outlined text-[16px] text-tertiary">check_circle</span>
-                  배송 정보 제출 완료
+                  ${t('shippingSubmittedComplete')}
                 </span>
               ` : `
                 <button class="self-center px-4 py-2 bg-tertiary text-on-tertiary rounded-full text-sm font-bold hover:opacity-90 transition-all active:scale-95 shrink-0" onclick="window.__openShippingModal('${wp.id}')">
@@ -374,13 +374,13 @@ export function render() {
                       pp.status === 'active' ? 'bg-primary-container/20 text-primary' : 
                       pp.status === 'not_won' ? 'bg-error-container/40 text-on-error-container font-extrabold' : 'bg-surface-variant text-on-surface-variant'
                     }">
-                      ${pp.status === 'active' ? t('ongoing_status') : pp.status === 'not_won' ? '미당첨' : t('ended')}
+                      ${pp.status === 'active' ? t('ongoing_status') : pp.status === 'not_won' ? t('notWonTitle') : t('ended')}
                     </span>
                   </div>
                   ${pp.status === 'not_won' ? `
                     <p class="text-xs text-error font-semibold mt-1 flex items-center gap-1">
                       <span class="material-symbols-outlined text-[15px]">info</span>
-                      ${pp.title} 상품 추첨 결과, 당첨되지 않았습니다.
+                      ${pp.title} (${t('notWonTitle')})
                     </p>
                   ` : `
                     <p class="text-xs text-on-surface-variant mt-1">${t('participatedAgo')}</p>

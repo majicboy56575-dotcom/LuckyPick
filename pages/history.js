@@ -3,7 +3,7 @@
 // Reads from Firestore closed_products collection
 // ============================================
 import { t } from '../i18n.js';
-import { getClosedProducts } from '../services/firestore.js';
+import { getClosedProducts, getAllShippingInfos } from '../services/firestore.js';
 
 function renderParticipantsModal(product) {
   return `
@@ -42,10 +42,19 @@ function renderParticipantsModal(product) {
     </div>`;
 }
 
-function renderHistoryCard(product) {
-  const statusBadge = product.status === 'shipped'
-    ? `<span class="px-3 py-1 rounded-full bg-secondary text-on-secondary font-label-caps text-label-caps">${t('shipped')}</span>`
-    : `<span class="px-3 py-1 rounded-full bg-outline text-white font-label-caps text-label-caps">${t('closed')}</span>`;
+function renderHistoryCard(product, shippingInfos = []) {
+  const shipInfo = shippingInfos.find(s => s.productId === product.id);
+  let statusBadge = `<span class="px-3 py-1 rounded-full bg-outline text-white font-label-caps text-label-caps">${t('closed')}</span>`;
+  
+  if (shipInfo) {
+    if (shipInfo.status === 'shipped') {
+      statusBadge = `<span class="px-3 py-1 rounded-full bg-secondary text-on-secondary font-label-caps text-label-caps">${t('shippedComplete')}</span>`;
+    } else {
+      statusBadge = `<span class="px-3 py-1 rounded-full bg-primary text-on-primary font-label-caps text-label-caps">${t('shippingPending')}</span>`;
+    }
+  } else {
+    statusBadge = `<span class="px-3 py-1 rounded-full bg-outline text-white font-label-caps text-label-caps">${t('shippingNotSubmitted')}</span>`;
+  }
 
   return `
     <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-xl overflow-hidden shadow-sm flex flex-col group transition-all duration-300 hover:shadow-lg hover:border-primary/20">
@@ -88,6 +97,7 @@ function renderHistoryCard(product) {
 
 export function render() {
   const products = getClosedProducts();
+  const shippingInfos = getAllShippingInfos();
 
   const html = `
     <main class="pt-24 pb-32 max-w-[1200px] mx-auto px-container-margin page-enter">
@@ -98,12 +108,12 @@ export function render() {
       ${products.length === 0 ? `
         <div class="glass-card rounded-2xl p-12 text-center">
           <span class="material-symbols-outlined text-outline text-6xl mb-4">history</span>
-          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">아직 마감된 상품이 없습니다</h3>
-          <p class="text-on-surface-variant">상품 타이머가 종료되면 자동으로 당첨자가 추첨되고 여기에 표시됩니다.</p>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">${t('noClosedProducts')}</h3>
+          <p class="text-on-surface-variant">${t('noClosedProductsDesc')}</p>
         </div>
       ` : `
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-          ${products.map(p => renderHistoryCard(p)).join('')}
+          ${products.map(p => renderHistoryCard(p, shippingInfos)).join('')}
         </div>
       `}
     </main>

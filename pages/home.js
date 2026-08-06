@@ -143,8 +143,8 @@ export function render() {
       ${products.length === 0 ? `
         <div class="glass-card rounded-3xl p-12 text-center border border-outline-variant/30 bg-white">
           <span class="material-symbols-outlined text-outline text-6xl mb-4 animate-pulse">hourglass_empty</span>
-          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">현재 진행 중인 럭키드로우가 없습니다</h3>
-          <p class="text-on-surface-variant text-sm">새로운 프리미엄 상품이 등록될 예정이니 잠시만 기다려 주세요!</p>
+          <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">${t('noOngoingDraws')}</h3>
+          <p class="text-on-surface-variant text-sm">${t('noOngoingDrawsDesc')}</p>
         </div>
       ` : `
         <section class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
@@ -177,7 +177,7 @@ export function render() {
   window.__participate = (productId) => {
     const user = getCurrentAuthUser();
     if (!user) {
-      alert('로그인이 필요한 서비스입니다. 로그인 화면으로 이동합니다.');
+      alert(t('loginRequiredAlert'));
       window.location.hash = `#profile?product=${productId}`;
       return;
     }

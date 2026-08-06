@@ -1,13 +1,13 @@
 // ============================================
 // LuckyPick - Main App (SPA Router)
 // ============================================
-import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026080517';
-import { getCurrentAuthUser } from './services/auth.js?v=2026080517';
-import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=2026080517';
-import * as homePage from './pages/home.js?v=2026080517';
-import * as historyPage from './pages/history.js?v=2026080517';
-import * as profilePage from './pages/profile.js?v=2026080517';
-import * as adminPage from './pages/admin.js?v=2026080517';
+import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026080518';
+import { getCurrentAuthUser } from './services/auth.js?v=2026080518';
+import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=2026080518';
+import * as homePage from './pages/home.js?v=2026080518';
+import * as historyPage from './pages/history.js?v=2026080518';
+import * as profilePage from './pages/profile.js?v=2026080518';
+import * as adminPage from './pages/admin.js?v=2026080518';
 
 // --- State ---
 let currentPage = null;
@@ -110,25 +110,25 @@ function renderDrawResultNotification() {
       toasts += `
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="draw-result-modal-${product.id}" onclick="if(event.target===this)window.__closeDrawNotification('${product.id}')">
           <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8 relative">
-            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="닫기">
+            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="${t('close')}">
               <span class="material-symbols-outlined">close</span>
             </button>
             <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
               <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
             </div>
-            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">🎉 축하합니다! 당첨되었습니다!</h2>
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">${t('congratsWinner')}</h2>
             <p class="text-on-surface-variant mb-2"><strong>${product.title}</strong></p>
             <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
-              <p class="font-label-caps text-label-caps text-tertiary mb-1">티켓 번호</p>
+              <p class="font-label-caps text-label-caps text-tertiary mb-1">${t('ticketNumberLabel')}</p>
               <p class="font-timer-numeric text-xl font-bold text-primary">${product.ticketNumber || '#WINNER'}</p>
             </div>
             <div class="flex flex-col gap-2.5">
               <button onclick="window.location.hash='#profile'; window.__closeDrawNotification('${product.id}')" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2">
                 <span class="material-symbols-outlined">local_shipping</span>
-                배송 정보 입력하러 가기
+                ${t('goEnterShipping')}
               </button>
               <button onclick="window.__closeDrawNotification('${product.id}')" class="w-full py-2.5 bg-surface-variant/30 text-on-surface-variant hover:bg-surface-variant/50 font-semibold rounded-full transition-all">
-                닫기
+                ${t('close')}
               </button>
             </div>
           </div>
@@ -137,21 +137,17 @@ function renderDrawResultNotification() {
       toasts += `
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="draw-result-modal-${product.id}" onclick="if(event.target===this)window.__closeDrawNotification('${product.id}')">
           <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8 relative">
-            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="닫기">
+            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="${t('close')}">
               <span class="material-symbols-outlined">close</span>
             </button>
             <div class="w-20 h-20 rounded-full bg-error-container/30 flex items-center justify-center mx-auto mb-4">
               <span class="material-symbols-outlined text-error text-5xl">sentiment_dissatisfied</span>
             </div>
-            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">😢 추첨 결과 안내</h2>
-            <p class="text-error font-bold mb-2">[${product.title}] 당첨되지 않았습니다.</p>
-            <p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
-              아쉽지만 <strong>${product.title}</strong> 추첨에서 당첨되지 않았습니다.<br>
-              (당첨자: ${product.winner ? product.winner.name : '비공개'})<br>
-              다음 럭키드로우에서 다시 도전해보세요!
-            </p>
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">${t('drawResultTitle')}</h2>
+            <p class="text-error font-bold mb-2">[${product.title}] ${t('notWonTitle')}</p>
+            <p class="text-on-surface-variant text-sm mb-6 leading-relaxed whitespace-pre-line">${t('notWonDesc', { title: product.title, winner: product.winner ? product.winner.name : '-' })}</p>
             <button onclick="window.__closeDrawNotification('${product.id}')" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
-              확인 (닫기)
+              ${t('close')}
             </button>
           </div>
         </div>`;
@@ -191,7 +187,7 @@ function navigate() {
   // --- Protected Route Check ---
   const user = getCurrentAuthUser();
   if (!user && (pageName === 'history' || pageName === 'admin')) {
-    alert('로그인이 필요한 기능입니다. 로그인 화면으로 이동합니다.');
+    alert(t('loginRequiredAlert'));
     window.location.hash = `#profile?redirect=${pageName}`;
     return;
   }

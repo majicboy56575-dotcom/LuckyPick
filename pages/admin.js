@@ -326,15 +326,15 @@ export function render() {
                         </td>
                         <td class="py-4">
                           <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${s.status === 'shipped' ? 'bg-tertiary-container/20 text-tertiary' : 'bg-secondary-container/20 text-secondary'}">
-                            ${s.status === 'shipped' ? '배송 완료' : '배송 대기'}
+                            ${s.status === 'shipped' ? t('shippedComplete') : t('shippingPending')}
                           </span>
                         </td>
                         <td class="py-4">
                           ${s.status === 'shipped' ? `
-                            <span class="text-xs text-outline font-bold">완료됨</span>
+                            <span class="text-xs text-outline font-bold">${t('shippedComplete')}</span>
                           ` : `
                             <button onclick="window.__markShipped('${s.id}')" class="px-3 py-1.5 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary-container transition-all shadow-sm">
-                              배송 완료 처리
+                              ${t('shippedComplete')}
                             </button>
                           `}
                         </td>
