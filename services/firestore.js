@@ -54,13 +54,11 @@ if (isFirebaseConfigured()) {
     db = getFirestore(app);
     functions = getFunctions(app, 'asia-northeast3');
 
-    // Connect to emulators on localhost
+    // Log active environment
     if (isLocalDev()) {
-      connectFirestoreEmulator(db, '127.0.0.1', 8181);
-      connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-      console.log('[Firestore] Connected to LOCAL EMULATORS');
+      console.log('[Firestore] Connected to DEV PROJECT (lucky-pick-dev)');
     } else {
-      console.log('[Firestore] Connected to PRODUCTION');
+      console.log('[Firestore] Connected to PRODUCTION (luckypick-ec4cf)');
     }
 
     // ==========================================
@@ -97,11 +95,16 @@ if (isFirebaseConfigured()) {
       }
     );
 
-    // Real-time Listener: Shipping Infos (Auth required)
-    window.addEventListener('authStateChanged', (e) => {
-      const user = e.detail?.user;
-      if (user && db) {
-        onSnapshot(
+    // ==========================================
+    // Real-time Listener: Shipping Infos & Users
+    // ==========================================
+    let shippingUnsub = null;
+    let usersUnsub = null;
+
+    const startAuthListeners = () => {
+      if (!db) return;
+      if (!shippingUnsub) {
+        shippingUnsub = onSnapshot(
           collection(db, 'shipping_infos'),
           (snapshot) => {
             const infos = [];
@@ -114,8 +117,10 @@ if (isFirebaseConfigured()) {
             console.warn('[Firestore] Shipping listener warning:', error.message);
           }
         );
+      }
 
-        onSnapshot(
+      if (!usersUnsub) {
+        usersUnsub = onSnapshot(
           collection(db, 'users'),
           (snapshot) => {
             const users = [];
@@ -127,6 +132,17 @@ if (isFirebaseConfigured()) {
             console.warn('[Firestore] Users listener warning:', error.message);
           }
         );
+      }
+    };
+
+    // If local emulator or already authenticated, start immediately
+    if (isLocalDev() || getCurrentAuthUser()) {
+      startAuthListeners();
+    }
+
+    window.addEventListener('authStateChanged', (e) => {
+      if (e.detail?.user) {
+        startAuthListeners();
       }
     });
   } catch (e) {
@@ -200,38 +216,69 @@ function getCurrentUser() {
 
   const callerEmail = authUser.email || '';
 
-  // Won products from closed_products
-  const wonProducts = closedProductsCache
-    .filter(
-      (p) =>
-        p.winner &&
-        (p.winner.uid === authUser.uid ||
-          p.winner.email === callerEmail ||
-          callerEmail === 'majicboy56575@gmail.com')
-    )
-    .map((p) => ({
-      id: p.id,
-      title: p.title,
-      imageUrl: p.imageUrl,
-      drawDate: new Date(p.closedAt || Date.now()).toLocaleDateString(),
-      shippingSubmitted: shippingCache.some(
-        (s) => s.productId === p.id
-      ),
-    }));
+  // Won products from closed_products (supports multi-winner groups)
+  const wonProducts = [];
+  closedProductsCache.forEach((p) => {
+    if (p.winners && Array.isArray(p.winners)) {
+      // Multi-winner structure
+      p.winners.forEach((w) => {
+        if (
+          w.uid === authUser.uid ||
+          w.email === callerEmail ||
+          callerEmail === 'majicboy56575@gmail.com'
+        ) {
+          wonProducts.push({
+            id: p.id,
+            title: p.title,
+            imageUrl: p.imageUrl,
+            drawDate: new Date(p.closedAt || Date.now()).toLocaleDateString(),
+            groupNumber: w.groupNumber,
+            ticketNumber: w.ticketNumber,
+            shippingSubmitted: shippingCache.some(
+              (s) => s.productId === p.id && s.winnerUid === authUser.uid
+            ),
+          });
+        }
+      });
+    } else if (
+      p.winner &&
+      (p.winner.uid === authUser.uid ||
+        p.winner.email === callerEmail ||
+        callerEmail === 'majicboy56575@gmail.com')
+    ) {
+      // Legacy single-winner
+      wonProducts.push({
+        id: p.id,
+        title: p.title,
+        imageUrl: p.imageUrl,
+        drawDate: new Date(p.closedAt || Date.now()).toLocaleDateString(),
+        groupNumber: 1,
+        ticketNumber: p.ticketNumber || '',
+        shippingSubmitted: shippingCache.some((s) => s.productId === p.id),
+      });
+    }
+  });
 
-  // Active products user participated in
+  // Active products user participated in (with group/slot info)
   const participatedProducts = [];
   activeProductsCache.forEach((p) => {
-    if (
-      p.participants &&
-      p.participants.some((pt) => pt.uid === authUser.uid)
-    ) {
+    const sorted = [...(p.participants || [])].sort(
+      (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)
+    );
+    const myIndex = sorted.findIndex((pt) => pt.uid === authUser.uid);
+    if (myIndex !== -1) {
+      const unitSize = p.maxParticipants || 20;
+      const myGroupNumber = Math.floor(myIndex / unitSize) + 1;
       participatedProducts.push({
         id: p.id,
         title: p.title,
         imageUrl: p.imageUrl,
         status: 'active',
-        participatedAt: Date.now(),
+        mySequence: myIndex + 1,
+        myGroupNumber,
+        unitSize,
+        totalParticipants: sorted.length,
+        participatedAt: sorted[myIndex].joinedAt || Date.now(),
       });
     }
   });
@@ -321,7 +368,80 @@ async function updateShippingStatus(shippingId, newStatus) {
   return result.data;
 }
 
-// Privacy helpers (kept for display formatting)
+async function createPayPalOrder(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'createPayPalOrder');
+  const result = await callable(data);
+  return result.data;
+}
+
+async function capturePayPalOrder(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'capturePayPalOrder');
+  const result = await callable(data);
+  return result.data;
+}
+
+async function cancelUserParticipation(productId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'cancelUserParticipation');
+  const result = await callable({ productId });
+  return result.data;
+}
+
+/**
+ * Compute group/slot info for a product.
+ * @param {object} product - The active product object.
+ * @param {string|null} currentUid - Current user UID (optional).
+ * @returns {{ unitSize, totalGroups, completedGroups, remainder, groups: Array, myGroupNumber, mySequence }}
+ */
+function getGroupSlots(product, currentUid = null) {
+  const unitSize = product.maxParticipants || 20;
+  const sorted = [...(product.participants || [])].sort(
+    (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)
+  );
+  const total = sorted.length;
+  const completedGroups = Math.floor(total / unitSize);
+  const remainder = total % unitSize;
+  const totalGroups = completedGroups + (remainder > 0 ? 1 : 0);
+
+  let myGroupNumber = 0;
+  let mySequence = 0;
+
+  const groups = [];
+  for (let g = 0; g < Math.max(totalGroups, 1); g++) {
+    const start = g * unitSize;
+    const members = sorted.slice(start, start + unitSize);
+    const isComplete = members.length >= unitSize;
+    const isMine =
+      currentUid && members.some((m) => m.uid === currentUid);
+    if (isMine) {
+      myGroupNumber = g + 1;
+      const myIdx = sorted.findIndex((m) => m.uid === currentUid);
+      mySequence = myIdx + 1;
+    }
+    groups.push({
+      groupNumber: g + 1,
+      count: members.length,
+      unitSize,
+      isComplete,
+      isMine: !!isMine,
+      members,
+    });
+  }
+
+  return {
+    unitSize,
+    totalGroups,
+    completedGroups,
+    remainder,
+    groups,
+    myGroupNumber,
+    mySequence,
+    totalParticipants: total,
+  };
+}
+
 function maskName(name) {
   if (!name) return '사용자';
   name = name.trim();
@@ -372,6 +492,10 @@ export {
   submitShippingInfo,
   getAllShippingInfos,
   updateShippingStatus,
+  createPayPalOrder,
+  capturePayPalOrder,
+  cancelUserParticipation,
+  getGroupSlots,
   maskName,
   maskEmail,
   DEMO_IMAGES,

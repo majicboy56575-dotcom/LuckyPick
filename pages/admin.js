@@ -2,13 +2,14 @@
 // LuckyPick - Admin Page (관리자 페이지)
 // ============================================
 import { t, renderLanguageDropdown } from '../i18n.js';
-import { getAdminStats, getMembers, getAdminInventory, addProduct, getAllShippingInfos, updateShippingStatus, DEMO_IMAGES } from '../services/firestore.js';
+import { getAdminStats, getMembers, getAdminInventory, addProduct, getAllShippingInfos, updateShippingStatus, getClosedProducts, DEMO_IMAGES } from '../services/firestore.js';
 
 export function render() {
   const stats = getAdminStats();
   const members = getMembers();
   const inventory = getAdminInventory();
   const shippingList = getAllShippingInfos();
+  const closedProducts = getClosedProducts();
 
   const html = `
     <div class="flex h-screen overflow-hidden page-enter" id="admin-layout">
@@ -345,6 +346,84 @@ export function render() {
               </div>
             `}
           </div>
+
+          <!-- Multi-Slot Draw Results (Winners per Group) -->
+          <div class="glass-card p-8 rounded-xl" id="admin-winners-section">
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-tertiary">emoji_events</span>
+                <h3 class="font-headline-sm text-headline-sm text-on-surface">${t('winnerManagement')}</h3>
+              </div>
+              <span class="text-xs bg-tertiary-container/20 text-tertiary font-bold px-3 py-1 rounded-full">
+                ${t('totalProducts')} ${closedProducts.length}${t('productUnit')}
+              </span>
+            </div>
+            ${closedProducts.length === 0 ? `
+              <div class="p-8 text-center bg-surface-bright rounded-xl border border-outline-variant/20">
+                <p class="text-on-surface-variant text-sm">${t('noClosedProducts')}</p>
+              </div>
+            ` : `
+              <div class="space-y-6">
+                ${closedProducts.map(cp => {
+                  const winners = cp.winners || (cp.winner && cp.winner.uid ? [{ ...cp.winner, groupNumber: 1, ticketNumber: cp.ticketNumber }] : []);
+                  const refunded = cp.refundedParticipants || [];
+                  return `
+                    <div class="border border-outline-variant/30 rounded-xl overflow-hidden">
+                      <div class="bg-surface-container-high p-4 flex items-center gap-4">
+                        <img src="${cp.imageUrl}" class="w-12 h-12 rounded-lg object-contain bg-white border border-outline-variant/20">
+                        <div class="flex-1">
+                          <h4 class="font-bold text-on-surface">${cp.title}</h4>
+                          <p class="text-xs text-on-surface-variant">${t('totalParticipantsLabel')}: ${cp.totalParticipants || 0}${t('personUnit')} | ${t('completedGroupsLabel')}: ${cp.completedGroups || 0}${t('groupUnit')} | ${t('drawDate')}: ${new Date(cp.closedAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div class="p-4">
+                        ${winners.length > 0 ? `
+                          <p class="text-xs font-bold text-tertiary mb-3 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">trophy</span>
+                            ${t('winnersListLabel')} (${winners.length}${t('personUnit')})
+                          </p>
+                          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                            ${winners.map(w => {
+                              const hasShipping = shippingList.some(s => s.productId === cp.id && s.winnerUid === w.uid);
+                              return `
+                                <div class="p-3 rounded-xl border ${hasShipping ? 'border-tertiary/30 bg-tertiary/5' : 'border-secondary/30 bg-secondary-container/5'}">
+                                  <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] font-bold bg-tertiary-container/20 text-tertiary px-2 py-0.5 rounded-full">${t('groupLabel')} ${w.groupNumber} ${t('winnerBadge')}</span>
+                                    <span class="font-mono text-[11px] text-on-surface-variant">${w.ticketNumber || ''}</span>
+                                  </div>
+                                  <p class="font-semibold text-sm text-on-surface">${w.name}</p>
+                                  <p class="text-xs font-mono text-on-surface-variant">${w.email}</p>
+                                  <div class="mt-2">
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${hasShipping ? 'bg-tertiary-container/20 text-tertiary' : 'bg-secondary-container/20 text-secondary'}">
+                                      ${hasShipping ? t('shippingSubmittedComplete') : t('shippingNotSubmitted')}
+                                    </span>
+                                  </div>
+                                </div>`;
+                            }).join('')}
+                          </div>
+                        ` : `
+                          <p class="text-sm text-on-surface-variant text-center py-4">${t('noWinners')}</p>
+                        `}
+                        ${refunded.length > 0 ? `
+                          <div class="mt-4 p-3 bg-error-container/5 border border-error/10 rounded-xl">
+                            <p class="text-[10px] font-bold text-error mb-2 flex items-center gap-1">
+                              <span class="material-symbols-outlined text-[14px]">undo</span>
+                              ${t('refundedGroupLabel')} (${refunded.length}${t('personUnit')})
+                            </p>
+                            <div class="flex flex-wrap gap-2">
+                              ${refunded.map(r => `
+                                <span class="text-[10px] bg-error-container/10 text-error px-2 py-1 rounded-full">${r.name}</span>
+                              `).join('')}
+                            </div>
+                          </div>
+                        ` : ''}
+                      </div>
+                    </div>`;
+                }).join('')}
+              </div>
+            `}
+          </div>
+
         </div>
       </main>
     </div>
@@ -430,7 +509,8 @@ export function render() {
   };
 
   // Product registration handler
-  window.__registerProduct = () => {
+  window.__registerProduct = async () => {
+    const submitBtn = document.getElementById('admin-submit-btn');
     const name = document.getElementById('admin-product-name')?.value?.trim();
     const desc = document.getElementById('admin-product-desc')?.value?.trim();
     const price = document.getElementById('admin-product-price')?.value;
@@ -464,42 +544,62 @@ export function render() {
       return;
     }
 
-    // Register product
-    const newProduct = addProduct({
-      title: name,
-      description: desc || '',
-      imageUrl: window.__uploadedImageDataUrl || null,
-      retailPrice: price,
-      entryPrice: ticket,
-      maxParticipants: max,
-      timerHours: hours,
-      timerMinutes: minutes,
-    });
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ 등록 중...';
+      }
 
-    // Show success toast
-    const toastContainer = document.getElementById('admin-toast-container');
-    if (toastContainer) {
-      toastContainer.innerHTML = `
-        <div class="pointer-events-auto bg-tertiary text-on-tertiary rounded-2xl p-4 shadow-2xl flex items-center gap-3 animate-bounce" style="animation-duration:0.5s;animation-iteration-count:1">
-          <span class="material-symbols-outlined text-3xl">check_circle</span>
-          <div class="flex-1">
-            <p class="font-bold text-sm">✅ ${t('productRegistered')}</p>
-            <p class="text-xs opacity-80">${name} — $${parseFloat(price).toLocaleString()}</p>
-          </div>
-          <button class="px-3 py-1 bg-white/20 rounded-full text-sm font-bold hover:bg-white/30 transition-all" onclick="window.location.hash='#home'">
-            ${t('viewHome')}
-          </button>
-        </div>`;
-      setTimeout(() => { toastContainer.innerHTML = ''; }, 4000);
+      // Default fallback image if user did not upload one
+      const defaultImg = DEMO_IMAGES.iphone;
+      const imageUrl = window.__uploadedImageDataUrl || defaultImg;
+
+      // Register product via Cloud Function
+      await addProduct({
+        title: name,
+        description: desc || '',
+        imageUrl: imageUrl,
+        retailPrice: parseFloat(price),
+        entryPrice: parseFloat(ticket),
+        maxParticipants: parseInt(max),
+        timerHours: hours,
+        timerMinutes: minutes,
+      });
+
+      // Show success toast
+      const toastContainer = document.getElementById('admin-toast-container');
+      if (toastContainer) {
+        toastContainer.innerHTML = `
+          <div class="pointer-events-auto bg-tertiary text-on-tertiary rounded-2xl p-4 shadow-2xl flex items-center gap-3 animate-bounce" style="animation-duration:0.5s;animation-iteration-count:1">
+            <span class="material-symbols-outlined text-3xl">check_circle</span>
+            <div class="flex-1">
+              <p class="font-bold text-sm">✅ ${t('productRegistered')}</p>
+              <p class="text-xs opacity-80">${name} — $${parseFloat(price).toLocaleString()}</p>
+            </div>
+            <button class="px-3 py-1 bg-white/20 rounded-full text-sm font-bold hover:bg-white/30 transition-all" onclick="window.location.hash='#home'">
+              ${t('viewHome')}
+            </button>
+          </div>`;
+        setTimeout(() => { toastContainer.innerHTML = ''; }, 4000);
+      }
+
+      // Reset form
+      document.getElementById('admin-register-form')?.reset();
+      window.__uploadedImageDataUrl = null;
+      const preview = document.getElementById('admin-photo-preview');
+      const placeholder = document.getElementById('admin-photo-placeholder');
+      if (preview) { preview.style.display = 'none'; preview.src = ''; }
+      if (placeholder) { placeholder.style.display = ''; }
+
+    } catch (err) {
+      console.error('[Admin] Error registering product:', err);
+      alert(`⚠️ 상품 등록 실패: ${err.message || '오류가 발생했습니다. 로그인을 확인해주세요.'}`);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = t('initializeLuckyPick');
+      }
     }
-
-    // Reset form
-    document.getElementById('admin-register-form')?.reset();
-    window.__uploadedImageDataUrl = null;
-    const preview = document.getElementById('admin-photo-preview');
-    const placeholder = document.getElementById('admin-photo-placeholder');
-    if (preview) { preview.style.display = 'none'; preview.src = ''; }
-    if (placeholder) { placeholder.style.display = ''; }
   };
 
   // Mobile sidebar toggle

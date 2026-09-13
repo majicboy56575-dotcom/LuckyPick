@@ -29,12 +29,11 @@ if (isFirebaseConfigured()) {
     firebaseApp = initializeApp(firebaseConfig);
     firebaseAuth = getAuth(firebaseApp);
 
-    // Connect to Auth Emulator on localhost
+    // Log active environment
     if (isLocalDev()) {
-      connectAuthEmulator(firebaseAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      console.log('[Firebase Auth] Connected to LOCAL EMULATOR (port 9099)');
+      console.log('[Firebase Auth] Connected to DEV PROJECT (lucky-pick-dev)');
     } else {
-      console.log('[Firebase Auth] Connected to PRODUCTION');
+      console.log('[Firebase Auth] Connected to PRODUCTION (luckypick-ec4cf)');
     }
 
     // Listen for real-time auth state changes

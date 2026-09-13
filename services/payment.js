@@ -1,17 +1,13 @@
-// ============================================
-// LuckyPick - Payment Service (Toss, Kakao, PayPal)
-// ============================================
+import { createPayPalOrder, capturePayPalOrder } from './firestore.js';
 
 const PAYPAL_CONFIG = {
-  clientId: 'ARnBA2jfyTPLQ_Q3AAUjoWIc_9PVYE_o_Klc1nWUNt_7rsFJZABm9ijFx7UAAPM9zHkgGb3kfCkRfRqZ',
-  clientSecret: 'EPKfWmVywQFWdwa4SYz-bxKMP5gnn_CM-lxg-032-BNs2XfiH9QnwDPXIRggAanz7LfvV3p3bIqyvNmj',
+  clientId: 'BAAIYArbS9Tv4eh1sD7CNm2ruF4mT1uEJytLaU_KXQ_T1ZC9tGCmEGXFP5HJTBH9zguanWW1fyP78Q6ly4',
+  clientSecret: '',
   currency: 'USD',
-  environment: 'sandbox'
+  environment: 'live'
 };
 
 const PAYMENT_METHODS = {
-  TOSS: 'toss',
-  KAKAO: 'kakao',
   PAYPAL: 'paypal'
 };
 
@@ -26,7 +22,7 @@ function getSelectedMethod() {
 }
 
 // --- PayPal Integration ---
-function renderPayPalButtons(containerId, { amount, orderName, onSuccess, onError, onCancel }) {
+function renderPayPalButtons(containerId, { productId, amount, orderName, onSuccess, onError, onCancel }) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = '';
@@ -44,29 +40,61 @@ function renderPayPalButtons(containerId, { amount, orderName, onSuccess, onErro
       shape: 'rect',
       label: 'pay'
     },
-    createOrder: (data, actions) => {
-      return actions.order.create({
-        purchase_units: [{
-          description: orderName || 'LuckyPick Entry Ticket',
-          amount: {
-            currency_code: PAYPAL_CONFIG.currency,
-            value: (amount || 50).toFixed(2)
-          }
-        }]
-      });
+    createOrder: async (data, actions) => {
+      try {
+        const res = await createPayPalOrder({
+          amount: amount || 50,
+          orderName: orderName || 'LuckyPick Entry Ticket',
+          productId: productId || ''
+        });
+        return res.orderId;
+      } catch (err) {
+        console.warn('[PayPal] Cloud Functions order creation fallback to client SDK:', err);
+        return actions.order.create({
+          purchase_units: [{
+            description: orderName || 'LuckyPick Entry Ticket',
+            amount: {
+              currency_code: PAYPAL_CONFIG.currency,
+              value: (amount || 50).toFixed(2)
+            }
+          }]
+        });
+      }
     },
     onApprove: async (data, actions) => {
       try {
-        const details = await actions.order.capture();
+        let details;
+        try {
+          details = await capturePayPalOrder({
+            orderId: data.orderID,
+            productId: productId || ''
+          });
+          details.isServerCaptured = true;
+        } catch (serverErr) {
+          console.warn('[PayPal] Cloud Functions capture fallback to client SDK:', serverErr);
+          const clientDetails = await actions.order.capture();
+          details = {
+            success: true,
+            paymentId: clientDetails.id,
+            amount: clientDetails.purchase_units[0]?.amount?.value || amount,
+            status: clientDetails.status,
+            payer: clientDetails.payer,
+            isServerCaptured: false
+          };
+        }
+
         console.log('[PayPal] Transaction completed:', details);
         if (onSuccess) {
           onSuccess({
             success: true,
-            paymentId: details.id,
+            paymentId: details.paymentId || details.id,
             payer: details.payer,
             method: 'PAYPAL',
-            amount: details.purchase_units[0].amount.value,
-            status: details.status
+            amount: details.amount || amount,
+            status: details.status,
+            isServerCaptured: details.isServerCaptured,
+            currentParticipants: details.currentParticipants,
+            maxParticipants: details.maxParticipants
           });
         }
       } catch (err) {
@@ -85,64 +113,10 @@ function renderPayPalButtons(containerId, { amount, orderName, onSuccess, onErro
   }).render(`#${containerId}`);
 }
 
-// --- Toss Pay Integration Stub ---
-async function requestTossPayment({ orderId, orderName, amount, customerName, customerEmail }) {
-  console.log('[TossPay] Payment requested:', { orderId, orderName, amount });
-  return {
-    success: true,
-    paymentId: 'toss_' + Date.now(),
-    method: 'TOSS_PAY',
-    amount,
-    orderId,
-  };
-}
-
-// --- Kakao Pay Integration Stub ---
-async function requestKakaoPayment({ orderId, orderName, amount, customerName }) {
-  console.log('[KakaoPay] Payment requested:', { orderId, orderName, amount });
-  return {
-    success: true,
-    paymentId: 'kakao_' + Date.now(),
-    method: 'KAKAO_PAY',
-    amount,
-    orderId,
-  };
-}
-
-// --- Unified Payment Request ---
-async function processPayment({ productId, productTitle, amount, userName, userEmail }) {
-  const orderId = `LP_${productId}_${Date.now()}`;
-  const params = {
-    orderId,
-    orderName: `LuckyPick: ${productTitle}`,
-    amount,
-    customerName: userName,
-    customerEmail: userEmail,
-  };
-
-  let result;
-  if (selectedMethod === PAYMENT_METHODS.TOSS) {
-    result = await requestTossPayment(params);
-  } else if (selectedMethod === PAYMENT_METHODS.KAKAO) {
-    result = await requestKakaoPayment(params);
-  } else if (selectedMethod === PAYMENT_METHODS.PAYPAL) {
-    result = { success: true, pendingPayPalButtons: true };
-  }
-
-  if (result?.success && !result?.pendingPayPalButtons) {
-    console.log('[Payment] Success:', result);
-  }
-
-  return result;
-}
-
 export {
   PAYPAL_CONFIG,
   PAYMENT_METHODS,
   selectPaymentMethod,
   getSelectedMethod,
   renderPayPalButtons,
-  processPayment,
-  requestTossPayment,
-  requestKakaoPayment,
 };

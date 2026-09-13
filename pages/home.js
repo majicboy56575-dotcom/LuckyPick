@@ -4,7 +4,7 @@
 // Backend handles expiration & winner selection.
 // ============================================
 import { t } from '../i18n.js';
-import { getActiveProducts } from '../services/firestore.js';
+import { getActiveProducts, getGroupSlots } from '../services/firestore.js';
 import { getCurrentAuthUser } from '../services/auth.js';
 
 let countdownIntervals = [];
@@ -74,9 +74,10 @@ function renderParticipantsModal(product) {
 
 function renderProductCard(product, index) {
   const remaining = product.endTime - Date.now();
-  const fillPercent = Math.round(((product.currentParticipants || 0) / (product.maxParticipants || 1)) * 100);
   const timerClasses = getTimerClasses(remaining);
   const isUrgent = remaining <= 300000;
+  const authUser = getCurrentAuthUser();
+  const groupInfo = getGroupSlots(product, authUser?.uid || null);
 
   return `
     <div class="bg-white rounded-[24px] border border-outline-variant/30 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-xl hover:-translate-y-1">
@@ -104,20 +105,44 @@ function renderProductCard(product, index) {
             </div>
           </div>
         </div>
+
+        <!-- Group Slots Grid -->
         <div class="mt-stack-sm mb-stack-md">
-          <div class="flex justify-between items-end mb-2">
+          <div class="flex justify-between items-center mb-3">
             <button class="font-label-caps text-label-caps text-primary hover:underline flex items-center gap-1 cursor-pointer" onclick="window.__showParticipants('${product.id}')">
               <span class="material-symbols-outlined text-[16px]">group</span>
-              ${t('participants')} (${product.currentParticipants || 0}/${product.maxParticipants || 0})
+              ${t('participants')} (${groupInfo.totalParticipants}${t('personUnit')})
             </button>
-            <span class="font-label-caps text-label-caps text-on-surface-variant">${fillPercent}% ${t('filled')}</span>
+            <span class="font-label-caps text-label-caps text-on-surface-variant">
+              ${groupInfo.completedGroups > 0 ? `${t('groupCompleted')} ${groupInfo.completedGroups}${t('groupUnit')}` : `${t('groupGoal')} ${groupInfo.unitSize}${t('personUnit')}`}
+            </span>
           </div>
-          <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden relative">
-            <div class="h-full ${isUrgent ? 'bg-secondary' : 'bg-primary'} rounded-full relative overflow-hidden" style="width:${fillPercent}%">
-              <div class="absolute inset-0 bg-white/20 progress-pulse w-1/4"></div>
-            </div>
+          <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-1 rounded-xl bg-surface-variant/10 border border-outline-variant/20 custom-scrollbar">
+            ${groupInfo.groups.map(g => {
+              const fillPct = Math.round((g.count / g.unitSize) * 100);
+              const isMyGroup = g.isMine;
+              const borderClass = isMyGroup
+                ? 'border-2 border-primary ring-2 ring-primary/20'
+                : g.isComplete
+                  ? 'border border-tertiary/40'
+                  : 'border border-outline-variant/40';
+              const bgClass = g.isComplete
+                ? 'bg-tertiary/5'
+                : 'bg-white';
+              return `
+                <div class="relative rounded-xl p-2 ${borderClass} ${bgClass} text-center transition-all shadow-xs">
+                  ${isMyGroup ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-primary text-on-primary px-1.5 py-0.2 rounded-full whitespace-nowrap shadow-sm">🎯 ${t('myGroup')}</span>` : ''}
+                  <p class="text-[9px] font-bold text-on-surface-variant mb-0.5">${t('groupLabel')} ${g.groupNumber}</p>
+                  <p class="font-timer-numeric text-xs font-semibold ${g.isComplete ? 'text-tertiary' : 'text-on-surface'}">${g.count}/${g.unitSize}</p>
+                  <div class="h-1 w-full bg-surface-container rounded-full mt-1 overflow-hidden">
+                    <div class="h-full ${g.isComplete ? 'bg-tertiary' : 'bg-primary'} rounded-full" style="width:${fillPct}%"></div>
+                  </div>
+                  ${g.isComplete ? `<span class="text-[7px] text-tertiary font-bold mt-0.5 block">${t('achieved')} ✓</span>` : ''}
+                </div>`;
+            }).join('')}
           </div>
         </div>
+
         <button onclick="window.__participate('${product.id}')" class="mt-auto w-full py-4 ${isUrgent ? 'bg-secondary-container text-on-secondary-container' : 'bg-primary text-on-primary'} font-bold rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-md">
           ${isUrgent ? t('hurryParticipate') : t('participateNow')}
           <span class="material-symbols-outlined">${isUrgent ? 'shopping_cart' : 'arrow_forward'}</span>

@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "luckypick-ec4cf"
+    "default": "luckypick-ec4cf",
+    "prod": "luckypick-ec4cf",
+    "dev": "lucky-pick-dev"
   }
 }
+

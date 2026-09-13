@@ -1,7 +1,51 @@
 import { t } from '../i18n.js';
-import { getCurrentUser, getActiveProducts, addParticipation, submitShippingInfo } from '../services/firestore.js';
+import { getCurrentUser, getActiveProducts, addParticipation, submitShippingInfo, cancelUserParticipation, getGroupSlots } from '../services/firestore.js';
 import { renderPayPalButtons, selectPaymentMethod } from '../services/payment.js';
 import { signInWithGoogle, signInWithApple, continueAsGuest, signOut, getCurrentAuthUser, signUpWithEmail, signInWithEmail } from '../services/auth.js';
+
+// ============================================
+// Delegated Click Listener for Cancel & Refund (Opens In-Page Modal)
+// ============================================
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-cancel-product]');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const productId = btn.getAttribute('data-cancel-product');
+  const productTitle = btn.getAttribute('data-cancel-title') || '해당 상품';
+
+  const container = document.getElementById('cancel-modal-container') || document.body;
+  const modalHtml = renderCancelModal(productId, productTitle);
+  const existing = document.getElementById('cancel-modal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+});
+
+
+function renderCancelModal(productId, productTitle) {
+  return `
+    <div class="fixed inset-0 z-[70] flex items-center justify-center p-4 modal-backdrop bg-black/40 backdrop-blur-sm" id="cancel-modal" onclick="if(event.target===this)window.__closeCancelModal()">
+      <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
+        <div class="w-16 h-16 rounded-full bg-error-container/20 text-error flex items-center justify-center mx-auto mb-4">
+          <span class="material-symbols-outlined text-3xl">undo</span>
+        </div>
+        <h3 class="font-headline-sm text-lg font-bold text-on-surface mb-2">참여 취소 및 PayPal 환불</h3>
+        <p class="text-sm text-on-surface-variant mb-6 leading-relaxed">
+          <strong class="text-primary">[${productTitle}]</strong> 참여를 취소하시겠습니까?<br>
+          취소 즉시 결제하신 대금이 <strong>PayPal을 통해 전액 환불</strong> 처리됩니다.
+        </p>
+        <div class="flex gap-3" id="cancel-modal-actions">
+          <button type="button" onclick="window.__closeCancelModal()" class="flex-1 py-3 bg-surface-variant/40 text-on-surface font-bold rounded-xl hover:bg-surface-variant/60 transition-colors">
+            닫기
+          </button>
+          <button type="button" id="confirm-cancel-exec-btn" onclick="window.__executeCancel('${productId}', '${productTitle.replace(/'/g, "\\'")}')" class="flex-1 py-3 bg-error text-white font-bold rounded-xl hover:bg-error/90 transition-colors shadow-md">
+            환불 받기
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
 
 function renderShippingModal(product = {}) {
   return `
@@ -223,6 +267,7 @@ export function render() {
   const entryPrice = parseFloat(selectedProduct.entryPrice) || 0;
   const fee = entryPrice > 0 ? 2.50 : 0;
   const totalAmount = (entryPrice + fee).toFixed(2);
+  const hasAlreadyParticipated = user && user.participatedProducts && user.participatedProducts.some(p => p.id === selectedProduct.id);
 
   const html = `
     <main class="pt-24 px-4 max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-32 page-enter">
@@ -263,48 +308,29 @@ export function render() {
             <span class="material-symbols-outlined text-primary">payments</span>
             ${t('paymentMethod')}
           </h2>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div class="payment-option relative">
-              <input checked id="paypal" name="payment" type="radio" class="hidden" onchange="window.__selectPayMethod('paypal')">
-              <label class="flex flex-col items-center justify-center p-4 border-2 border-outline-variant rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-white text-center" for="paypal">
-                <div class="h-10 flex items-center justify-center mb-1">
-                  <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-[#003087]">Pay<span class="text-[#0079C1]">Pal</span></span>
-                </div>
-                <span class="font-body-md text-xs text-on-surface-variant">Sandbox Active</span>
-              </label>
+          ${hasAlreadyParticipated ? `
+            <div class="p-8 bg-tertiary/10 border border-tertiary/20 rounded-2xl text-center space-y-2">
+              <span class="material-symbols-outlined text-tertiary text-4xl">check_circle</span>
+              <h4 class="font-bold text-lg text-on-surface">이미 응모 완료된 상품입니다.</h4>
+              <p class="text-sm text-on-surface-variant">이 상품은 계정당 1회만 참여 가능합니다.<br>추첨 결과를 기다려주세요!</p>
             </div>
-            <div class="payment-option relative">
-              <input id="toss" name="payment" type="radio" class="hidden" onchange="window.__selectPayMethod('toss')">
-              <label class="flex flex-col items-center justify-center p-4 border-2 border-outline-variant rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-white text-center" for="toss">
-                <div class="h-10 flex items-center justify-center mb-1">
-                  <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-[#0058be]">Toss Pay</span>
+          ` : `
+            <div class="mb-6">
+              <div class="payment-option relative max-w-sm mx-auto">
+                <div class="flex flex-col items-center justify-center p-4 border-2 border-primary rounded-xl bg-white text-center">
+                  <div class="h-10 flex items-center justify-center mb-1">
+                    <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-[#003087]">Pay<span class="text-[#0079C1]">Pal</span></span>
+                  </div>
+                  <span class="font-body-md text-xs text-on-surface-variant">Sandbox Active</span>
                 </div>
-                <span class="font-body-md text-xs text-on-surface-variant">${t('simpleAndFast')}</span>
-              </label>
+              </div>
             </div>
-            <div class="payment-option relative">
-              <input id="kakao" name="payment" type="radio" class="hidden" onchange="window.__selectPayMethod('kakao')">
-              <label class="flex flex-col items-center justify-center p-4 border-2 border-outline-variant rounded-xl cursor-pointer hover:border-primary/50 transition-all bg-white text-center" for="kakao">
-                <div class="h-10 flex items-center justify-center mb-1">
-                  <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-on-surface">Kakao Pay</span>
-                </div>
-                <span class="font-body-md text-xs text-on-surface-variant">${t('secureMobilePay')}</span>
-              </label>
-            </div>
-          </div>
 
-          <!-- PayPal SDK Container -->
-          <div id="paypal-button-wrapper" class="mt-6">
-            <div id="paypal-button-container" class="w-full min-h-[150px]"></div>
-          </div>
-
-          <!-- Toss / Kakao Button -->
-          <div id="standard-pay-button" class="mt-6 hidden">
-            <button onclick="window.__triggerStandardPay()" class="w-full bg-primary text-on-primary font-headline-sm text-headline-sm py-4 rounded-full shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3">
-              ${t('payNow')}
-              <span class="material-symbols-outlined">arrow_forward</span>
-            </button>
-          </div>
+            <!-- PayPal SDK Container -->
+            <div id="paypal-button-wrapper" class="mt-6">
+              <div id="paypal-button-container" class="w-full min-h-[150px]"></div>
+            </div>
+          `}
 
           <div class="mt-8 flex flex-wrap justify-center items-center gap-6 opacity-60 grayscale hover:grayscale-0 transition-all">
             <div class="flex items-center gap-1">
@@ -377,6 +403,12 @@ export function render() {
                       ${pp.status === 'active' ? t('ongoing_status') : pp.status === 'not_won' ? t('notWonTitle') : t('ended')}
                     </span>
                   </div>
+                  ${pp.status === 'active' && pp.myGroupNumber ? `
+                    <div class="flex items-center gap-2 mt-1.5">
+                      <span class="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">🎯 ${t('groupLabel')} ${pp.myGroupNumber}</span>
+                      <span class="text-[10px] font-mono text-on-surface-variant">#${pp.mySequence}${t('sequenceUnit')}</span>
+                    </div>
+                  ` : ''}
                   ${pp.status === 'not_won' ? `
                     <p class="text-xs text-error font-semibold mt-1 flex items-center gap-1">
                       <span class="material-symbols-outlined text-[15px]">info</span>
@@ -385,6 +417,13 @@ export function render() {
                   ` : `
                     <p class="text-xs text-on-surface-variant mt-1">${t('participatedAgo')}</p>
                   `}
+                  ${pp.status === 'active' ? `
+                    <button type="button" data-cancel-product="${pp.id}" data-cancel-title="${(pp.title || '').replace(/"/g, '&quot;')}"
+                      class="mt-2 px-3 py-1.5 bg-error-container/20 text-error hover:bg-error-container/40 font-bold rounded-lg text-[11px] transition-all flex items-center gap-1 cursor-pointer">
+                      <span class="material-symbols-outlined text-[14px]">undo</span>
+                      ${t('cancelAndRefund')}
+                    </button>
+                  ` : ''}
                 </div>
               </div>
             `).join('')}
@@ -445,21 +484,30 @@ export function render() {
         </div>
       </aside>
     </main>
-    <div id="shipping-modal-container"></div>`;
+    <div id="shipping-modal-container"></div>
+    <div id="cancel-modal-container"></div>`;
 
   // Render PayPal SDK buttons after DOM update for the SPECIFIC selected product
   setTimeout(() => {
+    if (hasAlreadyParticipated) return;
+
     renderPayPalButtons('paypal-button-container', {
       amount: parseFloat(totalAmount),
       orderName: `LuckyPick ${selectedProduct.title} Ticket`,
       onSuccess: async (payment) => {
         try {
-          const result = await addParticipation({
-            productId: selectedProduct.id,
-            paymentId: payment.paymentId,
-          });
-
-          const countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
+          let countText = '';
+          if (payment.isServerCaptured) {
+            countText = payment.currentParticipants && payment.maxParticipants 
+              ? `${payment.currentParticipants}/${payment.maxParticipants}` 
+              : '';
+          } else {
+            const result = await addParticipation({
+              productId: selectedProduct.id,
+              paymentId: payment.paymentId,
+            });
+            countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
+          }
 
           alert(`🎉 PayPal Sandbox 결제 성공!\n\nTransaction ID: ${payment.paymentId}\nStatus: ${payment.status}\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
 
@@ -476,36 +524,56 @@ export function render() {
     });
   }, 100);
 
-  window.__selectPayMethod = (method) => {
-    selectPaymentMethod(method);
-    const paypalWrapper = document.getElementById('paypal-button-wrapper');
-    const standardBtn = document.getElementById('standard-pay-button');
-
-    if (method === 'paypal') {
-      if (paypalWrapper) paypalWrapper.classList.remove('hidden');
-      if (standardBtn) standardBtn.classList.add('hidden');
-    } else {
-      if (paypalWrapper) paypalWrapper.classList.add('hidden');
-      if (standardBtn) standardBtn.classList.remove('hidden');
+  window.__openCancelModal = (productId, productTitle) => {
+    const container = document.getElementById('cancel-modal-container');
+    if (container) {
+      container.innerHTML = renderCancelModal(productId, productTitle || '해당 상품');
     }
   };
 
-  window.__triggerStandardPay = async () => {
+  window.__closeCancelModal = () => {
+    const el = document.getElementById('cancel-modal');
+    if (el) el.remove();
+    const container = document.getElementById('cancel-modal-container');
+    if (container) container.innerHTML = '';
+  };
+
+  window.__executeCancel = async (productId, productTitle) => {
+    const btn = document.getElementById('confirm-cancel-exec-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">refresh</span> 환불 처리 중...';
+    }
+
     try {
-      const result = await addParticipation({
-        productId: selectedProduct.id,
-        paymentId: 'pay_' + Date.now(),
-      });
-
-      const countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
-      alert(`🎉 결제가 완료되었습니다!\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
-
-      window.location.hash = '#home';
+      const result = await cancelUserParticipation(productId);
+      const actions = document.getElementById('cancel-modal-actions');
+      if (actions) {
+        actions.innerHTML = `
+          <div class="w-full p-4 bg-tertiary/10 border border-tertiary/20 rounded-xl text-center">
+            <p class="font-bold text-tertiary text-sm">✅ PayPal 환불이 정상 완료되었습니다!</p>
+            <p class="text-xs text-on-surface-variant mt-1">PayPal 계정 및 카드 취소 내역을 확인해주세요.</p>
+            <button type="button" onclick="window.__closeCancelModal(); window.location.hash='#home';" class="mt-3 px-6 py-2 bg-primary text-on-primary font-bold rounded-xl text-xs hover:bg-primary-container transition-all shadow-sm">
+              확인
+            </button>
+          </div>
+        `;
+      }
+      setTimeout(() => {
+        window.__closeCancelModal();
+        window.location.hash = '#home';
+      }, 2500);
     } catch (err) {
-      console.error('Participation error:', err);
-      alert(`참여 등록 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+      console.error('Cancel error:', err);
+      alert(`환불 처리 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '환불 받기';
+      }
     }
   };
+
+
 
   window.__openShippingModal = (productId) => {
     const wp = user.wonProducts.find(p => p.id === productId) || user.wonProducts[0] || {};
@@ -544,6 +612,26 @@ export function render() {
     }
   };
 
+  window.__cancelParticipation = async (productId) => {
+    const pp = user?.participatedProducts?.find(p => p.id === productId);
+    const productTitle = pp?.title || '해당 상품';
+    const confirmed = confirm(`⚠️ [${productTitle}] 참여를 취소하시겠습니까?\n\n취소 시 결제 금액이 PayPal로 환불되며, 참여 순번이 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.`);
+    if (!confirmed) return;
+
+    try {
+      const result = await cancelUserParticipation(productId);
+      if (result.refunded) {
+        alert(`✅ [${productTitle}] 참여가 취소되었습니다.\n\nPayPal 환불이 처리되었습니다.\n환불 금액은 PayPal 계정으로 입금됩니다.`);
+      } else {
+        alert(`✅ [${productTitle}] 참여가 취소되었습니다.\n\n(참여가 정상적으로 취소되었습니다.)`);
+      }
+      window.location.hash = '#home';
+    } catch (err) {
+      console.error('Cancel participation error:', err);
+      alert(`참여 취소 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+    }
+  };
+
   return html;
 }
 
@@ -555,4 +643,5 @@ export function cleanup() {
   delete window.__openShippingModal;
   delete window.__closeShippingModal;
   delete window.__submitShipping;
+  delete window.__cancelParticipation;
 }
