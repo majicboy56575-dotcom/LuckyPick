@@ -1,4 +1,4 @@
-import { createPayPalOrder, capturePayPalOrder } from './firestore.js';
+import { createPayPalOrder, capturePayPalOrder, confirmTossPayment } from './firestore.js';
 
 const PAYPAL_CONFIG = {
   clientId: 'BAAIYArbS9Tv4eh1sD7CNm2ruF4mT1uEJytLaU_KXQ_T1ZC9tGCmEGXFP5HJTBH9zguanWW1fyP78Q6ly4',
@@ -7,11 +7,15 @@ const PAYPAL_CONFIG = {
   environment: 'live'
 };
 
+// Toss Payments Client Key (사용자 테스트 클라이언트 키)
+const TOSS_CLIENT_KEY = 'test_ck_ZLKGPx4M3MbNoAwdPzJoVBaWypv1';
+
 const PAYMENT_METHODS = {
-  PAYPAL: 'paypal'
+  PAYPAL: 'paypal',
+  TOSS: 'toss',
 };
 
-let selectedMethod = PAYMENT_METHODS.PAYPAL;
+let selectedMethod = PAYMENT_METHODS.TOSS; // Default to Toss for Korean users
 
 function selectPaymentMethod(method) {
   selectedMethod = method;
@@ -113,10 +117,66 @@ function renderPayPalButtons(containerId, { productId, amount, orderName, onSucc
   }).render(`#${containerId}`);
 }
 
+// --- Toss Payments Integration ---
+/**
+ * Request Toss Payment - opens the Toss payment popup.
+ * On success, Toss redirects to successUrl with paymentKey, orderId, amount params.
+ */
+async function requestTossPayment({ productId, productName, amount, userId, userEmail }) {
+  if (!window.TossPayments) {
+    throw new Error('토스페이먼츠 SDK가 로드되지 않았습니다.');
+  }
+
+  const tossPayments = TossPayments(TOSS_CLIENT_KEY);
+
+  // Store pending productId in sessionStorage so it survives redirects
+  sessionStorage.setItem('toss_pending_product', productId);
+
+  // Generate unique order ID
+  const orderId = `LP_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Build success/fail URLs with query parameters
+  const baseUrl = window.location.origin + window.location.pathname;
+  const successUrl = `${baseUrl}?toss=success&productId=${encodeURIComponent(productId)}`;
+  const failUrl = `${baseUrl}?toss=fail`;
+
+  await tossPayments.requestPayment('카드', {
+    amount: amount,
+    orderId: orderId,
+    orderName: `LuckyPick ${productName}`,
+    successUrl: successUrl,
+    failUrl: failUrl,
+    customerEmail: userEmail || '',
+    customerName: userId || 'guest'
+  });
+}
+
+/**
+ * Handle Toss Payment success redirect.
+ * Parses URL params and calls the backend confirmTossPayment callable.
+ */
+async function handleTossSuccess(paymentKey, orderId, amount, productId) {
+  try {
+    const result = await confirmTossPayment({
+      paymentKey,
+      orderId,
+      amount: parseInt(amount),
+      productId
+    });
+    return result;
+  } catch (err) {
+    console.error('[Toss] Confirm error:', err);
+    throw err;
+  }
+}
+
 export {
   PAYPAL_CONFIG,
   PAYMENT_METHODS,
+  TOSS_CLIENT_KEY,
   selectPaymentMethod,
   getSelectedMethod,
   renderPayPalButtons,
+  requestTossPayment,
+  handleTossSuccess,
 };

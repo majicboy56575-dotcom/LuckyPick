@@ -389,6 +389,13 @@ async function cancelUserParticipation(productId) {
   return result.data;
 }
 
+async function confirmTossPayment(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'confirmTossPayment');
+  const result = await callable(data);
+  return result.data;
+}
+
 /**
  * Compute group/slot info for a product.
  * @param {object} product - The active product object.
@@ -495,6 +502,7 @@ export {
   createPayPalOrder,
   capturePayPalOrder,
   cancelUserParticipation,
+  confirmTossPayment,
   getGroupSlots,
   maskName,
   maskEmail,

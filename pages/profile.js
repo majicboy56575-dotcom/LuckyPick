@@ -1,6 +1,6 @@
 import { t } from '../i18n.js';
 import { getCurrentUser, getActiveProducts, addParticipation, submitShippingInfo, cancelUserParticipation, getGroupSlots } from '../services/firestore.js';
-import { renderPayPalButtons, selectPaymentMethod } from '../services/payment.js';
+import { renderPayPalButtons, selectPaymentMethod, getSelectedMethod, PAYMENT_METHODS, requestTossPayment, handleTossSuccess } from '../services/payment.js';
 import { signInWithGoogle, signInWithApple, continueAsGuest, signOut, getCurrentAuthUser, signUpWithEmail, signInWithEmail } from '../services/auth.js';
 
 // ============================================
@@ -30,16 +30,16 @@ function renderCancelModal(productId, productTitle) {
         <div class="w-16 h-16 rounded-full bg-error-container/20 text-error flex items-center justify-center mx-auto mb-4">
           <span class="material-symbols-outlined text-3xl">undo</span>
         </div>
-        <h3 class="font-headline-sm text-lg font-bold text-on-surface mb-2">참여 취소 및 PayPal 환불</h3>
+        <h3 class="font-headline-sm text-lg font-bold text-on-surface mb-2">참여 취소 및 환불</h3>
         <p class="text-sm text-on-surface-variant mb-6 leading-relaxed">
           <strong class="text-primary">[${productTitle}]</strong> 참여를 취소하시겠습니까?<br>
-          취소 즉시 결제하신 대금이 <strong>PayPal을 통해 전액 환불</strong> 처리됩니다.
+          취소 즉시 결제하신 대금이 <strong>전액 환불</strong> 처리됩니다.
         </p>
         <div class="flex gap-3" id="cancel-modal-actions">
           <button type="button" onclick="window.__closeCancelModal()" class="flex-1 py-3 bg-surface-variant/40 text-on-surface font-bold rounded-xl hover:bg-surface-variant/60 transition-colors">
             닫기
           </button>
-          <button type="button" id="confirm-cancel-exec-btn" onclick="window.__executeCancel('${productId}', '${productTitle.replace(/'/g, "\\'")}')" class="flex-1 py-3 bg-error text-white font-bold rounded-xl hover:bg-error/90 transition-colors shadow-md">
+          <button type="button" id="confirm-cancel-exec-btn" onclick="window.__executeCancel('${productId}', '${productTitle}')" class="flex-1 py-3 bg-error text-white font-bold rounded-xl hover:bg-error/90 transition-colors shadow-md">
             환불 받기
           </button>
         </div>
@@ -265,8 +265,8 @@ export function render() {
     entryPrice: 0
   };
   const entryPrice = parseFloat(selectedProduct.entryPrice) || 0;
-  const fee = entryPrice > 0 ? 2.50 : 0;
-  const totalAmount = (entryPrice + fee).toFixed(2);
+  const fee = 0;
+  const totalAmount = Math.round(entryPrice + fee);
   const hasAlreadyParticipated = user && user.participatedProducts && user.participatedProducts.some(p => p.id === selectedProduct.id);
 
   const html = `
@@ -316,19 +316,49 @@ export function render() {
             </div>
           ` : `
             <div class="mb-6">
-              <div class="payment-option relative max-w-sm mx-auto">
-                <div class="flex flex-col items-center justify-center p-4 border-2 border-primary rounded-xl bg-white text-center">
-                  <div class="h-10 flex items-center justify-center mb-1">
-                    <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-[#003087]">Pay<span class="text-[#0079C1]">Pal</span></span>
+              <!-- Payment Method Tabs -->
+              <div class="flex gap-2 mb-4">
+                <button id="tab-toss" onclick="window.__selectPayMethod('toss')" class="flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 border-primary bg-primary/10 text-primary">
+                  🇰🇷 토스페이 · 카드
+                </button>
+                <button id="tab-paypal" onclick="window.__selectPayMethod('paypal')" class="flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 border-outline-variant/30 bg-white text-on-surface-variant">
+                  🌍 PayPal
+                </button>
+              </div>
+
+              <!-- Toss Payment Section (default) -->
+              <div id="toss-payment-section">
+                <div class="payment-option relative max-w-sm mx-auto">
+                  <div class="flex flex-col items-center justify-center p-4 border-2 border-primary rounded-xl bg-white text-center">
+                    <div class="h-10 flex items-center justify-center mb-1">
+                      <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-[#0064FF]">toss</span>
+                      <span class="font-display-lg text-[16px] font-bold tracking-tight text-on-surface-variant ml-1">payments</span>
+                    </div>
+                    <span class="font-body-md text-xs text-on-surface-variant">테스트 모드</span>
                   </div>
-                  <span class="font-body-md text-xs text-on-surface-variant">Sandbox Active</span>
+                </div>
+                <div class="mt-4">
+                  <button id="toss-pay-btn" onclick="window.__triggerTossPay()" class="w-full py-4 bg-[#0064FF] text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#0050CC] transition-all active:scale-95 shadow-lg text-lg">
+                    <span class="material-symbols-outlined">credit_card</span>
+                    토스페이로 결제하기
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <!-- PayPal SDK Container -->
-            <div id="paypal-button-wrapper" class="mt-6">
-              <div id="paypal-button-container" class="w-full min-h-[150px]"></div>
+              <!-- PayPal Payment Section (hidden by default) -->
+              <div id="paypal-payment-section" style="display:none;">
+                <div class="payment-option relative max-w-sm mx-auto">
+                  <div class="flex flex-col items-center justify-center p-4 border-2 border-primary rounded-xl bg-white text-center">
+                    <div class="h-10 flex items-center justify-center mb-1">
+                      <span class="font-display-lg text-[20px] font-extrabold tracking-tight text-[#003087]">Pay<span class="text-[#0079C1]">Pal</span></span>
+                    </div>
+                    <span class="font-body-md text-xs text-on-surface-variant">Sandbox Active</span>
+                  </div>
+                </div>
+                <div id="paypal-button-wrapper" class="mt-6">
+                  <div id="paypal-button-container" class="w-full min-h-[150px]"></div>
+                </div>
+              </div>
             </div>
           `}
 
@@ -453,21 +483,21 @@ export function render() {
               <div class="space-y-4 border-t border-outline-variant/30 pt-6 mb-8">
                 <div class="flex justify-between items-center text-on-surface-variant">
                   <span class="font-body-md text-body-md">${t('entryPrice')}</span>
-                  <span class="font-timer-numeric text-on-surface">$${entryPrice.toFixed(2)}</span>
+                  <span class="font-timer-numeric text-on-surface">₩${entryPrice.toLocaleString()}</span>
                 </div>
                 <div class="flex justify-between items-center text-on-surface-variant">
                   <span class="font-body-md text-body-md">${t('platformFee')}</span>
-                  <span class="font-timer-numeric text-on-surface">$${fee.toFixed(2)}</span>
+                  <span class="font-timer-numeric text-on-surface">₩${fee.toLocaleString()}</span>
                 </div>
                 <div class="flex justify-between items-center text-tertiary">
                   <span class="font-body-md text-body-md">${t('discount')}</span>
-                  <span class="font-timer-numeric">-$0.00</span>
+                  <span class="font-timer-numeric">-₩0</span>
                 </div>
               </div>
               <div class="bg-surface-container-low rounded-lg p-6 flex flex-col gap-1 border border-primary/10">
                 <div class="flex justify-between items-center">
                   <span class="font-headline-md text-headline-md text-on-surface">${t('total')}</span>
-                  <span class="font-display-lg text-[28px] text-on-surface">$${totalAmount}</span>
+                  <span class="font-display-lg text-[28px] text-on-surface">₩${parseFloat(totalAmount).toLocaleString()}</span>
                 </div>
                 <p class="text-outline text-[12px] font-body-md text-right">${t('vatIncluded')}</p>
               </div>
@@ -487,41 +517,91 @@ export function render() {
     <div id="shipping-modal-container"></div>
     <div id="cancel-modal-container"></div>`;
 
-  // Render PayPal SDK buttons after DOM update for the SPECIFIC selected product
+  // Render payment buttons after DOM update
   setTimeout(() => {
     if (hasAlreadyParticipated) return;
 
-    renderPayPalButtons('paypal-button-container', {
-      amount: parseFloat(totalAmount),
-      orderName: `LuckyPick ${selectedProduct.title} Ticket`,
-      onSuccess: async (payment) => {
-        try {
-          let countText = '';
-          if (payment.isServerCaptured) {
-            countText = payment.currentParticipants && payment.maxParticipants 
-              ? `${payment.currentParticipants}/${payment.maxParticipants}` 
-              : '';
-          } else {
-            const result = await addParticipation({
-              productId: selectedProduct.id,
-              paymentId: payment.paymentId,
-            });
-            countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
+    // Payment method tab switching
+    window.__selectPayMethod = (method) => {
+      selectPaymentMethod(method);
+      const tossSection = document.getElementById('toss-payment-section');
+      const paypalSection = document.getElementById('paypal-payment-section');
+      const tabToss = document.getElementById('tab-toss');
+      const tabPaypal = document.getElementById('tab-paypal');
+
+      if (method === 'toss') {
+        if (tossSection) tossSection.style.display = '';
+        if (paypalSection) paypalSection.style.display = 'none';
+        if (tabToss) { tabToss.className = 'flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 border-primary bg-primary/10 text-primary'; }
+        if (tabPaypal) { tabPaypal.className = 'flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 border-outline-variant/30 bg-white text-on-surface-variant'; }
+      } else {
+        if (tossSection) tossSection.style.display = 'none';
+        if (paypalSection) paypalSection.style.display = '';
+        if (tabToss) { tabToss.className = 'flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 border-outline-variant/30 bg-white text-on-surface-variant'; }
+        if (tabPaypal) { tabPaypal.className = 'flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 border-primary bg-primary/10 text-primary'; }
+        // Render PayPal buttons only when PayPal tab is selected
+        renderPayPalButtons('paypal-button-container', {
+          amount: Math.max(1, parseFloat((totalAmount / 1400).toFixed(2))),
+          orderName: `LuckyPick ${selectedProduct.title} Ticket`,
+          onSuccess: async (payment) => {
+            try {
+              let countText = '';
+              if (payment.isServerCaptured) {
+                countText = payment.currentParticipants && payment.maxParticipants 
+                  ? `${payment.currentParticipants}/${payment.maxParticipants}` 
+                  : '';
+              } else {
+                const result = await addParticipation({
+                  productId: selectedProduct.id,
+                  paymentId: payment.paymentId,
+                });
+                countText = result ? `${result.currentParticipants}/${result.maxParticipants}` : '';
+              }
+              alert(`🎉 PayPal 결제 성공!\n\nTransaction ID: ${payment.paymentId}\nStatus: ${payment.status}\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
+              window.location.hash = '#home';
+            } catch (err) {
+              console.error('Participation error:', err);
+              alert(`참여 등록 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+            }
+          },
+          onError: (err) => {
+            console.error('PayPal Error:', err);
+            alert('PayPal 결제 진행 중 오류가 발생했습니다.');
           }
-
-          alert(`🎉 PayPal Sandbox 결제 성공!\n\nTransaction ID: ${payment.paymentId}\nStatus: ${payment.status}\n\n[${selectedProduct.title}] 참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
-
-          window.location.hash = '#home';
-        } catch (err) {
-          console.error('Participation error:', err);
-          alert(`참여 등록 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
-        }
-      },
-      onError: (err) => {
-        console.error('PayPal Error:', err);
-        alert('PayPal 결제 진행 중 오류가 발생했습니다.');
+        });
       }
-    });
+    };
+
+    // Toss Pay button handler
+    window.__triggerTossPay = async () => {
+      const btn = document.getElementById('toss-pay-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">refresh</span> 결제창 로딩 중...';
+      }
+      try {
+        const authUser = getCurrentAuthUser();
+        await requestTossPayment({
+          productId: selectedProduct.id,
+          productName: selectedProduct.title,
+          amount: totalAmount > 0 ? totalAmount : 1000,
+          userId: authUser?.uid || 'guest',
+          userEmail: authUser?.email || '',
+        });
+        // SDK will redirect to successUrl
+      } catch (err) {
+        console.error('[Toss] Payment request error:', err);
+        if (err.code === 'USER_CANCEL' || err.message?.includes('사용자')) {
+          // User closed payment popup
+        } else {
+          alert(`토스 결제 요청 실패: ${err.message || '알 수 없는 오류'}`);
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-outlined">credit_card</span> 토스페이로 결제하기';
+        }
+      }
+    };
   }, 100);
 
   window.__openCancelModal = (productId, productTitle) => {
@@ -615,13 +695,13 @@ export function render() {
   window.__cancelParticipation = async (productId) => {
     const pp = user?.participatedProducts?.find(p => p.id === productId);
     const productTitle = pp?.title || '해당 상품';
-    const confirmed = confirm(`⚠️ [${productTitle}] 참여를 취소하시겠습니까?\n\n취소 시 결제 금액이 PayPal로 환불되며, 참여 순번이 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.`);
+    const confirmed = confirm(`⚠️ [${productTitle}] 참여를 취소하시겠습니까?\n\n취소 시 결제 금액이 전액 환불되며, 참여 순번이 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.`);
     if (!confirmed) return;
 
     try {
       const result = await cancelUserParticipation(productId);
       if (result.refunded) {
-        alert(`✅ [${productTitle}] 참여가 취소되었습니다.\n\nPayPal 환불이 처리되었습니다.\n환불 금액은 PayPal 계정으로 입금됩니다.`);
+        alert(`✅ [${productTitle}] 참여가 취소되었습니다.\n\n환불이 처리되었습니다.`);
       } else {
         alert(`✅ [${productTitle}] 참여가 취소되었습니다.\n\n(참여가 정상적으로 취소되었습니다.)`);
       }
@@ -640,6 +720,7 @@ export function cleanup() {
   delete window.__doLogout;
   delete window.__selectPayMethod;
   delete window.__triggerStandardPay;
+  delete window.__triggerTossPay;
   delete window.__openShippingModal;
   delete window.__closeShippingModal;
   delete window.__submitShipping;

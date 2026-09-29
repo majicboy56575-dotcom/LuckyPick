@@ -175,6 +175,24 @@ function onAuthStateChanged(callback) {
   callback(currentUser);
 }
 
+function waitForAuth(timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    if (currentUser) {
+      resolve(currentUser);
+      return;
+    }
+    const handler = (e) => {
+      window.removeEventListener('authStateChanged', handler);
+      resolve(e.detail.user);
+    };
+    window.addEventListener('authStateChanged', handler);
+    setTimeout(() => {
+      window.removeEventListener('authStateChanged', handler);
+      resolve(currentUser);
+    }, timeoutMs);
+  });
+}
+
 export {
   signUpWithEmail,
   signInWithEmail,
@@ -186,4 +204,5 @@ export {
   isLoggedIn,
   isAdmin,
   onAuthStateChanged,
+  waitForAuth,
 };

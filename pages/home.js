@@ -98,10 +98,10 @@ function renderProductCard(product, index) {
             <p class="text-on-surface-variant font-body-md">${product.description || ''}</p>
           </div>
           <div class="flex flex-col items-end">
-            <span class="text-xs text-on-surface-variant line-through">${t('retail')}: $${(product.retailPrice || 0).toLocaleString()}</span>
+            <span class="text-xs text-on-surface-variant line-through">${t('retail')}: ₩${(product.retailPrice || 0).toLocaleString()}</span>
             <div class="flex flex-col items-end">
               <span class="text-label-caps text-[10px] text-primary uppercase tracking-widest">${t('entryPrice')}</span>
-              <span class="font-headline-sm text-headline-sm text-primary">$${product.entryPrice || 0}</span>
+              <span class="font-headline-sm text-headline-sm text-primary">₩${(product.entryPrice || 0).toLocaleString()}</span>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@
 // ============================================
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -15,6 +16,10 @@ const db = getFirestore();
 // ADMIN EMAIL (used for admin privilege checks)
 // ============================================
 const ADMIN_EMAIL = "majicboy56575@gmail.com";
+
+// Toss Payments Secret Key (loaded from functions/.env)
+const TOSS_SECRET_KEY =
+  process.env.TOSS_SECRET_KEY || "test_sk_24xLea5zVAjlGnv5D0e7rQAMYNwW";
 
 // ============================================
 // Helper: Privacy Masking
@@ -345,13 +350,22 @@ exports.checkExpiredProducts = onSchedule(
           for (const p of refundGroup) {
             if (p.paymentId) {
               try {
-                await refundPayPalCapture(
-                  p.paymentId,
-                  null,
-                  `LuckyPick 자동 환불: ${product.title} - 목표 인원 미달`
-                );
+                if (p.paymentMethod === "TOSS") {
+                  // Toss refund via paymentKey
+                  await refundTossPayment(
+                    p.paymentId,
+                    `LuckyPick 자동 환불: ${product.title} - 목표 인원 미달`
+                  );
+                } else {
+                  // PayPal refund (default for legacy participants)
+                  await refundPayPalCapture(
+                    p.paymentId,
+                    null,
+                    `LuckyPick 자동 환불: ${product.title} - 목표 인원 미달`
+                  );
+                }
                 console.log(
-                  `[Scheduler] Refunded ${p.name} (captureId: ${p.paymentId})`
+                  `[Scheduler] Refunded ${p.name} (${p.paymentMethod || "PAYPAL"}: ${p.paymentId})`
                 );
               } catch (refundErr) {
                 console.error(
@@ -365,6 +379,7 @@ exports.checkExpiredProducts = onSchedule(
               name: p.name,
               email: p.email,
               paymentId: p.paymentId || "",
+              paymentMethod: p.paymentMethod || "PAYPAL",
               refundedAt: now,
             });
           }
@@ -703,6 +718,7 @@ exports.cancelUserParticipation = onCall(
 
       const participant = product.participants[participantIndex];
       const paymentId = participant.paymentId;
+      const paymentMethod = participant.paymentMethod || "PAYPAL";
 
       // Remove participant from array
       const updatedParticipants = [...product.participants];
@@ -716,19 +732,26 @@ exports.cancelUserParticipation = onCall(
         participants: updatedParticipants,
       });
 
-      return { paymentId, participantName: participant.name };
+      return { paymentId, paymentMethod, participantName: participant.name };
     });
 
-    // Process PayPal refund outside the transaction
+    // Process refund outside the transaction (branch by payment method)
     if (result.paymentId) {
       try {
-        await refundPayPalCapture(
-          result.paymentId,
-          null,
-          "LuckyPick 참여 취소 환불"
-        );
+        if (result.paymentMethod === "TOSS") {
+          await refundTossPayment(
+            result.paymentId,
+            "LuckyPick 참여 취소 환불"
+          );
+        } else {
+          await refundPayPalCapture(
+            result.paymentId,
+            null,
+            "LuckyPick 참여 취소 환불"
+          );
+        }
         console.log(
-          `[Cancel] Refunded user ${uid}, captureId: ${result.paymentId}`
+          `[Cancel] Refunded user ${uid}, ${result.paymentMethod}: ${result.paymentId}`
         );
       } catch (refundErr) {
         console.error(`[Cancel] Refund failed for user ${uid}:`, refundErr);
@@ -737,5 +760,152 @@ exports.cancelUserParticipation = onCall(
     }
 
     return { success: true, refunded: !!result.paymentId };
+  }
+);
+
+// ============================================
+// Toss Payments REST API Helpers
+// ============================================
+async function refundTossPayment(paymentKey, cancelReason = "LuckyPick 환불") {
+  const encryptedKey = Buffer.from(`${TOSS_SECRET_KEY}:`).toString("base64");
+
+  const response = await fetch(
+    `https://api.tosspayments.com/v1/payments/${paymentKey}/cancel`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${encryptedKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ cancelReason }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("[Toss] Cancel/Refund error:", errText);
+    throw new Error(`토스 환불 실패: ${errText}`);
+  }
+
+  const data = await response.json();
+  console.log(`[Toss] Refund success: ${data.paymentKey}`);
+  return data;
+}
+
+// ============================================
+// 10. confirmTossPayment (Callable) - Authenticated Users
+//     Confirms Toss payment server-side and records participation
+// ============================================
+exports.confirmTossPayment = onCall(
+  {
+    region: "asia-northeast3",
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const { paymentKey, orderId, amount, productId } = request.data;
+    if (!paymentKey || !orderId || !amount || !productId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "paymentKey, orderId, amount, productId가 모두 필요합니다."
+      );
+    }
+
+    const uid = request.auth.uid;
+    const userName =
+      request.auth.token.name ||
+      request.auth.token.email?.split("@")[0] ||
+      "사용자";
+    const userEmail = request.auth.token.email || "user@luckypick.com";
+
+    // 1. Toss Payments Confirm API
+    const encryptedKey = Buffer.from(`${TOSS_SECRET_KEY}:`).toString("base64");
+
+    const confirmResponse = await fetch(
+      "https://api.tosspayments.com/v1/payments/confirm",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${encryptedKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ paymentKey, orderId, amount }),
+      }
+    );
+
+    if (!confirmResponse.ok) {
+      const errText = await confirmResponse.text();
+      console.error("[Toss] Confirm error:", errText);
+      throw new HttpsError(
+        "internal",
+        `토스 결제 승인 실패: ${errText}`
+      );
+    }
+
+    const paymentData = await confirmResponse.json();
+    console.log(`[Toss] Payment confirmed: ${paymentData.paymentKey}, status: ${paymentData.status}`);
+
+    if (paymentData.status !== "DONE") {
+      throw new HttpsError(
+        "failed-precondition",
+        `결제가 완료되지 않았습니다. (상태: ${paymentData.status})`
+      );
+    }
+
+    // 2. Record participation in Firestore via transaction
+    const productRef = db.collection("products").doc(productId);
+    const result = await db.runTransaction(async (transaction) => {
+      const productDoc = await transaction.get(productRef);
+      if (!productDoc.exists) {
+        throw new HttpsError("not-found", "상품을 찾을 수 없습니다.");
+      }
+      const product = productDoc.data();
+
+      if (product.status !== "active" || product.endTime <= Date.now()) {
+        throw new HttpsError("failed-precondition", "마감된 상품입니다.");
+      }
+
+      const isDuplicate = (product.participants || []).some(
+        (p) => p.uid === uid
+      );
+      if (isDuplicate) {
+        throw new HttpsError("already-exists", "이미 참여한 상품입니다.");
+      }
+
+      const newParticipant = {
+        uid,
+        name: maskName(userName),
+        email: maskEmail(userEmail),
+        phone: "",
+        initial: userName ? userName.charAt(0).toUpperCase() : "U",
+        paymentId: paymentKey,
+        paymentMethod: "TOSS",
+        tossOrderId: orderId,
+        joinedAt: Date.now(),
+      };
+
+      transaction.update(productRef, {
+        currentParticipants: product.currentParticipants + 1,
+        participants: [...(product.participants || []), newParticipant],
+      });
+
+      return {
+        currentParticipants: product.currentParticipants + 1,
+        maxParticipants: product.maxParticipants,
+      };
+    });
+
+    console.log(
+      `[Toss] Confirm & Participation success for user ${uid}, paymentKey ${paymentKey}`
+    );
+    return {
+      success: true,
+      paymentKey,
+      orderId,
+      status: paymentData.status,
+      ...result,
+    };
   }
 );

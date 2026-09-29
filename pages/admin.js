@@ -94,7 +94,7 @@ export function render() {
                 <span class="text-tertiary text-xs font-bold">+12.5%</span>
               </div>
               <p class="text-on-surface-variant font-label-caps text-label-caps">${t('totalRevenue')}</p>
-              <h2 class="text-primary font-display-lg text-display-lg-mobile mt-1">$${stats.totalRevenue.toLocaleString()}</h2>
+              <h2 class="text-primary font-display-lg text-display-lg-mobile mt-1">₩${stats.totalRevenue.toLocaleString()}</h2>
               <div class="mt-4 h-1 w-full bg-surface-variant rounded-full overflow-hidden"><div class="h-full bg-primary w-3/4"></div></div>
             </div>
             <div class="glass-card p-6 rounded-xl shadow-sm hover:shadow-md transition-all">
@@ -151,12 +151,12 @@ export function render() {
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div class="space-y-2">
-                    <label class="font-label-caps text-label-caps text-on-surface-variant">${t('priceUSD')}</label>
-                    <input id="admin-product-price" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="50.00" type="number" step="0.01" min="0" required>
+                    <label class="font-label-caps text-label-caps text-on-surface-variant">${t('priceKRW')}</label>
+                    <input id="admin-product-price" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="1500000" type="number" step="1000" min="0" required>
                   </div>
                   <div class="space-y-2">
                     <label class="font-label-caps text-label-caps text-on-surface-variant">${t('ticketCost')}</label>
-                    <input id="admin-product-ticket" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="1.00" type="number" step="0.01" min="0" required>
+                    <input id="admin-product-ticket" class="w-full bg-surface-bright border-outline-variant rounded-lg focus:ring-primary focus:border-primary px-4 py-3 outline-none border" placeholder="10000" type="number" step="100" min="0" required>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -262,7 +262,7 @@ export function render() {
                   <div class="p-4">
                     <h4 class="font-bold text-on-surface truncate">${item.title}</h4>
                     <div class="flex justify-between items-center mt-2">
-                      <span class="font-timer-numeric text-primary text-sm">$${item.price.toLocaleString()}</span>
+                      <span class="font-timer-numeric text-primary text-sm">₩${item.price.toLocaleString()}</span>
                       <span class="text-xs ${item.urgent ? 'text-secondary font-bold' : 'text-on-surface-variant'} ${item.fill === 0 ? 'italic' : ''}">${item.timeLeft}</span>
                     </div>
                     <div class="mt-3 h-1.5 w-full bg-surface-variant rounded-full">
