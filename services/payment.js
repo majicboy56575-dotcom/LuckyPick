@@ -10,6 +10,20 @@ const PAYPAL_CONFIG = {
 // Toss Payments Client Key (사용자 테스트 클라이언트 키)
 const TOSS_CLIENT_KEY = 'test_ck_ZLKGPx4M3MbNoAwdPzJoVBaWypv1';
 
+/**
+ * Trigger standard Meta Pixel Events
+ */
+export function trackMetaEvent(eventName, params = {}) {
+  if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+    try {
+      window.fbq('track', eventName, params);
+      console.log(`[MetaPixel] Tracked: ${eventName}`, params);
+    } catch (e) {
+      console.warn('[MetaPixel] Tracking failed:', e);
+    }
+  }
+}
+
 const PAYMENT_METHODS = {
   PAYPAL: 'paypal',
   TOSS: 'toss',
@@ -140,6 +154,14 @@ async function requestTossPayment({ productId, productName, amount, userId, user
   const successUrl = `${baseUrl}?toss=success&productId=${encodeURIComponent(productId)}`;
   const failUrl = `${baseUrl}?toss=fail`;
 
+  // Track Meta Pixel InitiateCheckout
+  trackMetaEvent('InitiateCheckout', {
+    content_name: productName,
+    content_ids: [productId],
+    value: amount,
+    currency: 'KRW'
+  });
+
   await tossPayments.requestPayment('카드', {
     amount: amount,
     orderId: orderId,
@@ -163,6 +185,15 @@ async function handleTossSuccess(paymentKey, orderId, amount, productId) {
       amount: parseInt(amount),
       productId
     });
+
+    // Track Meta Pixel Purchase Event
+    trackMetaEvent('Purchase', {
+      content_name: productId,
+      content_ids: [productId],
+      value: parseInt(amount),
+      currency: 'KRW'
+    });
+
     return result;
   } catch (err) {
     console.error('[Toss] Confirm error:', err);
