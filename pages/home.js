@@ -34,11 +34,9 @@ function formatTime(ms) {
 function renderLiveTicker() {
   const itemsHtml = LIVE_WINNING_FEED.concat(LIVE_WINNING_FEED).map((f) => `
     <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-xs text-white whitespace-nowrap mr-3 shadow-2xs">
-      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-      <span class="font-bold text-amber-300">${f.user}</span>
-      <span class="text-white/80">님이 [${f.box}]에서</span>
-      <span class="font-extrabold text-white underline decoration-amber-400 underline-offset-2">${f.item}</span>
-      <span class="text-emerald-300 font-mono text-[10px]">(${f.price})</span>
+      <span class="material-symbols-outlined text-amber-300 text-sm">${f.icon}</span>
+      <span class="font-bold text-amber-300">${f.title}</span>
+      <span class="text-white/80 text-[11px]">${f.desc}</span>
     </div>
   `).join('');
 

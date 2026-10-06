@@ -96,50 +96,20 @@ export const DEFAULT_SUPER_RAFFLES = [
 ];
 
 export const LIVE_WINNING_FEED = [
-  { user: '김*준 (010-****-1829)', box: '프리미엄 럭키박스', item: '소니 노이즈캔슬링 블루투스 헤드폰', time: '방금 전', price: '69,000원' },
-  { user: '이*연 (010-****-4910)', box: 'VIP 하이엔드 박스', item: '애플 에어팟 4세대 ANC', time: '2분 전', price: '269,000원' },
-  { user: '박*훈 (010-****-9921)', box: '베이직 럭키박스', item: '대용량 고속 보조배터리 10000mAh', time: '5분 전', price: '18,900원' },
-  { user: '최*은 (010-****-3312)', box: '프리미엄 럭키박스', item: '무선 전동 딥티슈 마사지건', time: '11분 전', price: '49,000원' },
-  { user: '정*우 (010-****-8843)', box: 'VIP 하이엔드 박스', item: '스마트 터치 무드등 블루투스 스피커', time: '18분 전', price: '79,000원' }
+  { icon: 'verified', title: '100% 정품 실물 재화 보장', desc: '모든 럭키박스는 엄선된 정품 실물 상품만 제공됩니다' },
+  { icon: 'local_shipping', title: '안전 무료 배송 지원', desc: '획득한 상품은 마이페이지에서 안전하게 택배 배송 신청 가능합니다' },
+  { icon: 'undo', title: '100% 자동 환불 보장', desc: '골든 래플 목표 인원 미달 시 응모 티켓이 전액 자동 환불 반환됩니다' },
+  { icon: 'security', title: '구매안전서비스(에스크로) 가입', desc: '네이버파이낸셜 구매안전서비스 가입 안전 쇼핑몰' }
 ];
 
 // Local Storage Keys
 const BOX_CATALOG_KEY = 'luckypick_custom_boxes_v2';
-const SUPER_RAFFLES_KEY = 'luckypick_custom_raffles';
+const SUPER_RAFFLES_KEY = 'luckypick_custom_raffles_v3';
 const INVENTORY_STORAGE_KEY = 'luckypick_user_vault';
 const UNASSIGNED_TICKETS_KEY = 'luckypick_unassigned_tickets';
 const USER_POINTS_KEY = 'luckypick_user_points';
 const SHIPPING_REQUESTS_KEY = 'luckypick_shipping_requests';
 const REFUND_NOTICES_KEY = 'luckypick_ticket_refund_notices';
-
-// Seed Initial Mock Participants for Super Raffles if empty
-function initializeSuperRafflesSeed(raffles) {
-  const names = ['김민준', '이서연', '박지훈', '최예은', '정우진', '강다은', '조성민', '윤서아', '임도윤', '한지민'];
-  raffles.forEach(r => {
-    if (!r.entries || r.entries.length === 0) {
-      r.entries = [];
-      // Seed Group 1 Complete (unitSize) + Group 2 Partial (42 entries)
-      const seedCount = r.unitSize + 42;
-      for (let i = 0; i < seedCount; i++) {
-        const name = names[i % names.length];
-        const maskedName = name.charAt(0) + '*' + name.slice(2);
-        const email = `user_${i + 1}@gmail.com`;
-        const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
-        const num = '#' + String(1000 + i) + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
-        r.entries.push({
-          ticketId: 'seed_' + r.id + '_' + i,
-          ticketNumber: num,
-          userId: 'seed_user_' + (i % 10),
-          userName: maskedName,
-          userEmail: maskedEmail,
-          appliedAt: Date.now() - (seedCount - i) * 60000,
-          slotIndex: i + 1,
-          status: 'active'
-        });
-      }
-    }
-  });
-}
 
 // Get Catalog Boxes
 export function getRandomBoxTiers() {
@@ -155,15 +125,26 @@ export function saveRandomBoxTiers(tiers) {
   localStorage.setItem(BOX_CATALOG_KEY, JSON.stringify(tiers));
 }
 
-// Get Super Raffles
+// Get Super Raffles (Clean 0-participant initial state)
 export function getSuperRaffles() {
   try {
     const custom = localStorage.getItem(SUPER_RAFFLES_KEY);
-    const raffles = custom ? JSON.parse(custom) : DEFAULT_SUPER_RAFFLES;
-    initializeSuperRafflesSeed(raffles);
-    return raffles;
+    if (custom) {
+      const parsed = JSON.parse(custom);
+      // Ensure no legacy seed entries exist
+      parsed.forEach(r => {
+        if (r.entries) {
+          r.entries = r.entries.filter(e => !e.ticketId || !e.ticketId.startsWith('seed_'));
+        } else {
+          r.entries = [];
+        }
+      });
+      return parsed;
+    }
+    // Default fresh raffles with 0 participants
+    return JSON.parse(JSON.stringify(DEFAULT_SUPER_RAFFLES));
   } catch (e) {
-    return DEFAULT_SUPER_RAFFLES;
+    return JSON.parse(JSON.stringify(DEFAULT_SUPER_RAFFLES));
   }
 }
 
@@ -174,10 +155,10 @@ export function saveSuperRaffles(raffles) {
 export const RANDOM_BOX_TIERS = getRandomBoxTiers();
 export const SUPER_GOLDEN_RAFFLES = getSuperRaffles();
 
-// Points Management
+// Points Management (Defaults to 0)
 export function getUserPoints() {
   const pts = localStorage.getItem(USER_POINTS_KEY);
-  return pts ? parseInt(pts, 10) : 35000;
+  return pts ? parseInt(pts, 10) : 0;
 }
 
 export function setUserPoints(points) {
@@ -194,16 +175,10 @@ export function getUserVault() {
   }
 }
 
-// Unassigned Golden Tickets (Wallet Balance)
-const TICKET_INIT_500_KEY = 'luckypick_tickets_500_applied';
-if (!localStorage.getItem(TICKET_INIT_500_KEY)) {
-  localStorage.setItem(UNASSIGNED_TICKETS_KEY, '500');
-  localStorage.setItem(TICKET_INIT_500_KEY, 'true');
-}
-
+// Unassigned Golden Tickets (Wallet Balance, Defaults to 0)
 export function getAvailableGoldenTicketsCount() {
   const tickets = localStorage.getItem(UNASSIGNED_TICKETS_KEY);
-  return tickets !== null ? parseInt(tickets, 10) : 500;
+  return tickets !== null ? parseInt(tickets, 10) : 0;
 }
 
 export function setAvailableGoldenTicketsCount(count) {
