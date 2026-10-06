@@ -200,13 +200,14 @@ function getAllShippingInfos() {
 function getMembers() {
   return usersCache.map((u) => ({
     uid: u.uid,
-    name: u.displayName || '사용자',
-    email: u.email,
-    initials: (u.displayName || 'U').charAt(0).toUpperCase(),
+    name: u.displayName || u.name || '사용자',
+    email: u.email || '미등록 이메일',
+    initials: (u.displayName || u.name || 'U').charAt(0).toUpperCase(),
     joinDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-',
-    tickets: 0,
-    status: 'verified',
-    colors: 'from-primary to-primary-container',
+    tickets: u.tickets || (u.participatedRaffles ? u.participatedRaffles.length : 0),
+    status: u.status || 'verified',
+    role: u.role || 'user',
+    colors: u.role === 'admin' ? 'from-tertiary to-tertiary-container' : 'from-primary to-primary-container',
   }));
 }
 
@@ -361,10 +362,31 @@ async function submitShippingInfo(data) {
   return result.data.shippingInfo;
 }
 
-async function updateShippingStatus(shippingId, newStatus) {
+async function updateShippingStatus(shippingId, newStatus, carrier = '', trackingNumber = '') {
   if (!functions) throw new Error('Firebase Functions not initialized');
   const callable = httpsCallable(functions, 'updateShippingStatus');
-  const result = await callable({ shippingId, newStatus });
+  const result = await callable({ shippingId, newStatus, carrier, trackingNumber });
+  return result.data;
+}
+
+async function deleteProduct(productId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'deleteProduct');
+  const result = await callable({ productId });
+  return result.data;
+}
+
+async function updateUserStatus(uid, status, role) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'updateUserStatus');
+  const result = await callable({ uid, status, role });
+  return result.data;
+}
+
+async function forceCloseProduct(productId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'forceCloseProduct');
+  const result = await callable({ productId });
   return result.data;
 }
 
@@ -491,6 +513,9 @@ export {
   getCurrentUser,
   createUserProfile,
   addProduct,
+  deleteProduct,
+  updateUserStatus,
+  forceCloseProduct,
   addParticipation,
   getMockParticipants,
   getAdminStats,

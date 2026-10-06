@@ -248,11 +248,12 @@ exports.updateShippingStatus = onCall({ region: "asia-northeast3" }, async (requ
   }
 
   const callerEmail = request.auth.token.email || "";
-  if (callerEmail !== ADMIN_EMAIL) {
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
     throw new HttpsError("permission-denied", "관리자만 배송 상태를 변경할 수 있습니다.");
   }
 
-  const { shippingId, newStatus } = request.data;
+  const { shippingId, newStatus, carrier, trackingNumber } = request.data;
   if (!shippingId || !newStatus) {
     throw new HttpsError("invalid-argument", "배송 ID와 새 상태가 필요합니다.");
   }
@@ -263,9 +264,16 @@ exports.updateShippingStatus = onCall({ region: "asia-northeast3" }, async (requ
     throw new HttpsError("not-found", "배송 정보를 찾을 수 없습니다.");
   }
 
-  await shippingRef.update({ status: newStatus });
+  const updateData = {
+    status: newStatus,
+    updatedAt: Date.now(),
+  };
+  if (carrier) updateData.carrier = carrier;
+  if (trackingNumber) updateData.trackingNumber = trackingNumber;
 
-  return { success: true };
+  await shippingRef.update(updateData);
+
+  return { success: true, ...updateData };
 });
 
 // ============================================
@@ -909,3 +917,136 @@ exports.confirmTossPayment = onCall(
     };
   }
 );
+
+// ============================================
+// 10. deleteProduct (Callable) - Admin Only
+// ============================================
+exports.deleteProduct = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 상품을 삭제할 수 있습니다.");
+  }
+
+  const { productId } = request.data;
+  if (!productId) {
+    throw new HttpsError("invalid-argument", "상품 ID가 필요합니다.");
+  }
+
+  const productRef = db.collection("products").doc(productId);
+  const doc = await productRef.get();
+  if (!doc.exists) {
+    throw new HttpsError("not-found", "상품을 찾을 수 없습니다.");
+  }
+
+  await productRef.delete();
+  console.log(`[Admin] Product ${productId} deleted by ${callerEmail}`);
+  return { success: true, productId };
+});
+
+// ============================================
+// 11. updateUserStatus (Callable) - Admin Only
+// ============================================
+exports.updateUserStatus = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 회원 상태를 변경할 수 있습니다.");
+  }
+
+  const { uid, status, role } = request.data;
+  if (!uid) {
+    throw new HttpsError("invalid-argument", "유저 UID가 필요합니다.");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+  const updateData = { updatedAt: Date.now() };
+  if (status) updateData.status = status;
+  if (role) updateData.role = role;
+
+  await userRef.set(updateData, { merge: true });
+  console.log(`[Admin] User ${uid} status updated to ${status || role}`);
+  return { success: true, uid, ...updateData };
+});
+
+// ============================================
+// 12. forceCloseProduct (Callable) - Admin Only
+//     Immediately executes draw & closes the product
+// ============================================
+exports.forceCloseProduct = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 즉시 추첨을 실행할 수 있습니다.");
+  }
+
+  const { productId } = request.data;
+  if (!productId) {
+    throw new HttpsError("invalid-argument", "상품 ID가 필요합니다.");
+  }
+
+  const productRef = db.collection("products").doc(productId);
+  const productDoc = await productRef.get();
+  if (!productDoc.exists) {
+    throw new HttpsError("not-found", "상품을 찾을 수 없습니다.");
+  }
+
+  const product = productDoc.data();
+  const unitSize = product.maxParticipants || 20;
+  const participants = product.participants || [];
+  const totalCount = participants.length;
+  const completedGroupsCount = Math.floor(totalCount / unitSize);
+  const remainderCount = totalCount % unitSize;
+
+  const winners = [];
+  const ticketPrefix = (product.title || "LP")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(0, 2)
+    .toUpperCase() || "LP";
+
+  for (let g = 0; g < completedGroupsCount; g++) {
+    const groupMembers = participants.slice(g * unitSize, (g + 1) * unitSize);
+    const winIdx = Math.floor(Math.random() * groupMembers.length);
+    const winnerMember = groupMembers[winIdx];
+    const ticketNumber = `${ticketPrefix}-${100 + winIdx}`;
+
+    winners.push({
+      groupNumber: g + 1,
+      uid: winnerMember.uid,
+      name: winnerMember.name,
+      email: winnerMember.email,
+      ticketNumber,
+      wonAt: Date.now(),
+    });
+  }
+
+  const incompleteMembers = remainderCount > 0 ? participants.slice(completedGroupsCount * unitSize) : [];
+
+  const closedData = {
+    ...product,
+    status: "closed",
+    closedAt: Date.now(),
+    totalParticipants: totalCount,
+    completedGroups: completedGroupsCount,
+    remainderCount,
+    winners,
+    refundedParticipants: incompleteMembers,
+    unitSize,
+  };
+
+  await db.collection("closed_products").doc(productId).set(closedData);
+  await productRef.delete();
+
+  console.log(`[Admin] Product ${productId} force-closed. Winners: ${winners.length}`);
+  return { success: true, winnersCount: winners.length, refundedCount: incompleteMembers.length };
+});
+

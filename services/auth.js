@@ -22,7 +22,14 @@ const ADMIN_EMAIL = 'majicboy56575@gmail.com';
 
 let firebaseApp = null;
 let firebaseAuth = null;
-let currentUser = null;
+let currentUser = isLocalDev() ? {
+  uid: 'my_user_id',
+  displayName: '이재영 (관리자)',
+  email: 'majicboy56575@gmail.com',
+  photoURL: null,
+  provider: 'google',
+  isAdmin: true,
+} : null;
 
 if (isFirebaseConfigured()) {
   try {

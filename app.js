@@ -1,14 +1,15 @@
 // ============================================
 // LuckyPick - Main App (SPA Router)
 // ============================================
-import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=2026092901';
-import { getCurrentAuthUser, waitForAuth } from './services/auth.js?v=2026092901';
-import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=2026092901';
-import { handleTossSuccess } from './services/payment.js?v=2026092901';
-import * as homePage from './pages/home.js?v=2026092901';
-import * as historyPage from './pages/history.js?v=2026092901';
-import * as profilePage from './pages/profile.js?v=2026092901';
-import * as adminPage from './pages/admin.js?v=2026092901';
+import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=20261004_20';
+import { getCurrentAuthUser, waitForAuth } from './services/auth.js?v=20261004_20';
+import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=20261004_20';
+import { handleTossSuccess } from './services/payment.js?v=20261004_20';
+import { getTicketRefundNotices, clearTicketRefundNotices } from './services/randombox.js?v=20261004_20';
+import * as homePage from './pages/home.js?v=20261004_20';
+import * as historyPage from './pages/history.js?v=20261004_20';
+import * as profilePage from './pages/profile.js?v=20261004_20';
+import * as adminPage from './pages/admin.js?v=20261004_20';
 
 // --- State ---
 let currentPage = null;
@@ -31,15 +32,15 @@ function renderHeader(pageName) {
   if (pageName === 'admin') return ''; // Admin has its own header
 
   return `
-    <header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm flex justify-between items-center h-16 px-container-margin max-w-full">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-primary">language</span>
-        <span class="font-display-lg text-primary font-extrabold text-[24px] cursor-pointer" onclick="window.location.hash='#home'">LuckyPick</span>
+    <header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs flex justify-between items-center h-16 px-container-margin max-w-full border-b border-slate-200/80">
+      <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.hash='#home'">
+        <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center font-black shadow-sm">🎁</span>
+        <span class="font-display-lg text-primary font-black text-[22px]">LuckyPick</span>
       </div>
       <div class="flex items-center gap-3">
         ${renderLanguageDropdown('header-lang-dropdown')}
-        <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all" onclick="window.location.hash='#admin'" title="Admin">
-          <span class="material-symbols-outlined text-primary">admin_panel_settings</span>
+        <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all text-slate-700" onclick="window.location.hash='#admin'" title="Admin">
+          <span class="material-symbols-outlined">admin_panel_settings</span>
         </button>
       </div>
     </header>`;
@@ -49,19 +50,19 @@ function renderBottomNav(pageName) {
   if (pageName === 'admin') return '';
 
   const tabs = [
-    { key: 'home', icon: 'stadium', label: 'ongoing' },
-    { key: 'history', icon: 'history', label: 'history' },
-    { key: 'profile', icon: 'person', label: 'profile' },
+    { key: 'home', icon: 'package_2', label: '럭키박스' },
+    { key: 'history', icon: 'military_tech', label: '당첨자' },
+    { key: 'profile', icon: 'inventory_2', label: '내 보관함' },
   ];
 
   return `
-    <nav class="fixed bottom-0 w-full z-50 bg-surface/80 backdrop-blur-md border-t border-outline-variant/30 shadow-lg flex justify-around items-center h-20 pb-safe px-4">
+    <nav class="fixed bottom-0 w-full z-50 bg-white/90 backdrop-blur-md border-t border-slate-200/80 shadow-lg flex justify-around items-center h-20 pb-safe px-4">
       ${tabs.map(tab => {
         const isActive = pageName === tab.key;
         return `
-          <a class="flex flex-col items-center justify-center ${isActive ? 'bg-primary-container text-on-primary-container rounded-full px-5 py-1' : 'text-on-surface-variant hover:text-primary'} transition-transform scale-95 active:scale-90" href="#${tab.key}">
+          <a class="flex flex-col items-center justify-center ${isActive ? 'bg-primary text-white rounded-2xl px-5 py-1.5 shadow-sm' : 'text-slate-500 hover:text-primary'} transition-all scale-95 active:scale-90" href="#${tab.key}">
             <span class="material-symbols-outlined">${tab.icon}</span>
-            <span class="font-label-caps text-label-caps">${t(tab.label)}</span>
+            <span class="text-[11px] font-bold mt-0.5">${tab.label}</span>
           </a>`;
       }).join('')}
     </nav>`;
@@ -91,7 +92,8 @@ function renderFooter(pageName) {
           <p><span class="font-semibold text-on-surface">상호(법인명):</span> 럭키픽 | <span class="font-semibold text-on-surface">대표자:</span> 이재영 | <span class="font-semibold text-on-surface">사업자등록번호:</span> 803-05-03449</p>
           <p><span class="font-semibold text-on-surface">통신판매업신고:</span> 제 2026-화성새솔-0099 호 | <span class="font-semibold text-on-surface">개인정보관리책임자:</span> 이재영</p>
           <p><span class="font-semibold text-on-surface">사업장 소재지:</span> 경기도 화성시 만세구 수노을1로 148, 101동 902호(새솔동, 송산신도시 대방노블랜드 더퍼스티지 1차) (우: 18237)</p>
-          <p><span class="font-semibold text-on-surface">고객센터:</span> 010-4710-5657 | <span class="font-semibold text-on-surface">이메일:</span> leejeayoung0713@gmail.com | <span class="font-semibold text-on-surface">호스팅:</span> Google Firebase</p>
+          <p><span class="font-semibold text-on-surface">고객센터:</span> 010-4710-5657 (운영시간: 평일 10:00~17:00 / 점심 12:00~13:00 / 주말·공휴일 휴무)</p>
+          <p><span class="font-semibold text-on-surface">이메일:</span> leejeayoung0713@gmail.com | <span class="font-semibold text-on-surface">호스팅 제공자:</span> Google Firebase</p>
         </div>
 
         <div class="bg-surface/60 rounded-xl p-3 border border-outline-variant/30 text-[11px] space-y-1.5">
@@ -117,9 +119,70 @@ function renderFooter(pageName) {
     </footer>`;
 }
 
+// Global Notification Handlers (Defined unconditionally at module top-level)
+window.__dismissTicketRefundNotice = () => {
+  const modal = document.getElementById('refund-notice-modal');
+  if (modal) modal.remove();
+  clearTicketRefundNotices();
+  
+  // Check if there are more notifications to show
+  setTimeout(() => {
+    const app = document.getElementById('app');
+    const nextNotification = renderDrawResultNotification();
+    if (nextNotification && app) {
+      app.insertAdjacentHTML('beforeend', nextNotification);
+    }
+  }, 100);
+};
+
+window.__closeDrawNotification = (productId) => {
+  const modal = document.getElementById(`draw-result-modal-${productId}`);
+  if (modal) modal.remove();
+
+  // Check if there are more notifications to show
+  setTimeout(() => {
+    const app = document.getElementById('app');
+    const nextNotification = renderDrawResultNotification();
+    if (nextNotification && app) {
+      app.insertAdjacentHTML('beforeend', nextNotification);
+    }
+  }, 100);
+};
+
 function renderDrawResultNotification() {
   const authUser = getCurrentAuthUser();
   if (!authUser) return '';
+
+  // 1. Golden Ticket Underflow Refund Notices
+  const refundNotices = getTicketRefundNotices();
+  if (refundNotices && refundNotices.length > 0) {
+    const notice = refundNotices[0];
+    return `
+      <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="refund-notice-modal" onclick="if(event.target===this)window.__dismissTicketRefundNotice()">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
+          <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-outlined text-3xl">undo</span>
+          </div>
+          <span class="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-full">
+            골든 티켓 100% 자동 반환 안내
+          </span>
+          <h3 class="font-headline-sm text-lg font-bold text-gray-900 mt-2 mb-1">[${notice.raffleTitle}]</h3>
+          <p class="text-xs text-gray-600 mb-4 leading-relaxed">
+            해당 상품 <strong>그룹 ${notice.groupNumber}</strong>의 목표 인원(${notice.target}명)이 시간 내 미달(${notice.gathered}명)되어 마감되었습니다.
+          </p>
+          <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs mb-5 space-y-1">
+            <div class="flex justify-between items-center font-bold text-amber-950">
+              <span>반환된 골든 티켓</span>
+              <span class="font-mono text-base text-primary">+${notice.refundCount}장</span>
+            </div>
+            <p class="text-[11px] text-amber-800">회원님의 골든 티켓 지갑으로 전액 자동 환불 반환되었습니다.</p>
+          </div>
+          <button onclick="window.__dismissTicketRefundNotice()" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md hover:bg-primary-container transition-all active:scale-95 cursor-pointer">
+            확인 및 다른 상품에 응모하기
+          </button>
+        </div>
+      </div>`;
+  }
 
   // Track which products we've already notified about this session
   const notifiedKey = 'luckypick_draw_notified';
@@ -208,21 +271,6 @@ function renderDrawResultNotification() {
     break;
   }
 
-  // Register the close handler
-  window.__closeDrawNotification = (productId) => {
-    const modal = document.getElementById(`draw-result-modal-${productId}`);
-    if (modal) modal.remove();
-
-    // Check if there are more notifications to show
-    setTimeout(() => {
-      const app = document.getElementById('app');
-      const nextNotification = renderDrawResultNotification();
-      if (nextNotification && app) {
-        app.insertAdjacentHTML('beforeend', nextNotification);
-      }
-    }, 300);
-  };
-
   return toasts;
 }
 
@@ -291,19 +339,35 @@ function navigate() {
 
   // Cleanup previous page
   if (currentCleanup) {
-    currentCleanup();
+    try { currentCleanup(); } catch (e) { console.warn('Cleanup error:', e); }
     currentCleanup = null;
   }
 
   const app = document.getElementById('app');
+  if (!app) return;
 
-  // For admin page, render without header/nav
-  if (pageName === 'admin') {
-    app.innerHTML = route.render();
-    // Initialize admin-specific handlers after DOM is ready
-    if (route.init) route.init();
-  } else {
-    app.innerHTML = renderHeader(pageName) + route.render() + renderFooter(pageName) + renderBottomNav(pageName);
+  try {
+    // For admin page, render without header/nav
+    if (pageName === 'admin') {
+      app.innerHTML = route.render();
+      if (route.init) route.init();
+    } else {
+      app.innerHTML = renderHeader(pageName) + route.render() + renderFooter(pageName) + renderBottomNav(pageName);
+    }
+  } catch (renderError) {
+    console.error(`[Router] Error rendering page ${pageName}:`, renderError);
+    app.innerHTML = `
+      <div class="p-8 max-w-lg mx-auto text-center space-y-4">
+        <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+          <span class="material-symbols-outlined text-3xl">error</span>
+        </div>
+        <h3 class="font-bold text-lg text-gray-900">페이지 렌더링 중 오류가 발생했습니다</h3>
+        <p class="text-xs text-gray-500 font-mono bg-slate-50 p-3 rounded-xl">${renderError.message}</p>
+        <button onclick="window.location.hash='#home'; window.location.reload();" class="px-6 py-2.5 bg-primary text-white font-bold rounded-xl text-xs">
+          홈으로 이동
+        </button>
+      </div>`;
+    return;
   }
 
   // Show draw result notifications (winner/loser) when user is logged in
@@ -328,20 +392,20 @@ const POLICY_CONTENT = {
     content: `
       <div class="space-y-4 text-xs text-on-surface-variant leading-relaxed">
         <h4 class="font-bold text-on-surface text-sm">제1조 (목적)</h4>
-        <p>본 약관은 럭키픽(이하 "회사")이 운영하는 온라인 서비스(이하 "서비스")의 이용과 관련하여 회사와 이용자 간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
+        <p>본 약관은 럭키픽(이하 "회사")이 운영하는 온라인 쇼핑몰(이하 "몰")에서 제공하는 전자상거래 관련 서비스(이하 "서비스")를 이용함에 있어 회사와 이용자의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
         
         <h4 class="font-bold text-on-surface text-sm">제2조 (용어의 정의)</h4>
-        <p>1. "럭키픽"이란 회사가 상품 또는 용역을 이용자에게 제공하기 위하여 설정한 전자상거래 및 한정 수량 프로모션 플랫폼을 말합니다.<br>
-        2. "이용자"란 서비스에 접속하여 본 약관에 따라 회사가 제공하는 서비스를 받는 회원 및 비회원을 말합니다.<br>
-        3. "참여 슬롯"이란 회원이 프로모션 상품의 추첨 대상자가 되기 위해 결제하는 1회의 응모 권리를 의미합니다.</p>
+        <p>1. "럭키픽"이란 회사가 실물 재화 또는 용역을 이용자에게 제공하기 위하여 설정한 전자상거래 쇼핑몰 플랫폼을 말합니다.<br>
+        2. "럭키박스 상품"이란 사전에 투명하게 공시된 정품 실물 상품 풀(Pool) 중 무작위 추첨 알고리즘을 통해 100% 실물 재화가 확정 지급되는 기획 패키지 상품을 의미합니다. (꽝 없음, 최소 보장 가치 보장)<br>
+        3. "골든 티켓 사은행사"란 럭키박스 구매 고객에게 감사의 의미로 무상 지급되는 마일리지성 프로모션 이벤트로, 어떠한 유료 복권이나 사행성 금전 대가를 요구하지 않는 고객 사은 행사입니다.</p>
 
-        <h4 class="font-bold text-on-surface text-sm">제3조 (서비스의 제공 및 공정 추첨)</h4>
-        <p>1. 회사는 정해진 모집 인원(슬롯)이 마감되는 즉시 투명하고 조작 불가능한 시스템 난수 추첨 알고리즘을 통해 1인의 당첨자를 공정하게 선정합니다.<br>
-        2. 당첨된 회원에게는 해당 상품을 무상(배송비 포함 무료)으로 배송합니다.</p>
+        <h4 class="font-bold text-on-surface text-sm">제3조 (재화의 공급 및 배송)</h4>
+        <p>1. 회사는 이용자가 구매한 럭키박스에서 결정된 실물 상품 또는 마이페이지 보관함에서 배송 요청한 상품에 대하여 영업일 기준 1~3일 이내에 지정된 택배사(CJ대한통운/우체국 등)를 통해 발송합니다.<br>
+        2. 배송 과정 중 발생한 상품의 훼손, 분실 등은 전적으로 회사가 책임을 지고 재배송 또는 환불을 진행합니다.</p>
 
-        <h4 class="font-bold text-on-surface text-sm">제4조 (100% 자동 환불 원칙)</h4>
-        <p>1. 정해진 모집 기한 내에 목표 슬롯이 마감되지 않거나 상품 제공이 불가능해진 경우, 해당 프로모션은 취소되며 참여자의 결제 금액은 <strong>별도 신청 없이 전액(100%) 자동 환불</strong>됩니다.<br>
-        2. 회원은 추첨 진행 전 마이페이지에서 언제든지 참여를 자진 취소하고 결제 대금을 전액 환불받을 수 있습니다.</p>
+        <h4 class="font-bold text-on-surface text-sm">제4조 (청약철회 및 환불 보장)</h4>
+        <p>1. 회원은 전자상거래 등에서의 소비자보호에 관한 법률 제17조에 따라 상품 구매 후 7일 이내에 청약철회(환불)를 요청할 수 있습니다.<br>
+        2. 상품의 내용이 표시·광고 내용과 다르거나 계약 내용과 다르게 이행된 경우에는 당해 상품을 공급받은 날부터 3개월 이내, 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내에 청약철회를 할 수 있습니다.</p>
       </div>
     `
   },
@@ -350,41 +414,46 @@ const POLICY_CONTENT = {
     content: `
       <div class="space-y-4 text-xs text-on-surface-variant leading-relaxed">
         <h4 class="font-bold text-on-surface text-sm">1. 개인정보의 수집 및 이용 목적</h4>
-        <p>회사는 다음의 목적을 위하여 개인정보를 처리합니다:<br>
-        - 회원 가입 의사 확인, 회원제 서비스 제공에 따른 본인 식별·인증<br>
-        - 결제 승인, 결제 취소 및 환불 처리<br>
-        - 프로모션 당첨자 확인 및 당첨 상품 배송</p>
+        <p>회사는 다음의 목적을 위하여 최소한의 개인정보를 처리합니다:<br>
+        • 회원 가입 의사 확인, 회원제 서비스 제공에 따른 본인 식별·인증<br>
+        • 결제 승인, 대금 결제 확인, 취소 및 환불 처리<br>
+        • 실물 상품의 주문 처리, 배송지 확인 및 택배 배송 위탁<br>
+        • 고객 문의 응대 및 불만 처리, 분쟁 조정을 위한 기록 보존</p>
 
         <h4 class="font-bold text-on-surface text-sm">2. 수집하는 개인정보 항목</h4>
-        <p>- 필수항목: 성명, 이메일 주소, 결제 승인 번호(Toss/PayPal 식별자)<br>
-        - 배송 필요 시(당첨자 한정): 수령인 성명, 연락처, 배송지 주소</p>
+        <p>• 필수항목: 이름(성명), 이메일 주소, 로그인 식별자, 결제 정보(PG사 거래 승인키)<br>
+        • 상품 배송 신청 시: 수령인 성명, 수령인 휴대전화번호, 배송지 주소</p>
 
-        <h4 class="font-bold text-on-surface text-sm">3. 개인정보의 보유 및 이용기간</h4>
-        <p>관계 법령의 규정에 따라 보존할 의무가 있는 경우를 제외하고는 이용자의 개인정보는 원칙적으로 개인정보의 수집 및 이용목적이 달성되면 지체 없이 파기합니다.<br>
-        - 계약 또는 청약철회 등에 관한 기록: 5년<br>
-        - 대금결제 및 재화 등의 공급에 관한 기록: 5년<br>
-        - 소비자의 불만 또는 분쟁처리에 관한 기록: 3년</p>
+        <h4 class="font-bold text-on-surface text-sm">3. 개인정보의 보유 및 파기</h4>
+        <p>이용자의 개인정보는 원칙적으로 개인정보의 수집 및 이용목적이 달성되면 지체 없이 파기합니다. 단, 전자상거래법 등 관계 법령에 따라 다음 기간 동안 보존합니다:<br>
+        • 계약 또는 청약철회 등에 관한 기록: 5년<br>
+        • 대금결제 및 재화 등의 공급에 관한 기록: 5년<br>
+        • 소비자의 불만 또는 분쟁처리에 관한 기록: 3년</p>
 
-        <h4 class="font-bold text-on-surface text-sm">4. 개인정보 보호책임자</h4>
-        <p>성명: 이재영 | 연락처: 010-4710-5657 | 이메일: leejeayoung0713@gmail.com</p>
+        <h4 class="font-bold text-on-surface text-sm">4. 개인정보 보호책임자 및 고객센터</h4>
+        <p>• 성명: 이재영 (대표자)<br>
+        • 고객센터: 010-4710-5657 (운영시간: 평일 10:00 ~ 17:00)<br>
+        • 이메일: leejeayoung0713@gmail.com</p>
       </div>
     `
   },
   refund: {
-    title: '취소 및 환불 정책 (Refund & Cancel Policy)',
+    title: '취소·교환·반품 및 배송 정책 (Refund & Shipping Policy)',
     content: `
       <div class="space-y-4 text-xs text-on-surface-variant leading-relaxed">
-        <h4 class="font-bold text-on-surface text-sm">1. 참여 취소 및 전액 환불 규정</h4>
-        <p>• <strong>추첨 진행 전 자진 취소:</strong> 프로모션이 마감(완판)되기 전까지는 '마이페이지 > 참여 내역'에서 언제든지 참여를 취소할 수 있으며, 취소 즉시 결제된 수단으로 100% 자동 환불 처리됩니다.<br>
-        • <strong>목표 인원 미달 시 자동 환불:</strong> 상품별 설정된 모집 기간 내에 정원이 채워지지 않은 경우, 프로모션은 자동 종료되며 모든 참여자의 결제 금액이 100% 자동 취소/환불됩니다.</p>
+        <h4 class="font-bold text-on-surface text-sm">1. 청약철회 (취소 및 환불) 안내</h4>
+        <p>• <strong>개봉 전 취소:</strong> 결제 후 박스를 개봉하지 않은 상태이거나 실물 상품의 배송 요청 전 상태에서는 결제일로부터 7일 이내 언제든지 주문 취소 및 100% 전액 환불이 가능합니다.<br>
+        • <strong>환불 처리 소요 기간:</strong> 결제 취소 요청 접수 즉시 PG사(토스페이먼츠)로 취소 전송되며, 신용카드는 영업일 기준 3~5일 내 승인 취소/한도 복구됩니다.</p>
 
-        <h4 class="font-bold text-on-surface text-sm">2. 당첨 상품 배송 및 교환 규정</h4>
-        <p>• <strong>배송 안내:</strong> 당첨자 발표 후 배송지가 입력되면 영업일 기준 3일 이내에 출고되며 모든 배송비는 무료입니다.<br>
-        • <strong>교환/반품 안내:</strong> 배송된 상품이 파손, 불량 또는 주문 내역과 상이한 경우 수령일로부터 7일 이내에 1:1 무상 교환을 진행합니다.</p>
+        <h4 class="font-bold text-on-surface text-sm">2. 상품 배송 안내</h4>
+        <p>• <strong>배송 택배사:</strong> CJ대한통운 또는 우체국택배<br>
+        • <strong>출고 일정:</strong> 마이페이지 보관함에서 배송 요청 시 영업일 기준 1~3일 이내 신속 출고됩니다.<br>
+        • <strong>배송비:</strong> 전 상품 기본 무료배송 (제주/도서산간 지역의 경우 추가 운임이 발생할 수 있습니다.)</p>
 
-        <h4 class="font-bold text-on-surface text-sm">3. 환불 소요 기간</h4>
-        <p>• 카드 결제: 카드사 영업일 기준 3~5일 이내 한도 복구 또는 결제 취소 반영<br>
-        • 간편결제(토스/페이팔): 승인 취소 즉시 환불 처리</p>
+        <h4 class="font-bold text-on-surface text-sm">3. 교환 및 반품 규정</h4>
+        <p>• <strong>상품 불량 및 오배송:</strong> 수령하신 상품이 파손, 불량 또는 주문 내역과 상이한 경우 수령일로부터 30일 이내 무상 1:1 교환 또는 전액 환불을 보장합니다. (반품 배송비 회사 전액 부담)<br>
+        • <strong>단순 변심 반품:</strong> 실물 상품 수령 후 미개봉 상태에서 7일 이내 반품 가능하며, 왕복 택배비(6,000원)는 고객 부담입니다.<br>
+        • <strong>반품/교환 주소지:</strong> 경기도 화성시 만세구 수노을1로 148, 101동 902호 럭키픽 반품담당자 앞 (우: 18237)</p>
       </div>
     `
   }
@@ -468,8 +537,15 @@ document.addEventListener('click', (e) => {
 
 // --- Event Listeners ---
 window.addEventListener('hashchange', navigate);
-window.addEventListener('DOMContentLoaded', navigate);
 window.addEventListener('languageChanged', navigate);
 window.addEventListener('firestoreDataChanged', navigate);
+
+// Immediately initialize router
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', navigate);
+} else {
+  navigate();
+}
+
 
 
