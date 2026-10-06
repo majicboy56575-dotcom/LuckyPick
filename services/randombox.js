@@ -18,7 +18,7 @@ export const DEFAULT_BOX_TIERS = [
     goldenTickets: 1,
     badge: 'BEST POPULAR',
     items: [
-      { id: 'b_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 18900, wholesalePrice: 6800, prob: 0.03, image: 'https://images.unsplash.com/photo-1609592424367-3367c3b9b47a?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'b_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 18900, wholesalePrice: 6800, prob: 0.03, image: 'https://images.unsplash.com/photo-1618424181497-157f25b6ddd5?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
       { id: 'b_item_2', name: '차량용 듀얼 초고속 충전 시가잭 45W', retailPrice: 12900, wholesalePrice: 3600, prob: 0.07, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
       { id: 'b_item_3', name: '304 스테인리스 이중 진공 보온보냉 텀블러 500ml', retailPrice: 6900, wholesalePrice: 1980, prob: 0.25, image: 'https://images.unsplash.com/photo-1577937927133-66ef06acdf18?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
       { id: 'b_item_4', name: '휴대용 접이식 각도조절 메탈 스마트폰 거치대', retailPrice: 4500, wholesalePrice: 1150, prob: 0.30, image: 'https://images.unsplash.com/photo-1586105251261-72a756497a11?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
@@ -103,7 +103,7 @@ export const LIVE_WINNING_FEED = [
 ];
 
 // Local Storage Keys
-const BOX_CATALOG_KEY = 'luckypick_custom_boxes_v2';
+const BOX_CATALOG_KEY = 'luckypick_custom_boxes_v3';
 const SUPER_RAFFLES_KEY = 'luckypick_custom_raffles_v3';
 const INVENTORY_STORAGE_KEY = 'luckypick_user_vault';
 const UNASSIGNED_TICKETS_KEY = 'luckypick_unassigned_tickets';
