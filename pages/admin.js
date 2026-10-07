@@ -22,7 +22,7 @@ import {
   setAvailableGoldenTicketsCount,
   getUserVault,
   getRaffleGroupData
-} from '../services/randombox.js?v=20261007_13';
+} from '../services/randombox.js';
 
 let activeAdminTab = 'boxes'; // 'boxes' | 'raffles' | 'shipping' | 'users' | 'analytics'
 let selectedBoxId = 'box_basic';

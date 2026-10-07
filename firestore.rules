@@ -25,41 +25,42 @@ service cloud.firestore {
 
     // =============================================
     // shipping_infos: Winner shipping details
-    // Read & Write: Authenticated users (own data or admin)
+    // Read: Authenticated users (own data or admin)
+    // Write: Cloud Functions only (Admin SDK)
     // =============================================
     match /shipping_infos/{shippingId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.email == 'majicboy56575@gmail.com');
+      allow read: if request.auth != null && (resource.data.winnerUid == request.auth.uid || resource.data.userId == request.auth.uid || request.auth.token.email == 'majicboy56575@gmail.com');
+      allow write: if false;
     }
 
     // =============================================
     // users: User profiles, points, golden tickets, vault & shipping requests
-    // Read & Write: Authenticated users (own data or admin)
+    // Read: Authenticated users (own data or admin)
+    // Write: Cloud Functions only (Admin SDK) - Zero Client Write
     // =============================================
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'majicboy56575@gmail.com');
-      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'majicboy56575@gmail.com');
+      allow write: if false;
     }
 
     // =============================================
     // super_raffles: Special Golden Raffles & Multi-group queues
     // Read: Anyone (public queue & winners transparency)
-    // Write: Authenticated users (ticket entry/cancel/draw resolution)
+    // Write: Cloud Functions only (Admin SDK) - prevents queue tampering
     // =============================================
     match /super_raffles/{raffleId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if false;
     }
 
     // =============================================
     // box_catalogs: Random box tiers, items, probabilities
-    // Read: Anyone
-    // Write: Admin only
+    // Read: Anyone (public catalog)
+    // Write: Cloud Functions only (Admin SDK) - prevents probability tampering
     // =============================================
     match /box_catalogs/{catalogId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if false;
     }
   }
 }

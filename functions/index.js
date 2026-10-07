@@ -1070,3 +1070,357 @@ exports.forceCloseProduct = onCall({ region: "asia-northeast3" }, async (request
   return { success: true, winnersCount: winners.length, refundedCount: incompleteMembers.length };
 });
 
+// ============================================
+// 13. Secure Helper: Cryptographic Random Float
+// ============================================
+const crypto = require("crypto");
+function secureRandomFloat() {
+  const buf = crypto.randomBytes(4);
+  return buf.readUInt32BE(0) / 0xffffffff;
+}
+
+// Fallback Box Tiers for server draw
+const SERVER_DEFAULT_BOXES = [
+  {
+    id: "box_basic",
+    name: "베이직 럭키박스",
+    price: 5000,
+    goldenTickets: 2,
+    items: [
+      { id: "b_item_1", name: "대용량 LED 디지털 잔량표시 보조배터리 10,000mAh", retailPrice: 9900, wholesalePrice: 4800, prob: 0.010, image: "assets/products/powerbank_10000mah.jpg", grade: "RARE" },
+      { id: "b_item_2", name: "차량용 듀얼 초고속 충전 시가잭 45W", retailPrice: 7900, wholesalePrice: 3500, prob: 0.030, image: "assets/products/carcharger_45w.jpg", grade: "RARE" },
+      { id: "b_item_3", name: "304 스테인리스 이중 진공 보온보냉 텀블러 500ml", retailPrice: 6500, wholesalePrice: 2800, prob: 0.100, image: "assets/products/tumbler_500ml.jpg", grade: "NORMAL" },
+      { id: "b_item_4", name: "휴대용 접이식 각도조절 메탈 스마트폰 거치대", retailPrice: 4900, wholesalePrice: 1800, prob: 0.340, image: "assets/products/phonestand_metal.jpg", grade: "NORMAL" },
+      { id: "b_item_5", name: "3in1 패브릭 메탈 초고속 충전 케이블 1.5M", retailPrice: 3900, wholesalePrice: 1400, prob: 0.520, image: "assets/products/cable_3in1_braided.jpg", grade: "NORMAL" },
+    ]
+  },
+  {
+    id: "box_premium",
+    name: "프리미엄 럭키박스",
+    price: 15000,
+    goldenTickets: 4,
+    items: [
+      { id: "p_item_1", name: "블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰", retailPrice: 29900, wholesalePrice: 13500, prob: 0.010, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
+      { id: "p_item_2", name: "캠핑/테이블 휴대용 무선 무드등 서큘레이터", retailPrice: 23900, wholesalePrice: 9800, prob: 0.030, image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "p_item_3", name: "GaN 65W 3포트 초고속 멀티 충전기", retailPrice: 18900, wholesalePrice: 7500, prob: 0.100, image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "p_item_4", name: "맥세이프 15W 3in1 무선 고속 충전패드", retailPrice: 15900, wholesalePrice: 6200, prob: 0.340, image: "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80", grade: "NORMAL" },
+      { id: "p_item_5", name: "고속 충전 대용량 슬림 보조배터리 10,000mAh", retailPrice: 13900, wholesalePrice: 5500, prob: 0.520, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
+    ]
+  },
+  {
+    id: "box_vip",
+    name: "VIP 하이엔드 럭키박스",
+    price: 30000,
+    goldenTickets: 8,
+    items: [
+      { id: "v_item_1", name: "스마트 터치 무드등 블루투스 스피커 & 무선충전기", retailPrice: 59000, wholesalePrice: 24000, prob: 0.010, image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80", grade: "LEGENDARY" },
+      { id: "v_item_2", name: "고출력 무선 터보 에어건 먼지제거기 100,000RPM", retailPrice: 49000, wholesalePrice: 18500, prob: 0.030, image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
+      { id: "v_item_3", name: "무선 고출력 딥티슈 전동 마사지건 (헤드 4종)", retailPrice: 39000, wholesalePrice: 14000, prob: 0.100, image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
+      { id: "v_item_4", name: "3D 온열 지압 무선 목 어깨 안마기", retailPrice: 32000, wholesalePrice: 12500, prob: 0.340, image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "v_item_5", name: "초고속 프리미엄 PD 100W 30,000mAh 보조배터리", retailPrice: 27900, wholesalePrice: 11000, prob: 0.520, image: "assets/products/powerbank_10000mah.jpg", grade: "RARE" },
+    ]
+  }
+];
+
+// ============================================
+// 14. openLuckyBox (Callable) - Server-Side Atomic Draw
+// ============================================
+exports.openLuckyBox = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const { tierId, payMethod } = request.data;
+  if (!tierId) {
+    throw new HttpsError("invalid-argument", "박스 종류가 필요합니다.");
+  }
+
+  // 1. Fetch tier config from Firestore catalog or fallback
+  const catDoc = await db.collection("box_catalogs").doc("default").get();
+  const tiers = (catDoc.exists && Array.isArray(catDoc.data().tiers)) ? catDoc.data().tiers : SERVER_DEFAULT_BOXES;
+  const tier = tiers.find((t) => t.id === tierId) || SERVER_DEFAULT_BOXES[0];
+
+  const userRef = db.collection("users").doc(uid);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const userData = userDoc.exists ? userDoc.data() : { points: 0, goldenTickets: 0, vault: [] };
+
+    const currentPoints = Number(userData.points) || 0;
+    if (payMethod === "points" && currentPoints < tier.price) {
+      throw new HttpsError("failed-precondition", `포인트가 부족합니다. (보유: ${currentPoints}P / 필요: ${tier.price}P)`);
+    }
+
+    // 2. Cryptographic random draw on server
+    const rand = secureRandomFloat();
+    let cumulative = 0;
+    let selectedItem = tier.items[tier.items.length - 1];
+    for (const item of tier.items) {
+      cumulative += Number(item.prob) || 0;
+      if (rand <= cumulative) {
+        selectedItem = item;
+        break;
+      }
+    }
+
+    const wonItem = {
+      id: "vault_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+      tierId: tier.id,
+      tierName: tier.name,
+      title: selectedItem.name,
+      name: selectedItem.name,
+      imageUrl: selectedItem.image,
+      retailPrice: selectedItem.retailPrice,
+      wholesalePrice: selectedItem.wholesalePrice,
+      grade: selectedItem.grade || "NORMAL",
+      refundPoints: Math.round(Number(selectedItem.retailPrice || 5000) * 0.8),
+      status: "in_vault",
+      wonAt: Date.now()
+    };
+
+    const newPoints = payMethod === "points" ? (currentPoints - tier.price) : currentPoints;
+    const newTickets = (Number(userData.goldenTickets) || 0) + (Number(tier.goldenTickets) || 2);
+    const updatedVault = [...(userData.vault || []), wonItem];
+
+    transaction.set(userRef, {
+      points: newPoints,
+      goldenTickets: newTickets,
+      vault: updatedVault,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    return {
+      wonItem,
+      newPoints,
+      newTickets,
+      tierName: tier.name
+    };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 15. convertVaultItemToPoints (Callable) - Server 80% Refund
+// ============================================
+exports.convertVaultItemToPoints = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const { vaultId } = request.data;
+  if (!vaultId) {
+    throw new HttpsError("invalid-argument", "보관함 아이템 ID가 필요합니다.");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) {
+      throw new HttpsError("not-found", "유저 정보를 찾을 수 없습니다.");
+    }
+    const userData = userDoc.data();
+    const vault = userData.vault || [];
+    let itemIdx = vault.findIndex((v) => String(v.id) === String(vaultId));
+    if (itemIdx === -1) {
+      itemIdx = vault.findIndex((v) => !v.status || v.status === "in_vault");
+    }
+    if (itemIdx === -1) {
+      throw new HttpsError("not-found", "해당 보관함 상품을 찾을 수 없습니다.");
+    }
+
+    const item = vault[itemIdx];
+    if (item.status === "shipping_requested") {
+      throw new HttpsError("failed-precondition", "이미 배송 접수가 진행 중인 상품입니다.");
+    }
+    if (item.status === "converted_to_points") {
+      throw new HttpsError("failed-precondition", "이미 포인트로 전환 완료된 상품입니다.");
+    }
+
+    const refundPoints = item.refundPoints || Math.round(Number(item.retailPrice || 5000) * 0.8);
+    item.status = "converted_to_points";
+    item.refundPoints = refundPoints;
+    item.convertedAt = Date.now();
+
+    const newPoints = (Number(userData.points) || 0) + refundPoints;
+    vault[itemIdx] = item;
+
+    transaction.update(userRef, {
+      vault,
+      points: newPoints,
+      updatedAt: Date.now()
+    });
+
+    return { item, addedPoints: refundPoints, newPoints };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 16. applyGoldenRaffle (Callable) - Server Ticket Deduction & Queueing
+// ============================================
+exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const { raffleId } = request.data;
+  if (!raffleId) {
+    throw new HttpsError("invalid-argument", "래플 ID가 필요합니다.");
+  }
+
+  const callerEmail = request.auth.token.email || "user@example.com";
+  const callerName = request.auth.token.name || callerEmail.split("@")[0] || "참여자";
+
+  const userRef = db.collection("users").doc(uid);
+  const raffleRef = db.collection("super_raffles").doc(raffleId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const raffleDoc = await transaction.get(raffleRef);
+    if (!raffleDoc.exists) {
+      throw new HttpsError("not-found", "해당 골든 래플을 찾을 수 없습니다.");
+    }
+
+    const userData = userDoc.exists ? userDoc.data() : { goldenTickets: 0 };
+    const curTickets = Number(userData.goldenTickets) || 0;
+    if (curTickets < 1) {
+      throw new HttpsError("failed-precondition", "보유 골든티켓이 부족합니다.");
+    }
+
+    const raffle = raffleDoc.data();
+    const entries = raffle.entries || [];
+    const nextSlot = entries.length + 1;
+    const ticketNumber = `#${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+    const newEntry = {
+      ticketId: "t_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+      ticketNumber,
+      userId: uid,
+      userName: maskName(callerName),
+      userEmail: maskEmail(callerEmail),
+      appliedAt: Date.now(),
+      slotIndex: nextSlot,
+      status: "active"
+    };
+
+    entries.push(newEntry);
+    const newTickets = curTickets - 1;
+
+    transaction.update(userRef, { goldenTickets: newTickets, updatedAt: Date.now() });
+    transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
+
+    return { newTickets, entry: newEntry };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 17. requestVaultShipping (Callable) - Server Shipping & Fee
+// ============================================
+exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const { vaultId, shippingData } = request.data;
+  if (!vaultId || !shippingData) {
+    throw new HttpsError("invalid-argument", "배송 정보가 올바르지 않습니다.");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) throw new HttpsError("not-found", "유저 정보 없음");
+    const userData = userDoc.data();
+    const vault = userData.vault || [];
+    const idx = vault.findIndex((v) => String(v.id) === String(vaultId));
+    if (idx === -1) throw new HttpsError("not-found", "해당 보관함 상품 없음");
+
+    const item = vault[idx];
+    if (item.status === "shipping_requested") throw new HttpsError("failed-precondition", "이미 배송 신청됨");
+    if (item.status === "converted_to_points") throw new HttpsError("failed-precondition", "이미 포인트 전환됨");
+
+    const fee = Number(shippingData.fee) || 3000;
+    let newPoints = Number(userData.points) || 0;
+    if (shippingData.payMethod === "points") {
+      if (newPoints < fee) throw new HttpsError("failed-precondition", "배송비 결제를 위한 포인트가 부족합니다.");
+      newPoints -= fee;
+    }
+
+    item.status = "shipping_requested";
+    item.shippingData = shippingData;
+    vault[idx] = item;
+
+    transaction.update(userRef, { vault, points: newPoints, updatedAt: Date.now() });
+
+    const shippingId = "ship_" + Date.now();
+    const shippingRecord = {
+      shippingId,
+      productId: item.id || vaultId,
+      productTitle: item.title || item.name || "보관함 상품",
+      imageUrl: item.imageUrl || "",
+      winnerUid: uid,
+      winnerName: shippingData.recipientName || userData.displayName || "회원",
+      recipientName: shippingData.recipientName,
+      recipientPhone: shippingData.recipientPhone,
+      shippingAddress: shippingData.address + (shippingData.detail ? " " + shippingData.detail : ""),
+      zipCode: shippingData.zipCode || "",
+      shippingMemo: shippingData.memo || "",
+      shippingFee: fee,
+      shippingPayMethod: shippingData.payMethod || "points",
+      status: "pending",
+      submittedAt: Date.now()
+    };
+
+    const shipRef = db.collection("shipping_infos").doc(shippingId);
+    transaction.set(shipRef, shippingRecord);
+
+    return { shippingInfo: shippingRecord, newPoints };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 18. grantUserBalance (Callable) - Admin Only Balance Grant
+// ============================================
+exports.grantUserBalance = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 재화를 지급할 수 있습니다.");
+  }
+
+  const { targetEmail, targetUid, points, goldenTickets } = request.data;
+  let userRef = null;
+  if (targetUid) {
+    userRef = db.collection("users").doc(targetUid);
+  } else if (targetEmail) {
+    const snap = await db.collection("users").where("email", "==", targetEmail).limit(1).get();
+    if (!snap.empty) {
+      userRef = snap.docs[0].ref;
+    } else {
+      userRef = db.collection("users").doc("admin_master");
+    }
+  } else {
+    userRef = db.collection("users").doc(request.auth.uid);
+  }
+
+  const updateData = { updatedAt: Date.now() };
+  if (typeof points === "number") updateData.points = points;
+  if (typeof goldenTickets === "number") updateData.goldenTickets = goldenTickets;
+
+  await userRef.set(updateData, { merge: true });
+  console.log(`[Admin] Granted balance to ${userRef.id}: points=${points}, tickets=${goldenTickets}`);
+  return { success: true, uid: userRef.id, ...updateData };
+});
+
+

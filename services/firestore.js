@@ -10,9 +10,7 @@ import {
   getFirestore,
   collection,
   doc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
+  getDoc,
   query,
   where,
   orderBy,
@@ -145,9 +143,16 @@ if (isFirebaseConfigured()) {
     let usersUnsub = null;
     let userDocUnsub = null;
 
-    const startAuthListeners = () => {
+    const startAuthListeners = (passedUser) => {
       if (!db) return;
-      const user = getCurrentAuthUser();
+      let user = passedUser;
+      if (!user) {
+        try {
+          user = getCurrentAuthUser();
+        } catch (e) {
+          user = null;
+        }
+      }
 
       // Listen to logged-in user's personal document
       if (user?.uid) {
@@ -157,12 +162,15 @@ if (isFirebaseConfigured()) {
           (snap) => {
             if (snap.exists()) {
               currentUserDocCache = { id: snap.id, ...snap.data() };
+              console.log('[Firestore] User doc loaded successfully:', currentUserDocCache);
               window.dispatchEvent(new CustomEvent('userDataChanged', { detail: currentUserDocCache }));
               window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+            } else {
+              console.warn('[Firestore] User doc does not exist in DB for UID:', user.uid);
             }
           },
           (error) => {
-            console.warn('[Firestore] User document listener error:', error.message);
+            console.error('[Firestore] User document listener ERROR:', error.code, error.message);
           }
         );
       } else {
@@ -202,40 +210,35 @@ if (isFirebaseConfigured()) {
       }
     };
 
-    // If local emulator or already authenticated, start immediately
-    if (isLocalDev() || getCurrentAuthUser()) {
-      startAuthListeners();
-    }
-
+    // Listen for auth state changes reliably
     window.addEventListener('authStateChanged', (e) => {
-      startAuthListeners();
+      startAuthListeners(e.detail?.user);
     });
+
+    // Check if auth was already restored
+    setTimeout(() => {
+      startAuthListeners();
+    }, 0);
   } catch (e) {
     console.warn('[Firestore Cloud Warning]', e);
   }
 }
 
 // ============================================
-// Server-Side Storage Helpers (Users, Raffles, Catalog)
+// ============================================
+// Server-Side Storage Helpers (Safe Memory Fallbacks - Zero Client Write)
+// All persistent writes must go through Cloud Functions
 // ============================================
 function getCurrentUserDocCache() {
   return currentUserDocCache;
 }
 
 async function saveUserDocData(data) {
-  const authUser = getCurrentAuthUser();
-  if (!db || !authUser?.uid) return false;
-  try {
-    const userRef = doc(db, 'users', authUser.uid);
-    await setDoc(userRef, data, { merge: true });
-    if (currentUserDocCache) {
-      Object.assign(currentUserDocCache, data);
-    }
-    return true;
-  } catch (err) {
-    console.error('[Firestore] saveUserDocData error:', err);
-    return false;
+  if (currentUserDocCache) {
+    Object.assign(currentUserDocCache, data);
+    window.dispatchEvent(new CustomEvent('userDataChanged', { detail: currentUserDocCache }));
   }
+  return true;
 }
 
 function getSuperRafflesCache() {
@@ -243,30 +246,24 @@ function getSuperRafflesCache() {
 }
 
 async function saveSuperRaffleToFirestore(raffle) {
-  if (!db || !raffle?.id) return false;
-  try {
-    const ref = doc(db, 'super_raffles', raffle.id);
-    await setDoc(ref, raffle, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] saveSuperRaffleToFirestore error:', err);
-    return false;
+  if (!raffle?.id) return false;
+  const idx = superRafflesCache.findIndex(r => r.id === raffle.id);
+  if (idx >= 0) {
+    superRafflesCache[idx] = { ...superRafflesCache[idx], ...raffle };
+  } else {
+    superRafflesCache.push(raffle);
   }
+  window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  return true;
 }
 
 async function deleteSuperRaffleFromFirestore(raffleId) {
-  if (!db || !raffleId) return false;
-  try {
-    const ref = doc(db, 'super_raffles', raffleId);
-    await deleteDoc(ref);
-    superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
-    window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
-    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-    return true;
-  } catch (err) {
-    console.error('[Firestore] deleteSuperRaffleFromFirestore error:', err);
-    return false;
-  }
+  if (!raffleId) return false;
+  superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
+  window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  return true;
 }
 
 function getBoxCatalogCache() {
@@ -274,18 +271,10 @@ function getBoxCatalogCache() {
 }
 
 async function saveBoxCatalogToFirestore(tiers) {
-  if (!db) return false;
-  try {
-    const ref = doc(db, 'box_catalogs', 'default');
-    await setDoc(ref, { tiers, updatedAt: Date.now() }, { merge: true });
-    boxCatalogCache = tiers;
-    window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
-    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-    return true;
-  } catch (err) {
-    console.error('[Firestore] saveBoxCatalogToFirestore error:', err);
-    return false;
-  }
+  boxCatalogCache = tiers;
+  window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  return true;
 }
 
 function getAllShippingInfosCache() {
@@ -293,78 +282,44 @@ function getAllShippingInfosCache() {
 }
 
 async function submitShippingInfoToFirestore(data) {
-  if (!db || !data) return false;
-  try {
-    const shippingId = data.shippingId || ('ship_' + Date.now());
-    const ref = doc(db, 'shipping_infos', shippingId);
-    const payload = {
-      ...data,
-      shippingId,
-      submittedAt: data.submittedAt || Date.now(),
-      status: data.status || 'pending'
-    };
-    await setDoc(ref, payload, { merge: true });
-    return payload;
-  } catch (err) {
-    console.error('[Firestore] submitShippingInfoToFirestore error:', err);
-    return false;
-  }
+  if (!data) return false;
+  const shippingId = data.shippingId || ('ship_' + Date.now());
+  const payload = {
+    ...data,
+    shippingId,
+    submittedAt: data.submittedAt || Date.now(),
+    status: data.status || 'pending'
+  };
+  shippingCache = [payload, ...shippingCache.filter(s => s.shippingId !== shippingId)];
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  return payload;
 }
 
 async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '') {
-  if (!db || !shippingId) return false;
-  try {
-    const ref = doc(db, 'shipping_infos', shippingId);
-    const updateData = {
-      status,
-      carrier: carrier || 'CJ대한통운',
-      trackingNumber: trackingNumber || '',
-      updatedAt: Date.now()
-    };
-    await updateDoc(ref, updateData);
-    return updateData;
-  } catch (err) {
-    console.error('[Firestore] updateShippingStatusInFirestore error:', err);
-    return false;
+  const item = shippingCache.find(s => s.id === shippingId || s.shippingId === shippingId);
+  if (item) {
+    item.status = status;
+    item.carrier = carrier || 'CJ대한통운';
+    item.trackingNumber = trackingNumber || '';
+    item.updatedAt = Date.now();
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   }
+  return true;
 }
 
 async function deleteShippingInfoFromFirestore(shippingId) {
-  if (!db || !shippingId) return false;
-  try {
-    const ref = doc(db, 'shipping_infos', shippingId);
-    await deleteDoc(ref);
-    shippingCache = shippingCache.filter(s => s.id !== shippingId && s.shippingId !== shippingId);
-    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-    return true;
-  } catch (err) {
-    console.error('[Firestore] deleteShippingInfoFromFirestore error:', err);
-    return false;
-  }
+  shippingCache = shippingCache.filter(s => s.id !== shippingId && s.shippingId !== shippingId);
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  return true;
 }
 
 async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
-  if (!db) return;
-  try {
-    // 1. Seed Box Catalogs if not present on server
-    if (!boxCatalogCache && defaultBoxes && defaultBoxes.length > 0) {
-      const catRef = doc(db, 'box_catalogs', 'default');
-      await setDoc(catRef, { tiers: defaultBoxes, updatedAt: Date.now() }, { merge: true });
-      boxCatalogCache = defaultBoxes;
-      console.log('[Firestore] Box catalogs seeded to server');
-    }
-
-    // 2. Seed Super Raffles if empty on server
-    if ((!superRafflesCache || superRafflesCache.length === 0) && defaultRaffles && defaultRaffles.length > 0) {
-      for (const raffle of defaultRaffles) {
-        const ref = doc(db, 'super_raffles', raffle.id);
-        await setDoc(ref, raffle, { merge: true });
-      }
-      superRafflesCache = defaultRaffles;
-      console.log('[Firestore] Super raffles seeded to server');
-    }
-  } catch (e) {
-    console.warn('[Firestore] Initial seeding note:', e);
+  // Safe in-memory fallback without direct setDoc to server
+  if ((!boxCatalogCache || boxCatalogCache.length === 0) && defaultBoxes && defaultBoxes.length > 0) {
+    boxCatalogCache = defaultBoxes;
+  }
+  if ((!superRafflesCache || superRafflesCache.length === 0) && defaultRaffles && defaultRaffles.length > 0) {
+    superRafflesCache = defaultRaffles;
   }
 }
 
@@ -636,6 +591,41 @@ async function confirmTossPayment(data) {
   return result.data;
 }
 
+async function openLuckyBoxServer(tierId, payMethod = 'points') {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'openLuckyBox');
+  const result = await callable({ tierId, payMethod });
+  return result.data;
+}
+
+async function convertVaultItemToPointsServer(vaultId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'convertVaultItemToPoints');
+  const result = await callable({ vaultId });
+  return result.data;
+}
+
+async function applyGoldenRaffleServer(raffleId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'applyGoldenRaffle');
+  const result = await callable({ raffleId });
+  return result.data;
+}
+
+async function requestVaultShippingServer(vaultId, shippingData) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'requestVaultShipping');
+  const result = await callable({ vaultId, shippingData });
+  return result.data;
+}
+
+async function grantUserBalanceServer(targetUid, targetEmail, points, goldenTickets) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'grantUserBalance');
+  const result = await callable({ targetUid, targetEmail, points, goldenTickets });
+  return result.data;
+}
+
 /**
  * Compute group/slot info for a product.
  * @param {object} product - The active product object.
@@ -762,4 +752,9 @@ export {
   updateShippingStatusInFirestore,
   deleteShippingInfoFromFirestore,
   ensureInitialFirestoreData,
+  openLuckyBoxServer,
+  convertVaultItemToPointsServer,
+  applyGoldenRaffleServer,
+  requestVaultShippingServer,
+  grantUserBalanceServer,
 };

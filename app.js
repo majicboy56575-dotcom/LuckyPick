@@ -1,17 +1,26 @@
 // ============================================
 // LuckyPick - Main App (SPA Router)
 // ============================================
-import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=20261007_13';
+import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js';
 // NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
-import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=20261007_14';
-import { handleTossSuccess } from './services/payment.js?v=20261007_14';
-import { getTicketRefundNotices, clearTicketRefundNotices } from './services/randombox.js?v=20261007_14';
-import { executeUnboxingAnimation } from './services/unboxing-modal.js?v=20261007_14';
-import * as homePage from './pages/home.js?v=20261007_14';
-import * as historyPage from './pages/history.js?v=20261007_14';
-import * as profilePage from './pages/profile.js?v=20261007_16';
-import * as adminPage from './pages/admin.js?v=20261007_14';
+import { getClosedProducts, getCurrentUser, getCurrentUserDocCache } from './services/firestore.js';
+import { handleTossSuccess } from './services/payment.js';
+import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
+import { executeUnboxingAnimation } from './services/unboxing-modal.js';
+
+import * as homePage from './pages/home.js';
+import * as historyPage from './pages/history.js';
+import * as profilePage from './pages/profile.js';
+import * as adminPage from './pages/admin.js';
+
+// Expose dev helpers to window
+window.setUserPoints = setUserPoints;
+window.setAvailableGoldenTicketsCount = setAvailableGoldenTicketsCount;
+window.getUserPoints = getUserPoints;
+window.getAvailableGoldenTicketsCount = getAvailableGoldenTicketsCount;
+window.getCurrentUserDocCache = getCurrentUserDocCache;
+window.getCurrentAuthUser = getCurrentAuthUser;
 
 // --- State ---
 let currentPage = null;

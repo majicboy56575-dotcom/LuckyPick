@@ -1,8 +1,9 @@
 // ============================================
 // LuckyPick - Interactive Unboxing & Payment Integration
 // ============================================
-import { getRandomBoxTiers, openRandomBox, convertVaultItemToPoints, getUserPoints, setUserPoints, getAvailableGoldenTicketsCount } from './randombox.js?v=20261004_19';
-import { requestTossPayment, renderPayPalButtons } from './payment.js?v=20261004_22';
+import { getRandomBoxTiers, openRandomBox, convertVaultItemToPoints, getUserPoints, setUserPoints, getAvailableGoldenTicketsCount } from './randombox.js';
+import { openLuckyBoxServer, convertVaultItemToPointsServer } from './firestore.js';
+import { requestTossPayment, renderPayPalButtons } from './payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
 
 export function showProbabilityModal(boxId) {
@@ -213,7 +214,7 @@ export function openDirectPaymentModal(tierId, amount) {
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-export function executeUnboxingAnimation(boxId) {
+export async function executeUnboxingAnimation(boxId, payMethod = 'points') {
   const confirmModal = document.getElementById('unboxing-confirm-modal');
   if (confirmModal) confirmModal.remove();
   const directPay = document.getElementById('direct-pay-modal');
@@ -222,9 +223,6 @@ export function executeUnboxingAnimation(boxId) {
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(b => b.id === boxId);
   if (!tier) return;
-
-  // Perform random box draw
-  const result = openRandomBox(boxId);
 
   // Stage 1: Shaking Box Animation Modal
   const animModalHtml = `
@@ -246,74 +244,86 @@ export function executeUnboxingAnimation(boxId) {
 
   document.body.insertAdjacentHTML('beforeend', animModalHtml);
 
-  // Stage 2: Reveal Results after 1.6s
-  setTimeout(() => {
-    const stageContent = document.getElementById('unboxing-stage-content');
-    if (!stageContent) return;
+  try {
+    // Perform server-side atomic draw
+    const serverResult = await openLuckyBoxServer(boxId, payMethod);
+    const wonItem = serverResult.wonItem;
+    const earnedGoldenTickets = tier.goldenTickets || 2;
+    const totalGoldenTickets = serverResult.newTickets;
 
-    const gradeBadges = {
-      LEGENDARY: 'bg-amber-400 text-amber-950 font-black',
-      EPIC: 'bg-purple-500 text-white font-bold',
-      RARE: 'bg-blue-500 text-white font-bold',
-      NORMAL: 'bg-emerald-500 text-white font-bold'
-    };
+    // Stage 2: Reveal Results after 1.6s
+    setTimeout(() => {
+      const stageContent = document.getElementById('unboxing-stage-content');
+      if (!stageContent) return;
 
-    stageContent.innerHTML = `
-      <div class="reveal-pop bg-white text-gray-900 rounded-3xl p-6 shadow-2xl border-2 border-amber-400 max-h-[90vh] overflow-y-auto custom-scrollbar">
-        <!-- Header -->
-        <div class="text-center mb-4">
-          <span class="text-[10px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full ${gradeBadges[result.wonItem.grade] || 'bg-gray-800 text-white'}">
-            🎉 ${result.wonItem.grade} GRADE 획득!
-          </span>
-          <h2 class="text-xl font-black text-gray-900 mt-2">축하합니다! 실물 상품 당첨</h2>
-        </div>
+      const gradeBadges = {
+        LEGENDARY: 'bg-amber-400 text-amber-950 font-black',
+        EPIC: 'bg-purple-500 text-white font-bold',
+        RARE: 'bg-blue-500 text-white font-bold',
+        NORMAL: 'bg-emerald-500 text-white font-bold'
+      };
 
-        <!-- 1. Won Physical Item Card -->
-        <div class="bg-gradient-to-b from-amber-50/60 to-orange-50/30 border-2 border-amber-300 rounded-2xl p-4 text-center mb-4 shadow-sm relative overflow-hidden">
-          <div class="w-28 h-28 mx-auto mb-3 relative">
-            <img src="${result.wonItem.image}" class="w-full h-full object-cover rounded-xl shadow-md border border-amber-200" alt="${result.wonItem.name}">
-          </div>
-          <h3 class="font-extrabold text-base text-gray-900 mb-1 leading-snug">${result.wonItem.name}</h3>
-          <div class="flex items-center justify-center gap-2 text-xs">
-            <span class="text-gray-500">소비자가: <strong class="text-gray-900">₩${result.wonItem.retailPrice.toLocaleString()}원</strong></span>
-            <span class="text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-md">실물 100% 지급</span>
-          </div>
-        </div>
-
-        <!-- 2. Bonus Golden Raffle Tickets Earned -->
-        <div class="ticket-stamp-anim bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-amber-950 rounded-2xl p-4 mb-5 shadow-lg border border-amber-300 text-left">
-          <div class="flex items-center justify-between mb-1.5">
-            <div class="flex items-center gap-1.5 font-black text-sm">
-              <span class="material-symbols-outlined text-lg">confirmation_number</span>
-              <span>골든 티켓 +${result.earnedGoldenTickets}장 적립 완료!</span>
-            </div>
-            <span class="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full">
-              보유 티켓: ${result.totalGoldenTickets}장
+      stageContent.innerHTML = `
+        <div class="reveal-pop bg-white text-gray-900 rounded-3xl p-6 shadow-2xl border-2 border-amber-400 max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <!-- Header -->
+          <div class="text-center mb-4">
+            <span class="text-[10px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full ${gradeBadges[wonItem.grade] || 'bg-gray-800 text-white'}">
+              🎉 ${wonItem.grade} GRADE 획득!
             </span>
+            <h2 class="text-xl font-black text-gray-900 mt-2">축하합니다! 실물 상품 당첨</h2>
           </div>
-          <p class="text-[11px] text-amber-950/80 leading-relaxed">
-            적립된 골든 티켓은 아이폰 16 Pro, PS5 Pro 등 <strong>원하는 스페셜 상품에 자유롭게 분배하여 응모</strong>할 수 있습니다!
-          </p>
-        </div>
 
-        <!-- 3. Immediate Action Choice -->
-        <div class="space-y-2">
-          <button onclick="window.__openVaultItemShipping('${result.vaultRecord.id}')" class="w-full py-3.5 bg-primary text-white font-extrabold rounded-2xl shadow-md hover:bg-primary-container transition-all flex items-center justify-center gap-2">
-            <span class="material-symbols-outlined">local_shipping</span>
-            내 보관함에서 배송 신청하기
-          </button>
-          
-          <button onclick="window.__quickConvertPoints('${result.vaultRecord.id}')" class="w-full py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-2xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 text-xs">
-            <span class="material-symbols-outlined text-base">swap_horiz</span>
-            80% 포인트로 즉시 전환 (+₩${result.vaultRecord.refundPoints.toLocaleString()}P 환급)
-          </button>
+          <!-- 1. Won Physical Item Card -->
+          <div class="bg-gradient-to-b from-amber-50/60 to-orange-50/30 border-2 border-amber-300 rounded-2xl p-4 text-center mb-4 shadow-sm relative overflow-hidden">
+            <div class="w-28 h-28 mx-auto mb-3 relative">
+              <img src="${wonItem.imageUrl || wonItem.image}" class="w-full h-full object-cover rounded-xl shadow-md border border-amber-200" alt="${wonItem.title || wonItem.name}">
+            </div>
+            <h3 class="font-extrabold text-base text-gray-900 mb-1 leading-snug">${wonItem.title || wonItem.name}</h3>
+            <div class="flex items-center justify-center gap-2 text-xs">
+              <span class="text-gray-500">소비자가: <strong class="text-gray-900">₩${(wonItem.retailPrice || 0).toLocaleString()}원</strong></span>
+              <span class="text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-md">실물 100% 지급</span>
+            </div>
+          </div>
 
-          <button onclick="window.__closeStageModal()" class="w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl text-xs hover:bg-gray-200 transition-colors">
-            보관함에 보관하고 계속 둘러보기
-          </button>
-        </div>
-      </div>`;
-  }, 1600);
+          <!-- 2. Bonus Golden Raffle Tickets Earned -->
+          <div class="ticket-stamp-anim bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-amber-950 rounded-2xl p-4 mb-5 shadow-lg border border-amber-300 text-left">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-1.5 font-black text-sm">
+                <span class="material-symbols-outlined text-lg">confirmation_number</span>
+                <span>골든 티켓 +${earnedGoldenTickets}장 적립 완료!</span>
+              </div>
+              <span class="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full">
+                보유 티켓: ${totalGoldenTickets}장
+              </span>
+            </div>
+            <p class="text-[11px] text-amber-950/80 leading-relaxed">
+              적립된 골든 티켓은 아이폰 16 Pro, PS5 Pro 등 <strong>원하는 스페셜 상품에 자유롭게 분배하여 응모</strong>할 수 있습니다!
+            </p>
+          </div>
+
+          <!-- 3. Immediate Action Choice -->
+          <div class="space-y-2">
+            <button onclick="window.__openVaultItemShipping('${wonItem.id}')" class="w-full py-3.5 bg-primary text-white font-extrabold rounded-2xl shadow-md hover:bg-primary-container transition-all flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined">local_shipping</span>
+              내 보관함에서 배송 신청하기
+            </button>
+            
+            <button onclick="window.__quickConvertPoints('${wonItem.id}')" class="w-full py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-2xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 text-xs">
+              <span class="material-symbols-outlined text-base">swap_horiz</span>
+              80% 포인트로 즉시 전환 (+₩${(wonItem.refundPoints || 0).toLocaleString()}P 환급)
+            </button>
+
+            <button onclick="window.__closeStageModal()" class="w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl text-xs hover:bg-gray-200 transition-colors">
+              보관함에 보관하고 계속 둘러보기
+            </button>
+          </div>
+        </div>`;
+    }, 1600);
+  } catch (err) {
+    const modal = document.getElementById('unboxing-stage-modal');
+    if (modal) modal.remove();
+    alert(`개봉 실패: ${err.message || '오류가 발생했습니다.'}`);
+  }
 }
 
 // Global Handlers
@@ -415,12 +425,11 @@ window.__executeOpenBoxWithPoints = (boxId) => {
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(b => b.id === boxId);
   const currentPts = getUserPoints();
-  if (currentPts < tier.price) {
+  if (tier && currentPts < tier.price) {
     alert('포인트가 부족합니다.');
     return;
   }
-  setUserPoints(currentPts - tier.price);
-  executeUnboxingAnimation(boxId);
+  executeUnboxingAnimation(boxId, 'points');
 };
 
 window.__closeStageModal = () => {
@@ -429,15 +438,15 @@ window.__closeStageModal = () => {
   window.dispatchEvent(new CustomEvent('vaultUpdated'));
 };
 
-window.__quickConvertPoints = (vaultId) => {
+window.__quickConvertPoints = async (vaultId) => {
   if (!requireLogin()) return;
   try {
-    const res = convertVaultItemToPoints(vaultId);
-    alert(`🎉 [${res.item.title}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
+    const res = await convertVaultItemToPointsServer(vaultId);
+    alert(`🎉 [${res.item.title || res.item.name}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
     window.__closeStageModal();
     window.location.hash = '#profile';
   } catch (err) {
-    alert(err.message);
+    alert(err.message || '포인트 전환 실패');
   }
 };
 

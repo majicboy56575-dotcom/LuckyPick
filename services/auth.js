@@ -23,8 +23,7 @@ const ADMIN_EMAIL = 'majicboy56575@gmail.com';
 
 let firebaseApp = null;
 let firebaseAuth = null;
-// No mock user: the app must reflect the real Firebase Auth state (logged out by default)
-let currentUser = null;
+var currentUser = null;
 
 if (isFirebaseConfigured()) {
   try {

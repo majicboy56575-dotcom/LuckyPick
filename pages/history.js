@@ -2,9 +2,9 @@
 // LuckyPick - History Page (마감 상품 기록)
 // Reads from Firestore closed_products and Closed Super Raffles
 // ============================================
-import { t } from '../i18n.js?v=20261007_13';
-import { getClosedProducts, getAllShippingInfos } from '../services/firestore.js?v=20261007_13';
-import { getSuperRaffles } from '../services/randombox.js?v=20261007_13';
+import { t } from '../i18n.js';
+import { getClosedProducts, getAllShippingInfos } from '../services/firestore.js';
+import { getSuperRaffles } from '../services/randombox.js';
 
 function renderParticipantsModal(product) {
   return `

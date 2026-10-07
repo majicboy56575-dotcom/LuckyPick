@@ -1,7 +1,7 @@
 // ============================================
 // LuckyPick - Home Page (100% Random Box + Multi-Group Golden Raffle Showcase)
 // ============================================
-import { t } from '../i18n.js?v=20261007_13';
+import { t } from '../i18n.js';
 import { 
   getRandomBoxTiers, 
   getSuperRaffles, 
@@ -12,8 +12,8 @@ import {
   getRaffleGroupData,
   cancelGoldenTicketApplication,
   checkAndResolveRaffleExpirations
-} from '../services/randombox.js?v=20261007_13';
-import '../services/unboxing-modal.js?v=20261007_13';
+} from '../services/randombox.js';
+import '../services/unboxing-modal.js';
 import { isLoggedIn, requireLogin } from '../services/auth.js';
 
 let countdownIntervals = [];

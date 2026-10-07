@@ -15,7 +15,11 @@ import {
   submitShippingInfoToFirestore,
   updateShippingStatusInFirestore,
   deleteShippingInfoFromFirestore,
-  ensureInitialFirestoreData
+  ensureInitialFirestoreData,
+  openLuckyBoxServer,
+  convertVaultItemToPointsServer,
+  applyGoldenRaffleServer,
+  requestVaultShippingServer
 } from './firestore.js';
 import { getCurrentAuthUser } from './auth.js';
 
@@ -34,11 +38,11 @@ export const DEFAULT_BOX_TIERS = [
     goldenTickets: 2,
     badge: 'BEST POPULAR',
     items: [
-      { id: 'b_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 18900, wholesalePrice: 8700, prob: 0.005, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개' },
-      { id: 'b_item_2', name: '차량용 듀얼 초고속 충전 시가잭 45W', retailPrice: 12900, wholesalePrice: 4500, prob: 0.025, image: 'assets/products/carcharger_45w.jpg', grade: 'RARE', moq: '1개' },
-      { id: 'b_item_3', name: '304 스테인리스 이중 진공 보온보냉 텀블러 500ml', retailPrice: 7900, wholesalePrice: 3200, prob: 0.170, image: 'assets/products/tumbler_500ml.jpg', grade: 'NORMAL', moq: '1개' },
-      { id: 'b_item_4', name: '휴대용 접이식 각도조절 메탈 스마트폰 거치대', retailPrice: 4900, wholesalePrice: 1800, prob: 0.350, image: 'assets/products/phonestand_metal.jpg', grade: 'NORMAL', moq: '1개' },
-      { id: 'b_item_5', name: '3in1 패브릭 메탈 초고속 충전 케이블 1.5M', retailPrice: 3900, wholesalePrice: 1400, prob: 0.450, image: 'assets/products/cable_3in1_braided.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'b_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 9900, wholesalePrice: 4800, prob: 0.010, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개' },
+      { id: 'b_item_2', name: '차량용 듀얼 초고속 충전 시가잭 45W', retailPrice: 7900, wholesalePrice: 3500, prob: 0.030, image: 'assets/products/carcharger_45w.jpg', grade: 'RARE', moq: '1개' },
+      { id: 'b_item_3', name: '304 스테인리스 이중 진공 보온보냉 텀블러 500ml', retailPrice: 6500, wholesalePrice: 2800, prob: 0.100, image: 'assets/products/tumbler_500ml.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'b_item_4', name: '휴대용 접이식 각도조절 메탈 스마트폰 거치대', retailPrice: 4900, wholesalePrice: 1800, prob: 0.340, image: 'assets/products/phonestand_metal.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'b_item_5', name: '3in1 패브릭 메탈 초고속 충전 케이블 1.5M', retailPrice: 3900, wholesalePrice: 1400, prob: 0.520, image: 'assets/products/cable_3in1_braided.jpg', grade: 'NORMAL', moq: '1개' },
     ]
   },
   {
@@ -54,31 +58,31 @@ export const DEFAULT_BOX_TIERS = [
     goldenTickets: 4,
     badge: 'HOT CHOICE',
     items: [
-      { id: 'p_item_1', name: '소니 노이즈캔슬링 블루투스 헤드폰 WH-CH520', retailPrice: 69000, wholesalePrice: 49000, prob: 0.003, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'p_item_2', name: '무선 고출력 딥티슈 전동 마사지건 (헤드 4종)', retailPrice: 49000, wholesalePrice: 14500, prob: 0.027, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'p_item_3', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 24000, wholesalePrice: 7900, prob: 0.170, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'p_item_4', name: '블루투스 5.3 초경량 무선 이어폰 C타입', retailPrice: 15900, wholesalePrice: 6500, prob: 0.350, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'p_item_5', name: 'GaN 65W 3포트 초고속 멀티 충전기', retailPrice: 13900, wholesalePrice: 5800, prob: 0.450, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
+      { id: 'p_item_1', name: '블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰', retailPrice: 29900, wholesalePrice: 13500, prob: 0.010, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
+      { id: 'p_item_2', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 23900, wholesalePrice: 9800, prob: 0.030, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'p_item_3', name: 'GaN 65W 3포트 초고속 멀티 충전기', retailPrice: 18900, wholesalePrice: 7500, prob: 0.100, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'p_item_4', name: '맥세이프 15W 3in1 무선 고속 충전패드', retailPrice: 15900, wholesalePrice: 6200, prob: 0.340, image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
+      { id: 'p_item_5', name: '고속 충전 대용량 슬림 보조배터리 10,000mAh', retailPrice: 13900, wholesalePrice: 5500, prob: 0.520, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
     ]
   },
   {
     id: 'box_vip',
     name: 'VIP 하이엔드 럭키박스',
     nameEn: 'VIP High-End LuckyBox',
-    tagline: '하이엔드 가전 및 명품 굿즈 100% 지급',
+    tagline: '하이엔드 가전 및 프리미엄 라이프 굿즈 100% 지급',
     price: 30000,
-    minGuaranteedValue: 26900,
+    minGuaranteedValue: 27900,
     color: 'from-amber-500 via-yellow-600 to-amber-800',
     accentColor: '#eab308',
     boxImage: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=600&auto=format&fit=crop&q=80',
     goldenTickets: 8,
     badge: '👑 HIGH-END',
     items: [
-      { id: 'v_item_1', name: '애플 에어팟 4세대 액티브 노이즈 캔슬링', retailPrice: 269000, wholesalePrice: 249000, prob: 0.001, image: 'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
-      { id: 'v_item_2', name: '네스프레소 버츄오 팝 캡슐 커피머신', retailPrice: 139000, wholesalePrice: 99000, prob: 0.009, image: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
-      { id: 'v_item_3', name: '스마트 터치 무드등 블루투스 5.0 스피커', retailPrice: 59000, wholesalePrice: 14500, prob: 0.150, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'v_item_4', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 29900, wholesalePrice: 13500, prob: 0.400, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'v_item_5', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 26900, wholesalePrice: 12800, prob: 0.440, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_1', name: '스마트 터치 무드등 블루투스 스피커 & 무선충전기', retailPrice: 59000, wholesalePrice: 24000, prob: 0.010, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
+      { id: 'v_item_2', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 49000, wholesalePrice: 18500, prob: 0.030, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
+      { id: 'v_item_3', name: '무선 고출력 딥티슈 전동 마사지건 (헤드 4종)', retailPrice: 39000, wholesalePrice: 14000, prob: 0.100, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
+      { id: 'v_item_4', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 32000, wholesalePrice: 12500, prob: 0.340, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_5', name: '초고속 프리미엄 PD 100W 30,000mAh 보조배터리', retailPrice: 27900, wholesalePrice: 11000, prob: 0.520, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개' },
     ]
   }
 ];
@@ -98,13 +102,13 @@ export const DEFAULT_SUPER_RAFFLES = [
     entries: [] // Queue of active participants
   },
   {
-    id: 'super_ps5',
-    title: 'PlayStation 5 Pro 콘솔',
-    retailPrice: 1118000,
-    imageUrl: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=600&auto=format&fit=crop&q=80',
-    unitSize: 150, // 150 tickets per Group
-    endTime: Date.now() + 86400000 * 4.2,
-    winnerBonus: '듀얼센스 추가 컨트롤러 1EA 동봉',
+    id: 'super_gucci_bag',
+    title: '구찌 오피디아 GG 스몰 숄더백',
+    retailPrice: 2450000,
+    imageUrl: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&auto=format&fit=crop&q=80',
+    unitSize: 250, // 250 tickets per Group
+    endTime: 1791980800000,
+    winnerBonus: '공식 인보이스 영수증 및 보증서 동봉',
     badge: 'SUPER RAFFLE #2',
     status: 'active',
     entries: []
@@ -161,8 +165,9 @@ export const SUPER_GOLDEN_RAFFLES = getSuperRaffles();
 // Points Management (100% Firestore User Doc backed)
 export function getUserPoints() {
   const docData = getCurrentUserDocCache();
-  if (docData && typeof docData.points === 'number') {
-    return docData.points;
+  if (docData && docData.points !== undefined && docData.points !== null) {
+    const pts = Number(docData.points);
+    if (!isNaN(pts)) return pts;
   }
   return 0;
 }
@@ -184,8 +189,9 @@ export function getUserVault() {
 // Unassigned Golden Tickets (100% Firestore User Doc goldenTickets backed)
 export function getAvailableGoldenTicketsCount() {
   const docData = getCurrentUserDocCache();
-  if (docData && typeof docData.goldenTickets === 'number') {
-    return docData.goldenTickets;
+  if (docData && docData.goldenTickets !== undefined && docData.goldenTickets !== null) {
+    const tickets = Number(docData.goldenTickets);
+    if (!isNaN(tickets)) return tickets;
   }
   return 0;
 }
@@ -195,35 +201,8 @@ export function setAvailableGoldenTicketsCount(count) {
   window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count } }));
 }
 
-// Automatic Initial Migration (Runs at most once per account):
-// When a user logs in, if their server document is empty (new account)
-// but this local browser has existing test points/tickets/vault, upload them once.
-const migratedUserIds = new Set();
+// User is initialized directly via Cloud Functions / Firestore cache
 
-window.addEventListener('userDataChanged', (e) => {
-  const userDoc = e.detail;
-  if (!userDoc || !userDoc.id || migratedUserIds.has(userDoc.id) || userDoc.migratedAt) return;
-
-  const localPts = parseInt(localStorage.getItem(USER_POINTS_KEY) || '0', 10);
-  const localTickets = parseInt(localStorage.getItem(UNASSIGNED_TICKETS_KEY) || '0', 10);
-  let localVault = [];
-  try { localVault = JSON.parse(localStorage.getItem(INVENTORY_STORAGE_KEY) || '[]'); } catch(err) {}
-
-  const needsPointsMigration = (userDoc.points === 0 || userDoc.points === undefined) && localPts > 0;
-  const needsTicketsMigration = (userDoc.goldenTickets === 0 || userDoc.goldenTickets === undefined) && localTickets > 0;
-  const needsVaultMigration = (!userDoc.vault || userDoc.vault.length === 0) && localVault.length > 0;
-
-  if (needsPointsMigration || needsTicketsMigration || needsVaultMigration) {
-    migratedUserIds.add(userDoc.id);
-    const updates = { migratedAt: Date.now() };
-    if (needsPointsMigration) updates.points = localPts;
-    if (needsTicketsMigration) updates.goldenTickets = localTickets;
-    if (needsVaultMigration) updates.vault = localVault;
-    saveUserDocData(updates);
-  } else {
-    migratedUserIds.add(userDoc.id);
-  }
-});
 
 export function getAppliedGoldenTickets(currentUserId) {
   const authUser = getCurrentAuthUser();
@@ -355,52 +334,19 @@ export function getRaffleGroupData(raffle, currentUserId) {
   };
 }
 
-// Apply Golden Tickets to a Super Raffle (Append to Multi-Group Queue)
-export function applyGoldenTicketsToRaffle(raffleId, ticketCount, userInfo = {}) {
-  const available = getAvailableGoldenTicketsCount();
-  const count = parseInt(ticketCount, 10);
-  if (isNaN(count) || count <= 0) throw new Error('올바른 티켓 수량을 입력해주세요.');
-  if (count > available) throw new Error(`보유 티켓이 부족합니다. (보유: ${available}장 / 신청: ${count}장)`);
-
-  const raffles = getSuperRaffles();
-  const targetRaffle = raffles.find(r => r.id === raffleId);
-  if (!targetRaffle) throw new Error('해당 스페셜 래플을 찾을 수 없습니다.');
-
-  if (!targetRaffle.entries) targetRaffle.entries = [];
-
-  setAvailableGoldenTicketsCount(available - count);
-
-  const newApplied = [];
-  const authUser = getCurrentAuthUser();
-  const userName = authUser?.displayName || userInfo.name || '나(회원)';
-  const userEmail = authUser?.email || userInfo.email || 'my_account@luckypick.com';
-  const userId = authUser?.uid || userInfo.uid || 'my_user_id';
-
-  for (let i = 0; i < count; i++) {
-    const currentSlot = targetRaffle.entries.length + 1;
-    const num = '#' + String(Math.floor(1000 + Math.random() * 9000)) + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
-    const entry = {
-      ticketId: 'ticket_' + Date.now() + '_' + i,
-      ticketNumber: num,
-      userId: userId,
-      userName: userName,
-      userEmail: userEmail,
-      appliedAt: Date.now(),
-      slotIndex: currentSlot,
-      status: 'active'
+// Apply Golden Tickets to a Super Raffle (Server-Backed Atomic Deduction & Entry)
+export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, userInfo = {}) {
+  try {
+    const res = await applyGoldenRaffleServer(raffleId);
+    return {
+      appliedCount: 1,
+      totalGoldenTickets: res.newTickets,
+      newTickets: [res.entry]
     };
-    targetRaffle.entries.push(entry);
-    newApplied.push(entry);
+  } catch (err) {
+    console.error('[Raffle] applyGoldenRaffleServer error:', err);
+    throw new Error(err.message || '골든티켓 응모 처리 중 오류가 발생했습니다.');
   }
-
-  saveSuperRaffles(raffles);
-
-  return {
-    raffle: targetRaffle,
-    appliedCount: count,
-    remainingTickets: available - count,
-    newTickets: newApplied
-  };
 }
 
 // Cancel User's Ticket & FIFO Slot Shifting (Requirement 4)
@@ -701,111 +647,25 @@ export function openRandomBox(tierId) {
   };
 }
 
-// Convert won item into points (80% value) (100% Firestore backed)
-export function convertVaultItemToPoints(vaultId) {
-  const vault = getUserVault();
-  let index = vault.findIndex(v => String(v.id) === String(vaultId));
-  if (index === -1) {
-    index = vault.findIndex(v => !v.status || v.status === 'in_vault');
+// Convert won item into points (80% value) (Server-Backed Atomic Refund)
+export async function convertVaultItemToPoints(vaultId) {
+  try {
+    return await convertVaultItemToPointsServer(vaultId);
+  } catch (err) {
+    console.error('[Vault] convertVaultItemToPoints error:', err);
+    throw new Error(err.message || '포인트 전환 중 오류가 발생했습니다.');
   }
-  if (index === -1) throw new Error('해당 보관함 아이템을 찾을 수 없습니다.');
-
-  const item = vault[index];
-  if (item.status === 'shipping_requested') {
-    throw new Error('이미 배송 접수가 진행 중인 상품은 포인트로 전환할 수 없습니다.');
-  }
-  if (item.status === 'converted_to_points') {
-    throw new Error('이미 포인트로 전환 완료된 상품입니다.');
-  }
-
-  const refundPoints = item.refundPoints || Math.round((Number(item.retailPrice) || 5000) * 0.8);
-  item.refundPoints = refundPoints;
-  item.status = 'converted_to_points';
-  item.convertedAt = Date.now();
-
-  const currentPoints = getUserPoints();
-  const newPoints = currentPoints + refundPoints;
-
-  saveUserDocData({ 
-    vault, 
-    points: newPoints 
-  });
-
-  return { item, newPoints, addedPoints: refundPoints };
 }
 
-// Request Individual Shipping (100% Firestore collection shipping_infos & userDoc backed)
-export function requestShippingForVaultItem(vaultId, shippingData) {
-  const vault = getUserVault();
-  let index = vault.findIndex(v => String(v.id) === String(vaultId));
-  if (index === -1 && shippingData?.itemTitle) {
-    index = vault.findIndex(v => v.title === shippingData.itemTitle && (!v.status || v.status === 'in_vault'));
+// Request Individual Shipping (Server-Backed Atomic Shipping Request)
+export async function requestShippingForVaultItem(vaultId, shippingData) {
+  try {
+    const res = await requestVaultShippingServer(vaultId, shippingData);
+    return res.shippingInfo;
+  } catch (err) {
+    console.error('[Shipping] requestShippingForVaultItem error:', err);
+    throw new Error(err.message || '배송 신청 중 오류가 발생했습니다.');
   }
-  if (index === -1) {
-    index = vault.findIndex(v => !v.status || v.status === 'in_vault');
-  }
-  if (index === -1) throw new Error('해당 보관함 아이템을 찾을 수 없습니다.');
-
-  const item = vault[index];
-  if (item.status === 'shipping_requested') {
-    throw new Error('이미 배송 접수가 완료된 상품입니다.');
-  }
-  if (item.status === 'converted_to_points') {
-    throw new Error('이미 포인트로 환급 전환된 상품입니다.');
-  }
-
-  const fee = Number(shippingData.fee) || 3000;
-  const payMethod = shippingData.payMethod || 'points';
-
-  // If paid with points, deduct from points balance
-  let curPts = getUserPoints();
-  if (payMethod === 'points') {
-    if (curPts < fee) {
-      throw new Error(`보유 포인트가 부족합니다. (보유: ₩${curPts.toLocaleString()}P / 배송비: ₩${fee.toLocaleString()}원)`);
-    }
-    curPts -= fee;
-  }
-
-  item.status = 'shipping_requested';
-  item.shippingData = shippingData;
-  item.shippingFee = fee;
-  item.shippingPayMethod = payMethod;
-  item.requestedAt = Date.now();
-
-  const authUser = getCurrentAuthUser();
-  const shippingId = 'ship_' + Date.now();
-
-  const newShippingRecord = {
-    shippingId,
-    vaultId: item.id || vaultId,
-    userId: authUser?.uid || 'guest',
-    userEmail: authUser?.email || 'guest@luckypick.com',
-    itemTitle: item.title,
-    retailPrice: item.retailPrice,
-    imageUrl: item.imageUrl,
-    shippingData,
-    shippingFee: fee,
-    shippingPayMethod: payMethod,
-    status: 'pending',
-    requestedAt: Date.now(),
-    carrier: 'CJ대한통운',
-    trackingNumber: ''
-  };
-
-  // Submit to central shipping_infos Firestore collection
-  submitShippingInfoToFirestore(newShippingRecord);
-
-  // Also update user's own document
-  const userShippingRequests = (getCurrentUserDocCache()?.shippingRequests || []);
-  userShippingRequests.unshift(newShippingRecord);
-
-  saveUserDocData({ 
-    vault, 
-    points: curPts,
-    shippingRequests: userShippingRequests 
-  });
-
-  return item;
 }
 
 // Admin Shipping Requests (100% Firestore collection shipping_infos backed)

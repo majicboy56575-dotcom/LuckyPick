@@ -2,8 +2,8 @@
 // LuckyPick - Profile & My Vault & Golden Tickets Page
 // Clean Individual Item Shipping & Instant Points Conversion
 // ============================================
-import { t } from '../i18n.js?v=20261007_14';
-import { getCurrentUser } from '../services/firestore.js?v=20261007_14';
+import { t } from '../i18n.js';
+import { getCurrentUser, convertVaultItemToPointsServer, requestVaultShippingServer, grantUserBalanceServer } from '../services/firestore.js';
 import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentAuthUser } from '../services/auth.js';
 import { 
   getUserPoints, 
@@ -14,8 +14,8 @@ import {
   convertVaultItemToPoints, 
   requestShippingForVaultItem,
   cancelGoldenTicketApplication
-} from '../services/randombox.js?v=20261007_14';
-import '../services/unboxing-modal.js?v=20261007_14';
+} from '../services/randombox.js';
+import '../services/unboxing-modal.js';
 
 let activeProfileTab = 'vault'; // 'vault' | 'tickets' | 'charge'
 let isSignUpMode = false;
@@ -923,7 +923,7 @@ export function render() {
     }
   };
 
-  window.__submitSingleShipping = (passedVaultId) => {
+  window.__submitSingleShipping = async (passedVaultId) => {
     const vaultId = passedVaultId || document.getElementById('s-ship-vault-id')?.value;
     const itemTitle = document.getElementById('s-ship-item-title')?.value || '';
     
@@ -1014,7 +1014,7 @@ export function render() {
     };
 
     try {
-      requestShippingForVaultItem(vaultId, {
+      await requestVaultShippingServer(vaultId, {
         itemTitle,
         name,
         phone,
@@ -1052,22 +1052,27 @@ export function render() {
     if (modal) modal.remove();
   };
 
-  window.__executeChargePayment = (points, method) => {
-    const current = getUserPoints();
-    setUserPoints(current + points);
-    alert(`🎉 [${method} 결제 완료]\n₩${points.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${(current + points).toLocaleString()}P`);
-    window.__closeChargePayModal();
-    window.location.reload();
+  window.__executeChargePayment = async (points, method) => {
+    try {
+      const current = getUserPoints();
+      await grantUserBalanceServer(null, null, current + points, null);
+      alert(`🎉 [${method} 결제 완료]\n₩${points.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${(current + points).toLocaleString()}P`);
+      window.__closeChargePayModal();
+      window.location.reload();
+    } catch (err) {
+      alert(`충전 오류: ${err.message || err}`);
+    }
   };
 
-  window.__convertItemToPoints = (vaultId) => {
+  window.__convertItemToPoints = async (vaultId) => {
     try {
-      const res = convertVaultItemToPoints(vaultId);
-      alert(`🎉 [80% 포인트 환급 완료]\n[${res.item.title}]\n+₩${res.addedPoints.toLocaleString()}P 가 즉시 적립되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
+      const res = await convertVaultItemToPointsServer(vaultId);
+      const title = res.item?.title || res.item?.name || '상품';
+      alert(`🎉 [80% 포인트 환급 완료]\n[${title}]\n+₩${res.addedPoints.toLocaleString()}P 가 즉시 적립되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
       window.__switchProfileTab('vault');
 
       // Refresh top points display
-      const newPts = getUserPoints();
+      const newPts = res.newPoints;
       const ptsDisplay = document.querySelector('#profile-points-display, .font-black.text-2xl.text-amber-300');
       if (ptsDisplay) ptsDisplay.textContent = `₩${newPts.toLocaleString()} P`;
     } catch (err) {
