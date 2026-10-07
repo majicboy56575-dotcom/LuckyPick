@@ -1,15 +1,17 @@
 // ============================================
 // LuckyPick - Main App (SPA Router)
 // ============================================
-import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=20261004_20';
-import { getCurrentAuthUser, waitForAuth } from './services/auth.js?v=20261004_20';
-import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=20261004_20';
-import { handleTossSuccess } from './services/payment.js?v=20261004_20';
-import { getTicketRefundNotices, clearTicketRefundNotices } from './services/randombox.js?v=20261004_20';
-import * as homePage from './pages/home.js?v=20261004_20';
-import * as historyPage from './pages/history.js?v=20261004_20';
-import * as profilePage from './pages/profile.js?v=20261004_20';
-import * as adminPage from './pages/admin.js?v=20261004_20';
+import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js?v=20261007_13';
+// NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
+import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
+import { getClosedProducts, getCurrentUser } from './services/firestore.js?v=20261007_14';
+import { handleTossSuccess } from './services/payment.js?v=20261007_14';
+import { getTicketRefundNotices, clearTicketRefundNotices } from './services/randombox.js?v=20261007_14';
+import { executeUnboxingAnimation } from './services/unboxing-modal.js?v=20261007_14';
+import * as homePage from './pages/home.js?v=20261007_14';
+import * as historyPage from './pages/history.js?v=20261007_14';
+import * as profilePage from './pages/profile.js?v=20261007_16';
+import * as adminPage from './pages/admin.js?v=20261007_14';
 
 // --- State ---
 let currentPage = null;
@@ -31,6 +33,8 @@ function getPageFromHash() {
 function renderHeader(pageName) {
   if (pageName === 'admin') return ''; // Admin has its own header
 
+  const showAdminButton = isAdmin();
+
   return `
     <header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs flex justify-between items-center h-16 px-container-margin max-w-full border-b border-slate-200/80">
       <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.hash='#home'">
@@ -39,9 +43,11 @@ function renderHeader(pageName) {
       </div>
       <div class="flex items-center gap-3">
         ${renderLanguageDropdown('header-lang-dropdown')}
-        <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all text-slate-700" onclick="window.location.hash='#admin'" title="Admin">
-          <span class="material-symbols-outlined">admin_panel_settings</span>
-        </button>
+        ${showAdminButton ? `
+          <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all text-slate-700" onclick="window.location.hash='#admin'" title="Admin">
+            <span class="material-symbols-outlined">admin_panel_settings</span>
+          </button>
+        ` : ''}
       </div>
     </header>`;
 }
@@ -297,7 +303,9 @@ function navigate() {
 
   if (tossPaymentKey && tossOrderId && tossAmount) {
     window.history.replaceState({}, document.title, window.location.pathname);
+    const pendingBoxId = sessionStorage.getItem('pending_unboxing_box_id');
     sessionStorage.removeItem('toss_pending_product');
+    sessionStorage.removeItem('pending_unboxing_box_id');
 
     (async () => {
       const user = await waitForAuth(5000);
@@ -307,16 +315,24 @@ function navigate() {
         return;
       }
       try {
-        const result = await handleTossSuccess(tossPaymentKey, tossOrderId, tossAmount, tossProductId || 'prod_001');
-        const countText = result.currentParticipants && result.maxParticipants
-          ? `${result.currentParticipants}/${result.maxParticipants}`
-          : '';
-        alert(`🎉 토스 결제 성공!\n\nPayment Key: ${tossPaymentKey}\n\n참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
+        const result = await handleTossSuccess(tossPaymentKey, tossOrderId, tossAmount, tossProductId || pendingBoxId || 'box_basic');
+        
+        if (pendingBoxId) {
+          // Lucky box unboxing flow
+          executeUnboxingAnimation(pendingBoxId);
+        } else {
+          // General golden raffle entry flow
+          const countText = result.currentParticipants && result.maxParticipants
+            ? `${result.currentParticipants}/${result.maxParticipants}`
+            : '';
+          alert(`🎉 토스 결제 성공!\n\n참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
+          window.location.hash = '#home';
+        }
       } catch (err) {
         console.error('[Toss] Confirm failed:', err);
         alert(`토스 결제 승인 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
+        window.location.hash = '#home';
       }
-      window.location.hash = '#home';
     })();
     return;
   }
@@ -330,9 +346,8 @@ function navigate() {
   }
 
   // --- Protected Route Check ---
-  const user = getCurrentAuthUser();
-  if (!user && (pageName === 'history' || pageName === 'admin')) {
-    alert(t('loginRequiredAlert'));
+  if (pageName === 'admin' && !isAdmin()) {
+    alert(t('loginRequiredAlert') || '관리자 권한이 필요합니다.');
     window.location.hash = `#profile?redirect=${pageName}`;
     return;
   }
@@ -535,14 +550,34 @@ document.addEventListener('click', (e) => {
   });
 });
 
+// --- Debounced Router for Background Data Syncs ---
+let backgroundSyncTimer = null;
+function debouncedNavigate() {
+  // If an active animation modal is open, defer re-rendering so animations are not interrupted
+  if (document.getElementById('unboxing-stage-modal') || document.getElementById('direct-pay-modal')) {
+    return;
+  }
+  if (backgroundSyncTimer) clearTimeout(backgroundSyncTimer);
+  backgroundSyncTimer = setTimeout(() => {
+    navigate();
+  }, 50);
+}
+
 // --- Event Listeners ---
-window.addEventListener('hashchange', navigate);
-window.addEventListener('languageChanged', navigate);
-window.addEventListener('firestoreDataChanged', navigate);
+// Direct User Interactions: 0ms Immediate Rendering
+window.addEventListener('hashchange', () => navigate());
+window.addEventListener('languageChanged', () => navigate());
+
+// Background Server Data Sync: 50ms Batch Throttled (Flicker-Free)
+window.addEventListener('firestoreDataChanged', debouncedNavigate);
+window.addEventListener('authStateChanged', debouncedNavigate);
+window.addEventListener('userDataChanged', debouncedNavigate);
+window.addEventListener('superRafflesChanged', debouncedNavigate);
+window.addEventListener('boxCatalogChanged', debouncedNavigate);
 
 // Immediately initialize router
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', navigate);
+  document.addEventListener('DOMContentLoaded', () => navigate());
 } else {
   navigate();
 }

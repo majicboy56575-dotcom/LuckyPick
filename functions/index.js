@@ -19,7 +19,7 @@ const ADMIN_EMAIL = "majicboy56575@gmail.com";
 
 // Toss Payments Secret Key (loaded from functions/.env)
 const TOSS_SECRET_KEY =
-  process.env.TOSS_SECRET_KEY || "test_sk_24xLea5zVAjlGnv5D0e7rQAMYNwW";
+  process.env.TOSS_SECRET_KEY || "test_sk_yL0qZ4G1VOYGpLXpe4YB8oWb2MQY";
 
 // ============================================
 // Helper: Privacy Masking
@@ -454,16 +454,36 @@ exports.createUserProfile = onCall({ region: "asia-northeast3" }, async (request
 
   const userRef = db.collection("users").doc(uid);
   const docSnap = await userRef.get();
+  const isAdmin = email === ADMIN_EMAIL;
+
   if (!docSnap.exists) {
     await userRef.set({
       uid,
       displayName,
       email,
       provider,
-      isAdmin: email === ADMIN_EMAIL,
+      isAdmin,
+      points: 0,
+      goldenTickets: 0,
+      vault: [],
+      shippingRequests: [],
+      ticketRefundNotices: [],
       createdAt: Date.now(),
     });
-    console.log(`[Auth] Created user profile: ${displayName} (${email})`);
+    console.log(`[Auth] Created user profile: ${displayName} (${email}) - Initialized with 0P / 0 Tickets`);
+  } else {
+    // Ensure all required fields exist for existing users
+    const data = docSnap.data();
+    const updates = {};
+    if (isAdmin) updates.isAdmin = true;
+    if (typeof data.points !== 'number') updates.points = 0;
+    if (typeof data.goldenTickets !== 'number') updates.goldenTickets = 0;
+    if (!Array.isArray(data.vault)) updates.vault = [];
+    if (!Array.isArray(data.shippingRequests)) updates.shippingRequests = [];
+    if (!Array.isArray(data.ticketRefundNotices)) updates.ticketRefundNotices = [];
+    if (Object.keys(updates).length > 0) {
+      await userRef.update(updates);
+    }
   }
   return { success: true };
 });

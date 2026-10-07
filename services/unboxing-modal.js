@@ -2,6 +2,8 @@
 // LuckyPick - Interactive Unboxing & Payment Integration
 // ============================================
 import { getRandomBoxTiers, openRandomBox, convertVaultItemToPoints, getUserPoints, setUserPoints, getAvailableGoldenTicketsCount } from './randombox.js?v=20261004_19';
+import { requestTossPayment, renderPayPalButtons } from './payment.js?v=20261004_22';
+import { getCurrentAuthUser, requireLogin } from './auth.js';
 
 export function showProbabilityModal(boxId) {
   const tiers = getRandomBoxTiers();
@@ -74,6 +76,7 @@ export function showProbabilityModal(boxId) {
 }
 
 export function startUnboxingFlow(boxId) {
+  if (!requireLogin('럭키박스 개봉 및 100% 실물 득템은 로그인 후 이용하실 수 있습니다.')) return;
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(b => b.id === boxId);
   if (!tier) return;
@@ -147,6 +150,7 @@ export function startUnboxingFlow(boxId) {
 }
 
 export function openDirectPaymentModal(tierId, amount) {
+  if (!requireLogin()) return;
   const confirmModal = document.getElementById('unboxing-confirm-modal');
   if (confirmModal) confirmModal.remove();
 
@@ -331,12 +335,83 @@ window.__closeDirectPayModal = () => {
   if (modal) modal.remove();
 };
 
-window.__processDirectPayment = (tierId, amount, method) => {
-  alert(`🎉 [${method.toUpperCase()} 결제 승인 완료]\n₩${amount.toLocaleString()}원 결제가 완료되어 럭키박스를 개봉합니다!`);
-  executeUnboxingAnimation(tierId);
+window.__processDirectPayment = async (tierId, amount, method) => {
+  if (!requireLogin()) return;
+  const tiers = getRandomBoxTiers();
+  const tier = tiers.find(b => b.id === tierId);
+  const tierName = tier ? tier.name : '럭키박스';
+  
+  const authUser = getCurrentAuthUser();
+  const userId = authUser.uid;
+  const userEmail = authUser.email;
+
+  if (method === 'toss') {
+    try {
+      const modal = document.getElementById('direct-pay-modal');
+      if (modal) modal.remove();
+
+      // Store pending unboxing box ID
+      sessionStorage.setItem('pending_unboxing_box_id', tierId);
+
+      // Invoke real Toss Payments checkout popup / standard SDK
+      await requestTossPayment({
+        productId: tierId,
+        productName: tierName,
+        amount: Number(amount),
+        userId: userId,
+        userEmail: userEmail
+      });
+    } catch (err) {
+      console.error('[Toss] Payment request error:', err);
+      alert(`토스 결제창 호출 실패: ${err.message || err}`);
+    }
+  } else if (method === 'paypal') {
+    const modalContent = document.querySelector('#direct-pay-modal .space-y-2\\.5');
+    if (!modalContent) return;
+
+    const usdAmount = Number((amount / 1350).toFixed(2)) || 3.70;
+
+    modalContent.innerHTML = `
+      <div class="space-y-3">
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+          <span>결제 금액 (USD 환산)</span>
+          <span class="font-bold text-amber-950 font-mono text-sm">$${usdAmount} USD (₩${Number(amount).toLocaleString()}원)</span>
+        </div>
+        <div id="paypal-button-container" class="min-h-[140px] flex items-center justify-center">
+          <div class="text-xs text-gray-500 animate-pulse">PayPal 결제창 로딩 중...</div>
+        </div>
+        <button onclick="window.__openDirectPaymentModal('${tierId}', ${amount})" class="w-full py-2 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
+          <span class="material-symbols-outlined text-sm">arrow_back</span>
+          다른 결제 수단 선택
+        </button>
+      </div>
+    `;
+
+    setTimeout(() => {
+      renderPayPalButtons('paypal-button-container', {
+        productId: tierId,
+        amount: usdAmount,
+        orderName: `${tierName} (LuckyPick)`,
+        onSuccess: (details) => {
+          console.log('[PayPal] Payment success, triggering unbox:', details);
+          const modal = document.getElementById('direct-pay-modal');
+          if (modal) modal.remove();
+          executeUnboxingAnimation(tierId);
+        },
+        onError: (err) => {
+          console.error('[PayPal] Payment error:', err);
+          alert(`PayPal 결제 처리 중 오류가 발생했습니다: ${err.message || err}`);
+        },
+        onCancel: () => {
+          console.log('[PayPal] Payment cancelled by user');
+        }
+      });
+    }, 100);
+  }
 };
 
 window.__executeOpenBoxWithPoints = (boxId) => {
+  if (!requireLogin()) return;
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(b => b.id === boxId);
   const currentPts = getUserPoints();
@@ -355,6 +430,7 @@ window.__closeStageModal = () => {
 };
 
 window.__quickConvertPoints = (vaultId) => {
+  if (!requireLogin()) return;
   try {
     const res = convertVaultItemToPoints(vaultId);
     alert(`🎉 [${res.item.title}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);

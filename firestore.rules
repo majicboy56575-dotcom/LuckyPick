@@ -25,22 +25,41 @@ service cloud.firestore {
 
     // =============================================
     // shipping_infos: Winner shipping details
-    // Read: Authenticated users (own data or admin)
-    // Write: Only Cloud Functions (Admin SDK)
+    // Read & Write: Authenticated users (own data or admin)
     // =============================================
     match /shipping_infos/{shippingId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.email == 'majicboy56575@gmail.com');
     }
 
     // =============================================
-    // users: User profiles
-    // Read: Authenticated users (own data or admin)
-    // Write: Only Cloud Functions (Admin SDK)
+    // users: User profiles, points, golden tickets, vault & shipping requests
+    // Read & Write: Authenticated users (own data or admin)
     // =============================================
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'majicboy56575@gmail.com');
-      allow write: if false;
+      allow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == 'majicboy56575@gmail.com');
+    }
+
+    // =============================================
+    // super_raffles: Special Golden Raffles & Multi-group queues
+    // Read: Anyone (public queue & winners transparency)
+    // Write: Authenticated users (ticket entry/cancel/draw resolution)
+    // =============================================
+    match /super_raffles/{raffleId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // =============================================
+    // box_catalogs: Random box tiers, items, probabilities
+    // Read: Anyone
+    // Write: Admin only
+    // =============================================
+    match /box_catalogs/{catalogId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }

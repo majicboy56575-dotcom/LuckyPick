@@ -1,14 +1,14 @@
 import { createPayPalOrder, capturePayPalOrder, confirmTossPayment } from './firestore.js';
 
 const PAYPAL_CONFIG = {
-  clientId: 'BAAIYArbS9Tv4eh1sD7CNm2ruF4mT1uEJytLaU_KXQ_T1ZC9tGCmEGXFP5HJTBH9zguanWW1fyP78Q6ly4',
+  clientId: 'BAAQd5qD8T0M-kWCigLv7lhFjYOCzRMShNtqn5HtqqBxPU09YUnDupVHiK1nCFZqXEE5oJGeW98XENwlbl',
   clientSecret: '',
   currency: 'USD',
   environment: 'live'
 };
 
 // Toss Payments Client Key (사용자 테스트 클라이언트 키)
-const TOSS_CLIENT_KEY = 'test_ck_ZLKGPx4M3MbNoAwdPzJoVBaWypv1';
+const TOSS_CLIENT_KEY = 'test_ck_ALnQvDd2VJPBwJDy4W0Y8Mj7X41m';
 
 /**
  * Trigger standard Meta Pixel Events
@@ -162,15 +162,37 @@ async function requestTossPayment({ productId, productName, amount, userId, user
     currency: 'KRW'
   });
 
-  await tossPayments.requestPayment('카드', {
-    amount: amount,
-    orderId: orderId,
-    orderName: `LuckyPick ${productName}`,
-    successUrl: successUrl,
-    failUrl: failUrl,
-    customerEmail: userEmail || '',
-    customerName: userId || 'guest'
-  });
+  // Toss SDK v2 vs v1 compatibility
+  if (typeof tossPayments.payment === 'function') {
+    // Toss Payments SDK v2 (standard)
+    const customerKey = userId ? `usr_${String(userId).replace(/[^a-zA-Z0-9-_]/g, '_')}` : (window.TossPayments?.ANONYMOUS || 'ANONYMOUS');
+    const payment = tossPayments.payment({ customerKey });
+
+    await payment.requestPayment({
+      method: 'CARD',
+      amount: {
+        currency: 'KRW',
+        value: amount
+      },
+      orderId: orderId,
+      orderName: `LuckyPick ${productName}`,
+      successUrl: successUrl,
+      failUrl: failUrl,
+      customerEmail: userEmail || undefined,
+      customerName: userId || undefined
+    });
+  } else if (typeof tossPayments.requestPayment === 'function') {
+    // Toss Payments SDK v1 fallback
+    await tossPayments.requestPayment('카드', {
+      amount: amount,
+      orderId: orderId,
+      orderName: `LuckyPick ${productName}`,
+      successUrl: successUrl,
+      failUrl: failUrl,
+      customerEmail: userEmail || '',
+      customerName: userId || 'guest'
+    });
+  }
 }
 
 /**

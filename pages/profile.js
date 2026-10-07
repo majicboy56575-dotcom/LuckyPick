@@ -2,9 +2,9 @@
 // LuckyPick - Profile & My Vault & Golden Tickets Page
 // Clean Individual Item Shipping & Instant Points Conversion
 // ============================================
-import { t } from '../i18n.js?v=20261004_20';
-import { getCurrentUser } from '../services/firestore.js?v=20261004_20';
-import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, signOut, getCurrentAuthUser } from '../services/auth.js?v=20261004_20';
+import { t } from '../i18n.js?v=20261007_14';
+import { getCurrentUser } from '../services/firestore.js?v=20261007_14';
+import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentAuthUser } from '../services/auth.js';
 import { 
   getUserPoints, 
   setUserPoints, 
@@ -14,8 +14,8 @@ import {
   convertVaultItemToPoints, 
   requestShippingForVaultItem,
   cancelGoldenTicketApplication
-} from '../services/randombox.js?v=20261004_20';
-import '../services/unboxing-modal.js?v=20261004_20';
+} from '../services/randombox.js?v=20261007_14';
+import '../services/unboxing-modal.js?v=20261007_14';
 
 let activeProfileTab = 'vault'; // 'vault' | 'tickets' | 'charge'
 let isSignUpMode = false;
@@ -60,7 +60,12 @@ function renderLoginSection() {
             <input type="email" id="auth-email-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="user@example.com" required>
           </div>
           <div class="space-y-1">
-            <label class="text-xs font-bold text-on-surface-variant">${t('password')}</label>
+            <div class="flex justify-between items-center">
+              <label class="text-xs font-bold text-on-surface-variant">${t('password')}</label>
+              <button type="button" onclick="window.__openPasswordResetModal()" id="forgot-pw-btn" class="text-[11px] text-slate-500 hover:text-primary transition-colors cursor-pointer">
+                비밀번호를 잊으셨나요?
+              </button>
+            </div>
             <input type="password" id="auth-pw-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="6자 이상 입력" minlength="6" required>
           </div>
           <button type="submit" id="email-submit-btn" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:bg-primary-container transition-all active:scale-95 text-sm shadow-md mt-2 cursor-pointer">
@@ -68,9 +73,12 @@ function renderLoginSection() {
           </button>
         </form>
 
-        <div class="flex justify-center items-center text-xs pt-1">
+        <div class="flex justify-between items-center text-xs pt-1 px-1">
           <button onclick="window.__toggleAuthMode()" id="toggle-auth-btn" class="text-primary font-bold hover:underline cursor-pointer">
             ${t('noAccountSignup')}
+          </button>
+          <button type="button" onclick="window.__openPasswordResetModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            아이디/비밀번호 찾기
           </button>
         </div>
 
@@ -82,6 +90,43 @@ function renderLoginSection() {
         </div>
       </div>
     </main>`;
+}
+
+function renderPasswordResetModal(initialEmail = '') {
+  return `
+    <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" id="password-reset-modal" onclick="if(event.target===this)window.__closePasswordResetModal()">
+      <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200 border border-slate-100">
+        <div class="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+          <span class="material-symbols-outlined text-3xl">lock_reset</span>
+        </div>
+        
+        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-1">아이디 / 비밀번호 재설정</h3>
+        <p class="text-xs text-gray-500 mb-4 leading-relaxed">
+          LuckyPick의 아이디는 가입하신 <strong>이메일 주소</strong>입니다.<br>
+          비밀번호를 재설정할 이메일을 입력하시면 안전한 재설정 링크를 발송해 드립니다.
+        </p>
+
+        <form onsubmit="event.preventDefault(); window.__submitPasswordReset();" class="space-y-3 text-left">
+          <div>
+            <label class="text-xs font-bold text-gray-700 block mb-1">가입 이메일 주소</label>
+            <input type="email" id="reset-email-input" value="${initialEmail}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="user@example.com" required>
+          </div>
+
+          <div id="reset-error-msg" class="hidden text-[11px] text-red-600 font-medium"></div>
+
+          <div class="space-y-2 pt-2">
+            <button type="submit" id="reset-submit-btn" class="w-full py-3 bg-primary text-white font-bold rounded-2xl text-xs hover:bg-primary-container shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+              <span class="material-symbols-outlined text-base">mail</span>
+              <span>비밀번호 재설정 이메일 전송</span>
+            </button>
+            <button type="button" onclick="window.__closePasswordResetModal()" class="w-full py-2.5 bg-slate-100 text-slate-600 font-semibold rounded-xl text-xs hover:bg-slate-200 transition-colors cursor-pointer">
+              취소
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
 }
 
 function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice) {
@@ -461,30 +506,76 @@ function renderTicketsTab(unassignedCount, appliedTickets) {
           </div>
         ` : `
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            ${appliedTickets.map(t => `
-              <div class="bg-white rounded-2xl border-2 border-amber-300 p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-                <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-amber-400/10 rounded-full pointer-events-none"></div>
-                <div>
-                  <div class="flex justify-between items-center mb-2">
-                    <span class="text-[10px] text-emerald-600 font-extrabold flex items-center gap-0.5">
-                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      실시간 추첨 대기
-                    </span>
-                    <span class="text-[9px] text-gray-400">${new Date(t.appliedAt).toLocaleDateString()}</span>
+            ${appliedTickets.map(t => {
+              const status = t.resolvedStatus || 'active';
+              
+              let badgeHtml = '';
+              let borderClass = 'border-amber-300';
+              let actionHtml = '';
+
+              if (status === 'won') {
+                badgeHtml = `
+                  <span class="text-[10px] text-amber-950 font-black bg-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                    <span class="material-symbols-outlined text-xs">military_tech</span>
+                    🎉 1등 당첨 (보관함 지급)
+                  </span>`;
+                borderClass = 'border-amber-500 shadow-md bg-amber-50/30';
+                actionHtml = `<span class="text-amber-700 font-extrabold text-[10px]">실물 보관함 확인</span>`;
+              } else if (status === 'refunded') {
+                badgeHtml = `
+                  <span class="text-[10px] text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">undo</span>
+                    목표 미달 100% 자동 환불
+                  </span>`;
+                borderClass = 'border-slate-200 opacity-75';
+                actionHtml = `<span class="text-slate-400 font-bold text-[10px]">티켓 환불 완료</span>`;
+              } else if (status === 'closed_lost') {
+                badgeHtml = `
+                  <span class="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">
+                    🏁 추첨 종료 (미당첨)
+                  </span>`;
+                borderClass = 'border-slate-200 opacity-75';
+                actionHtml = `<span class="text-slate-400 font-bold text-[10px]">마감됨</span>`;
+              } else if (status === 'group_locked') {
+                badgeHtml = `
+                  <span class="text-[10px] text-blue-700 font-extrabold bg-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                    그룹 ${t.groupNumber} 100% 달성 (추첨 대기)
+                  </span>`;
+                borderClass = 'border-blue-300';
+                actionHtml = `<span class="text-blue-600 font-bold text-[10px]">추첨 확정</span>`;
+              } else {
+                badgeHtml = `
+                  <span class="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    그룹 ${t.groupNumber} 실시간 모집 중
+                  </span>`;
+                borderClass = 'border-amber-300';
+                actionHtml = `
+                  <button onclick="window.__cancelTicketFromProfile('${t.raffleId}', '${t.ticketId}')" class="text-red-600 hover:text-red-800 font-bold underline cursor-pointer">
+                    응모 취소
+                  </button>`;
+              }
+
+              return `
+                <div class="bg-white rounded-2xl border-2 ${borderClass} p-4 shadow-sm flex flex-col justify-between relative overflow-hidden transition-all">
+                  <div class="absolute -right-6 -bottom-6 w-20 h-20 bg-amber-400/10 rounded-full pointer-events-none"></div>
+                  <div>
+                    <div class="flex justify-between items-center mb-2">
+                      ${badgeHtml}
+                      <span class="text-[9px] text-gray-400">${new Date(t.appliedAt).toLocaleDateString()}</span>
+                    </div>
+                    <p class="text-xs font-bold text-gray-800 line-clamp-1 mb-2">${t.raffleTitle}</p>
+                    <div class="p-2.5 bg-slate-900 text-amber-300 rounded-xl text-center font-mono font-black text-sm tracking-wider shadow-inner mb-2">
+                      ${t.ticketNumber}
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] pt-1 border-t border-slate-100">
+                      <span class="text-gray-500 font-mono">슬롯 #${t.slotIndex}</span>
+                      ${actionHtml}
+                    </div>
                   </div>
-                  <p class="text-xs font-bold text-gray-800 line-clamp-1 mb-2">${t.raffleTitle}</p>
-                  <div class="p-2.5 bg-slate-900 text-amber-300 rounded-xl text-center font-mono font-black text-sm tracking-wider shadow-inner mb-2">
-                    ${t.ticketNumber}
-                  </div>
-                  <div class="flex justify-between items-center text-[10px] pt-1">
-                    <span class="text-gray-500 font-mono">슬롯 #${t.slotIndex}</span>
-                    <button onclick="window.__cancelTicketFromProfile('${t.raffleId}', '${t.ticketId}')" class="text-red-600 hover:text-red-800 font-bold underline">
-                      응모 취소
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `).join('')}
+                </div>`;
+            }).join('')}
           </div>
         `}
       </div>
@@ -608,6 +699,59 @@ export function render() {
     window.location.reload();
   };
 
+  window.__openPasswordResetModal = () => {
+    const currentEmail = document.getElementById('auth-email-input')?.value?.trim() || '';
+    const existing = document.getElementById('password-reset-modal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', renderPasswordResetModal(currentEmail));
+  };
+
+  window.__closePasswordResetModal = () => {
+    const modal = document.getElementById('password-reset-modal');
+    if (modal) modal.remove();
+  };
+
+  window.__submitPasswordReset = async () => {
+    const emailInput = document.getElementById('reset-email-input');
+    const submitBtn = document.getElementById('reset-submit-btn');
+    const errorMsg = document.getElementById('reset-error-msg');
+    const email = emailInput?.value?.trim();
+
+    if (!email) return;
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="material-symbols-outlined animate-spin text-sm">refresh</span> 전송 중...';
+    }
+    if (errorMsg) errorMsg.classList.add('hidden');
+
+    try {
+      await sendPasswordReset(email);
+      alert(`📧 [비밀번호 재설정 이메일 발송 완료]\n\n${email} 주소로 비밀번호 재설정 링크를 전송했습니다.\n이메일 편지함(또는 스팸함)을 확인하여 비밀번호를 재설정해주세요.`);
+      window.__closePasswordResetModal();
+    } catch (err) {
+      console.error('Password reset error:', err);
+      let msg = '비밀번호 재설정 이메일 전송에 실패했습니다.';
+      if (err.code === 'auth/user-not-found') {
+        msg = '해당 이메일로 가입된 계정을 찾을 수 없습니다.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = '올바르지 않은 이메일 형식입니다.';
+      } else if (err.message) {
+        msg = err.message;
+      }
+      if (errorMsg) {
+        errorMsg.textContent = msg;
+        errorMsg.classList.remove('hidden');
+      } else {
+        alert(`⚠️ ${msg}`);
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span class="material-symbols-outlined text-base">mail</span><span>비밀번호 재설정 이메일 전송</span>';
+      }
+    }
+  };
+
   const authUser = getCurrentAuthUser();
   if (!authUser) {
     return renderLoginSection();
@@ -637,35 +781,48 @@ export function render() {
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
+          <!-- Golden Tickets Summary Card -->
+          <div class="bg-gradient-to-r from-amber-500/20 to-yellow-500/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-amber-400/30 text-right cursor-pointer hover:border-amber-400 transition-all" onclick="window.location.hash='#home'" title="홈 화면에서 스페셜 상품에 응모하세요!">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] text-amber-300 font-extrabold flex items-center gap-1">
+                <span class="material-symbols-outlined text-xs">confirmation_number</span>
+                골든티켓
+              </span>
+              <span class="text-[9px] text-amber-200 font-bold bg-amber-400/20 px-1.5 py-0.2 rounded">응모하기 &gt;</span>
+            </div>
+            <span class="font-black text-xl text-amber-400 font-mono mt-0.5 block">${unassignedTickets.toLocaleString()}장</span>
+          </div>
+
+          <!-- Points Display Card -->
           <div class="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/15 text-right">
             <span class="text-[10px] text-gray-300 font-bold block">내 보유 포인트</span>
             <span id="profile-points-display" class="font-black text-2xl text-amber-300 font-mono">₩${userPts.toLocaleString()} P</span>
           </div>
 
-          <button onclick="window.__switchProfileTab('charge')" class="px-5 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-md hover:from-amber-400 transition-all active:scale-95 flex items-center gap-1.5">
+          <button onclick="window.__switchProfileTab('charge')" class="px-5 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-md hover:from-amber-400 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
             <span class="material-symbols-outlined text-base">add_circle</span>
             + 포인트 충전
           </button>
 
-          <button onclick="window.__doLogout()" class="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors" title="로그아웃">
+          <button onclick="window.__doLogout()" class="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer" title="로그아웃">
             <span class="material-symbols-outlined text-lg">logout</span>
           </button>
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
-      <div class="flex gap-2 border-b border-slate-200 pb-4 mb-6">
-        <button onclick="window.__switchProfileTab('vault')" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 ${activeProfileTab === 'vault' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
+      <!-- Navigation Tabs (3 Tabs: Vault, Golden Tickets, Points Charge) -->
+      <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-6">
+        <button onclick="window.__switchProfileTab('vault')" id="tab-btn-vault" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${activeProfileTab === 'vault' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
           <span class="material-symbols-outlined text-base">inventory_2</span>
           내 실물 보관함 (${vault.length})
         </button>
 
-        <button onclick="window.__switchProfileTab('tickets')" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 ${activeProfileTab === 'tickets' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
+        <button onclick="window.__switchProfileTab('tickets')" id="tab-btn-tickets" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${activeProfileTab === 'tickets' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold' : 'bg-white text-gray-600 hover:bg-slate-100'}">
           <span class="material-symbols-outlined text-base">confirmation_number</span>
           내 골든 티켓 (${unassignedTickets}장 보유)
         </button>
 
-        <button onclick="window.__switchProfileTab('charge')" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 ${activeProfileTab === 'charge' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
+        <button onclick="window.__switchProfileTab('charge')" id="tab-btn-charge" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${activeProfileTab === 'charge' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
           <span class="material-symbols-outlined text-base">payments</span>
           포인트 충전
         </button>
@@ -683,6 +840,16 @@ export function render() {
   window.__switchProfileTab = (tab) => {
     activeProfileTab = tab;
     const content = document.getElementById('profile-tab-content');
+    const btnVault = document.getElementById('tab-btn-vault');
+    const btnTickets = document.getElementById('tab-btn-tickets');
+    const btnCharge = document.getElementById('tab-btn-charge');
+
+    if (btnVault && btnTickets && btnCharge) {
+      btnVault.className = 'px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ' + (tab === 'vault' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100');
+      btnTickets.className = 'px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ' + (tab === 'tickets' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold' : 'bg-white text-gray-600 hover:bg-slate-100');
+      btnCharge.className = 'px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ' + (tab === 'charge' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100');
+    }
+
     if (content) {
       if (tab === 'vault') content.innerHTML = renderVaultTab(getUserVault());
       else if (tab === 'tickets') content.innerHTML = renderTicketsTab(getAvailableGoldenTicketsCount(), getAppliedGoldenTickets());
@@ -937,6 +1104,9 @@ export function cleanup() {
   delete window.__submitEmailAuth;
   delete window.__doLogin;
   delete window.__doLogout;
+  delete window.__openPasswordResetModal;
+  delete window.__closePasswordResetModal;
+  delete window.__submitPasswordReset;
   delete window.__switchProfileTab;
   delete window.__openSingleShippingModal;
   delete window.__closeSingleShipModal;

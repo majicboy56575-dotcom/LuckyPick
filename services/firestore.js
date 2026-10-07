@@ -5,10 +5,14 @@
 // ============================================
 import { getCurrentAuthUser } from './auth.js';
 import { firebaseConfig, isFirebaseConfigured, isLocalDev } from '../firebase-config.js';
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import {
   getFirestore,
   collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -47,10 +51,13 @@ let activeProductsCache = [];
 let closedProductsCache = [];
 let shippingCache = [];
 let usersCache = [];
+let currentUserDocCache = null;
+let superRafflesCache = [];
+let boxCatalogCache = null;
 
 if (isFirebaseConfigured()) {
   try {
-    const app = initializeApp(firebaseConfig);
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     db = getFirestore(app);
     functions = getFunctions(app, 'asia-northeast3');
 
@@ -96,13 +103,73 @@ if (isFirebaseConfigured()) {
     );
 
     // ==========================================
+    // Real-time Listener: Super Raffles
+    // ==========================================
+    onSnapshot(
+      collection(db, 'super_raffles'),
+      (snapshot) => {
+        const raffles = [];
+        snapshot.forEach((doc) => raffles.push({ id: doc.id, ...doc.data() }));
+        if (raffles.length > 0) {
+          superRafflesCache = raffles;
+          window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: raffles }));
+          window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] super_raffles listener error:', error.message);
+      }
+    );
+
+    // ==========================================
+    // Real-time Listener: Box Catalog Tiers
+    // ==========================================
+    onSnapshot(
+      doc(db, 'box_catalogs', 'default'),
+      (snap) => {
+        if (snap.exists() && snap.data()?.tiers) {
+          boxCatalogCache = snap.data().tiers;
+          window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
+          window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+        }
+      },
+      (error) => {
+        // Doc may not exist yet on fresh databases
+      }
+    );
+
+    // ==========================================
     // Real-time Listener: Shipping Infos & Users
     // ==========================================
     let shippingUnsub = null;
     let usersUnsub = null;
+    let userDocUnsub = null;
 
     const startAuthListeners = () => {
       if (!db) return;
+      const user = getCurrentAuthUser();
+
+      // Listen to logged-in user's personal document
+      if (user?.uid) {
+        if (userDocUnsub) userDocUnsub();
+        userDocUnsub = onSnapshot(
+          doc(db, 'users', user.uid),
+          (snap) => {
+            if (snap.exists()) {
+              currentUserDocCache = { id: snap.id, ...snap.data() };
+              window.dispatchEvent(new CustomEvent('userDataChanged', { detail: currentUserDocCache }));
+              window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+            }
+          },
+          (error) => {
+            console.warn('[Firestore] User document listener error:', error.message);
+          }
+        );
+      } else {
+        currentUserDocCache = null;
+        if (userDocUnsub) { userDocUnsub(); userDocUnsub = null; }
+      }
+
       if (!shippingUnsub) {
         shippingUnsub = onSnapshot(
           collection(db, 'shipping_infos'),
@@ -129,7 +196,7 @@ if (isFirebaseConfigured()) {
             window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
           },
           (error) => {
-            console.warn('[Firestore] Users listener warning:', error.message);
+            // Non-admin will receive permission denied for whole collection, which is normal
           }
         );
       }
@@ -141,12 +208,163 @@ if (isFirebaseConfigured()) {
     }
 
     window.addEventListener('authStateChanged', (e) => {
-      if (e.detail?.user) {
-        startAuthListeners();
-      }
+      startAuthListeners();
     });
   } catch (e) {
     console.warn('[Firestore Cloud Warning]', e);
+  }
+}
+
+// ============================================
+// Server-Side Storage Helpers (Users, Raffles, Catalog)
+// ============================================
+function getCurrentUserDocCache() {
+  return currentUserDocCache;
+}
+
+async function saveUserDocData(data) {
+  const authUser = getCurrentAuthUser();
+  if (!db || !authUser?.uid) return false;
+  try {
+    const userRef = doc(db, 'users', authUser.uid);
+    await setDoc(userRef, data, { merge: true });
+    if (currentUserDocCache) {
+      Object.assign(currentUserDocCache, data);
+    }
+    return true;
+  } catch (err) {
+    console.error('[Firestore] saveUserDocData error:', err);
+    return false;
+  }
+}
+
+function getSuperRafflesCache() {
+  return superRafflesCache;
+}
+
+async function saveSuperRaffleToFirestore(raffle) {
+  if (!db || !raffle?.id) return false;
+  try {
+    const ref = doc(db, 'super_raffles', raffle.id);
+    await setDoc(ref, raffle, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] saveSuperRaffleToFirestore error:', err);
+    return false;
+  }
+}
+
+async function deleteSuperRaffleFromFirestore(raffleId) {
+  if (!db || !raffleId) return false;
+  try {
+    const ref = doc(db, 'super_raffles', raffleId);
+    await deleteDoc(ref);
+    superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
+    window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+    return true;
+  } catch (err) {
+    console.error('[Firestore] deleteSuperRaffleFromFirestore error:', err);
+    return false;
+  }
+}
+
+function getBoxCatalogCache() {
+  return boxCatalogCache;
+}
+
+async function saveBoxCatalogToFirestore(tiers) {
+  if (!db) return false;
+  try {
+    const ref = doc(db, 'box_catalogs', 'default');
+    await setDoc(ref, { tiers, updatedAt: Date.now() }, { merge: true });
+    boxCatalogCache = tiers;
+    window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+    return true;
+  } catch (err) {
+    console.error('[Firestore] saveBoxCatalogToFirestore error:', err);
+    return false;
+  }
+}
+
+function getAllShippingInfosCache() {
+  return shippingCache;
+}
+
+async function submitShippingInfoToFirestore(data) {
+  if (!db || !data) return false;
+  try {
+    const shippingId = data.shippingId || ('ship_' + Date.now());
+    const ref = doc(db, 'shipping_infos', shippingId);
+    const payload = {
+      ...data,
+      shippingId,
+      submittedAt: data.submittedAt || Date.now(),
+      status: data.status || 'pending'
+    };
+    await setDoc(ref, payload, { merge: true });
+    return payload;
+  } catch (err) {
+    console.error('[Firestore] submitShippingInfoToFirestore error:', err);
+    return false;
+  }
+}
+
+async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '') {
+  if (!db || !shippingId) return false;
+  try {
+    const ref = doc(db, 'shipping_infos', shippingId);
+    const updateData = {
+      status,
+      carrier: carrier || 'CJ대한통운',
+      trackingNumber: trackingNumber || '',
+      updatedAt: Date.now()
+    };
+    await updateDoc(ref, updateData);
+    return updateData;
+  } catch (err) {
+    console.error('[Firestore] updateShippingStatusInFirestore error:', err);
+    return false;
+  }
+}
+
+async function deleteShippingInfoFromFirestore(shippingId) {
+  if (!db || !shippingId) return false;
+  try {
+    const ref = doc(db, 'shipping_infos', shippingId);
+    await deleteDoc(ref);
+    shippingCache = shippingCache.filter(s => s.id !== shippingId && s.shippingId !== shippingId);
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+    return true;
+  } catch (err) {
+    console.error('[Firestore] deleteShippingInfoFromFirestore error:', err);
+    return false;
+  }
+}
+
+async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
+  if (!db) return;
+  try {
+    // 1. Seed Box Catalogs if not present on server
+    if (!boxCatalogCache && defaultBoxes && defaultBoxes.length > 0) {
+      const catRef = doc(db, 'box_catalogs', 'default');
+      await setDoc(catRef, { tiers: defaultBoxes, updatedAt: Date.now() }, { merge: true });
+      boxCatalogCache = defaultBoxes;
+      console.log('[Firestore] Box catalogs seeded to server');
+    }
+
+    // 2. Seed Super Raffles if empty on server
+    if ((!superRafflesCache || superRafflesCache.length === 0) && defaultRaffles && defaultRaffles.length > 0) {
+      for (const raffle of defaultRaffles) {
+        const ref = doc(db, 'super_raffles', raffle.id);
+        await setDoc(ref, raffle, { merge: true });
+      }
+      superRafflesCache = defaultRaffles;
+      console.log('[Firestore] Super raffles seeded to server');
+    }
+  } catch (e) {
+    console.warn('[Firestore] Initial seeding note:', e);
   }
 }
 
@@ -532,4 +750,16 @@ export {
   maskName,
   maskEmail,
   DEMO_IMAGES,
+  getCurrentUserDocCache,
+  saveUserDocData,
+  getSuperRafflesCache,
+  saveSuperRaffleToFirestore,
+  deleteSuperRaffleFromFirestore,
+  getBoxCatalogCache,
+  saveBoxCatalogToFirestore,
+  getAllShippingInfosCache,
+  submitShippingInfoToFirestore,
+  updateShippingStatusInFirestore,
+  deleteShippingInfoFromFirestore,
+  ensureInitialFirestoreData,
 };

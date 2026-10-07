@@ -9,6 +9,7 @@ import {
   autoBalanceBoxProbabilities,
   getSuperRaffles, 
   saveSuperRaffles, 
+  deleteSuperRaffle,
   forceDrawAndResolveRaffle,
   reopenRaffle,
   getAllShippingRequests, 
@@ -21,7 +22,7 @@ import {
   setAvailableGoldenTicketsCount,
   getUserVault,
   getRaffleGroupData
-} from '../services/randombox.js?v=20261004_19';
+} from '../services/randombox.js?v=20261007_13';
 
 let activeAdminTab = 'boxes'; // 'boxes' | 'raffles' | 'shipping' | 'users' | 'analytics'
 let selectedBoxId = 'box_basic';
@@ -451,20 +452,20 @@ function renderUsersTab() {
             <button onclick="window.__adminGrantPoints(10000)" class="px-3.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors">
               + 10,000P 지급
             </button>
-            <button onclick="window.__adminGrantPoints(50000)" class="px-3.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors">
-              + 50,000P 지급
-            </button>
             <button onclick="window.__adminGrantPoints(100000)" class="px-3.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors">
               + 100,000P 지급
             </button>
-            <button onclick="window.__adminGrantTickets(5)" class="px-3.5 py-2 bg-amber-50 text-amber-800 hover:bg-amber-100 font-bold rounded-xl text-xs transition-colors">
-              + 골든티켓 5장 지급
+            <button onclick="window.__adminGrantPoints(1000000)" class="px-3.5 py-2 bg-primary text-white font-bold rounded-xl text-xs shadow-xs hover:bg-primary-container transition-all">
+              + 1,000,000P 지급
             </button>
             <button onclick="window.__adminGrantTickets(20)" class="px-3.5 py-2 bg-amber-50 text-amber-800 hover:bg-amber-100 font-bold rounded-xl text-xs transition-colors">
               + 골든티켓 20장 지급
             </button>
-            <button onclick="window.__adminGrantTickets(500)" class="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs hover:from-amber-400 transition-all">
-              + 골든티켓 500장 지급 (테스트용)
+            <button onclick="window.__adminGrantTickets(500)" class="px-3.5 py-2 bg-amber-100 text-amber-900 font-bold rounded-xl text-xs hover:bg-amber-200 transition-colors">
+              + 골든티켓 500장 지급
+            </button>
+            <button onclick="window.__adminGrantTickets(1000)" class="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs hover:from-amber-400 transition-all">
+              + 골든티켓 1,000장 지급 (테스트용)
             </button>
           </div>
         </div>
@@ -1197,9 +1198,8 @@ export function render() {
 
     if (!confirm(`정말 [${raffle.title}] 스페셜 래플을 삭제하시겠습니까?`)) return;
 
-    const filtered = raffles.filter(r => r.id !== raffleId);
-    saveSuperRaffles(filtered);
-    alert('✓ 스페셜 래플이 삭제되었습니다.');
+    deleteSuperRaffle(raffleId);
+    alert('✓ 스페셜 래플이 서버에서 성공적으로 삭제되었습니다.');
     window.__switchAdminTab('raffles');
   };
 
@@ -1466,10 +1466,6 @@ export function render() {
 
   window.__resetAllTestData = () => {
     if (!confirm('⚠️ 모든 테스트 데이터(보관함, 잔액, 래플 상태)를 초기화하시겠습니까?')) return;
-    localStorage.removeItem('luckypick_user_vault');
-    localStorage.removeItem('luckypick_custom_raffles');
-    localStorage.removeItem('luckypick_ticket_refund_notices');
-    localStorage.removeItem('luckypick_shipping_requests');
     setUserPoints(35000);
     setAvailableGoldenTicketsCount(500);
     alert('✓ 모든 테스트 데이터가 성공적으로 리셋되었습니다.');

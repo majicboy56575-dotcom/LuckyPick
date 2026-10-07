@@ -1,7 +1,7 @@
 // ============================================
 // LuckyPick - Home Page (100% Random Box + Multi-Group Golden Raffle Showcase)
 // ============================================
-import { t } from '../i18n.js?v=20261004_19';
+import { t } from '../i18n.js?v=20261007_13';
 import { 
   getRandomBoxTiers, 
   getSuperRaffles, 
@@ -12,8 +12,9 @@ import {
   getRaffleGroupData,
   cancelGoldenTicketApplication,
   checkAndResolveRaffleExpirations
-} from '../services/randombox.js?v=20261004_19';
-import '../services/unboxing-modal.js?v=20261004_19';
+} from '../services/randombox.js?v=20261007_13';
+import '../services/unboxing-modal.js?v=20261007_13';
+import { isLoggedIn, requireLogin } from '../services/auth.js';
 
 let countdownIntervals = [];
 
@@ -117,8 +118,8 @@ function renderRandomBoxCard(box) {
 
         <!-- Action Button -->
         <button onclick="window.__startUnboxing('${box.id}')" class="w-full py-4 bg-gradient-to-r ${box.color} text-white font-extrabold rounded-2xl shadow-lg hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:shadow-primary/20">
-          <span class="material-symbols-outlined text-xl">redeem</span>
-          럭키박스 즉시 개봉하기
+          <span class="material-symbols-outlined text-xl">${isLoggedIn() ? 'redeem' : 'lock'}</span>
+          ${isLoggedIn() ? '럭키박스 즉시 개봉하기' : '로그인하고 개봉하기'}
         </button>
       </div>
     </div>`;
@@ -127,8 +128,11 @@ function renderRandomBoxCard(box) {
 function renderSuperRaffleCard(raffle, index) {
   const isClosed = raffle.status === 'closed';
   const remaining = Math.max(0, raffle.endTime - Date.now());
-  const userTickets = getAvailableGoldenTicketsCount();
+  const loggedIn = isLoggedIn();
+  const userTickets = loggedIn ? getAvailableGoldenTicketsCount() : 0;
   const groupData = getRaffleGroupData(raffle, 'my_user_id');
+  // Never show "my ticket" markers to logged-out visitors
+  if (!loggedIn) groupData.groups.forEach(g => { g.hasMyTicket = false; g.myTicketCount = 0; });
 
   return `
     <div class="relative bg-gradient-to-b from-slate-900 to-slate-950 text-white rounded-3xl p-6 border-2 ${isClosed ? 'border-slate-700 bg-slate-950/90 opacity-95' : 'border-amber-400/40'} shadow-2xl overflow-hidden flex flex-col justify-between">
@@ -260,10 +264,15 @@ function renderSuperRaffleCard(raffle, index) {
           <span class="material-symbols-outlined text-base">military_tech</span>
           당첨자 전체 명단 & 환불 상세 내역 보기 (마감)
         </button>
-      ` : `
+      ` : loggedIn ? `
         <button onclick="window.__openApplyTicketModal('${raffle.id}', '${raffle.title.replace(/'/g, "\\'")}', ${userTickets})" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
           <span class="material-symbols-outlined text-base">confirmation_number</span>
           이 상품에 골든 티켓 응모하기 (${userTickets}장 보유)
+        </button>
+      ` : `
+        <button onclick="window.__requireLoginForRaffle()" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-base">lock</span>
+          로그인하고 골든 티켓 응모하기
         </button>
       `}
     </div>`;
@@ -275,7 +284,9 @@ function renderTransparencyModal(raffleId) {
   if (!raffle) return '';
 
   const isClosed = raffle.status === 'closed';
+  const loggedIn = isLoggedIn();
   const groupData = getRaffleGroupData(raffle, 'my_user_id');
+  if (!loggedIn) groupData.groups.forEach(g => { g.hasMyTicket = false; g.myTicketCount = 0; });
 
   // Map winners by group number
   const winnerMap = {};
@@ -327,7 +338,7 @@ function renderTransparencyModal(raffleId) {
                 ${g.entries.length === 0 ? `
                   <div class="p-6 text-center text-xs text-gray-400">아직 해당 그룹에 응모된 티켓이 없습니다.</div>
                 ` : g.entries.map(e => {
-                  const isMine = e.userId === 'my_user_id';
+                  const isMine = loggedIn && e.userId === 'my_user_id';
                   const isWinner = groupWinner && (groupWinner.ticketId === e.ticketId || groupWinner.ticketNumber === e.ticketNumber);
                   
                   return `
@@ -433,8 +444,9 @@ export function render() {
   clearTimers();
   checkAndResolveRaffleExpirations();
 
-  const userPts = getUserPoints();
-  const userTickets = getAvailableGoldenTicketsCount();
+  const loggedIn = isLoggedIn();
+  const userPts = loggedIn ? getUserPoints() : 0;
+  const userTickets = loggedIn ? getAvailableGoldenTicketsCount() : 0;
   const boxes = getRandomBoxTiers();
   const allRaffles = getSuperRaffles();
   const raffles = allRaffles.filter(r => r.status === 'active');
@@ -470,6 +482,7 @@ export function render() {
                 <span class="material-symbols-outlined">package_2</span>
                 럭키박스 라인업 둘러보기
               </a>
+              ${loggedIn ? `
               <div class="flex items-center gap-3 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-xs">
                 <div>
                   <span class="text-gray-300 text-[10px] block">내 보유 포인트</span>
@@ -481,6 +494,12 @@ export function render() {
                   <span class="font-black text-amber-300 text-sm font-mono">${userTickets}장</span>
                 </div>
               </div>
+              ` : `
+              <a href="#profile?redirect=home" id="hero-login-cta" class="flex items-center gap-2 px-5 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl border border-white/20 text-xs font-bold text-white transition-all active:scale-95">
+                <span class="material-symbols-outlined text-amber-300 text-lg">login</span>
+                <span>로그인하고 내 포인트·골든티켓 확인</span>
+              </a>
+              `}
             </div>
           </div>
         </div>
@@ -551,7 +570,12 @@ export function render() {
   }, 100);
 
   // Handlers
+  window.__requireLoginForRaffle = () => {
+    requireLogin('스페셜 상품 골든 티켓 응모는 로그인 후 이용할 수 있습니다.');
+  };
+
   window.__openApplyTicketModal = (raffleId, title, tickets) => {
+    if (!requireLogin()) return;
     const container = document.getElementById('home-modal-container') || document.body;
     const existing = document.getElementById('apply-ticket-modal');
     if (existing) existing.remove();
@@ -564,6 +588,7 @@ export function render() {
   };
 
   window.__confirmApplyTickets = (raffleId) => {
+    if (!requireLogin()) return;
     const input = document.getElementById('apply-ticket-input');
     const count = parseInt(input?.value || '1', 10);
 
@@ -590,6 +615,7 @@ export function render() {
   };
 
   window.__cancelTicket = (raffleId, ticketId) => {
+    if (!requireLogin()) return;
     if (!confirm('이 골든 티켓 응모를 취소하시겠습니까?\n취소 시 티켓은 내 지갑으로 즉시 반환되며, 뒤 순서 참여자의 순번이 1칸씩 자동으로 앞당겨집니다.')) return;
     try {
       const res = cancelGoldenTicketApplication(raffleId, ticketId);
@@ -605,6 +631,7 @@ export function render() {
 
 export function cleanup() {
   clearTimers();
+  delete window.__requireLoginForRaffle;
   delete window.__openApplyTicketModal;
   delete window.__closeApplyTicketModal;
   delete window.__confirmApplyTickets;

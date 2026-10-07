@@ -2,9 +2,9 @@
 // LuckyPick - Auth Service (Firebase Auth)
 // Uses real Firebase Auth only - no local mocks
 // ============================================
-import { createUserProfile } from './firestore.js';
+import { createUserProfile, saveUserDocData } from './firestore.js';
 import { firebaseConfig, isFirebaseConfigured, isLocalDev } from '../firebase-config.js';
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import {
   getAuth,
   signInWithPopup,
@@ -12,6 +12,7 @@ import {
   OAuthProvider,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile,
   signOut as firebaseSignOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
@@ -22,18 +23,12 @@ const ADMIN_EMAIL = 'majicboy56575@gmail.com';
 
 let firebaseApp = null;
 let firebaseAuth = null;
-let currentUser = isLocalDev() ? {
-  uid: 'my_user_id',
-  displayName: '이재영 (관리자)',
-  email: 'majicboy56575@gmail.com',
-  photoURL: null,
-  provider: 'google',
-  isAdmin: true,
-} : null;
+// No mock user: the app must reflect the real Firebase Auth state (logged out by default)
+let currentUser = null;
 
 if (isFirebaseConfigured()) {
   try {
-    firebaseApp = initializeApp(firebaseConfig);
+    firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
     firebaseAuth = getAuth(firebaseApp);
 
     // Log active environment
@@ -99,6 +94,15 @@ async function signInWithEmail(email, password) {
     isAdmin: res.user.email === ADMIN_EMAIL,
   };
   return currentUser;
+}
+
+async function sendPasswordReset(email) {
+  if (!firebaseAuth) throw new Error('Firebase Auth not initialized');
+  if (!email || !email.includes('@')) {
+    throw new Error('올바른 이메일 주소를 입력해주세요.');
+  }
+  await sendPasswordResetEmail(firebaseAuth, email);
+  return true;
 }
 
 // --- Social Auth ---
@@ -168,11 +172,62 @@ function getCurrentAuthUser() {
 }
 
 function isLoggedIn() {
-  return currentUser !== null;
+  // Guest sessions are not treated as logged-in for purchases / point usage
+  return currentUser !== null && currentUser.provider !== 'guest';
+}
+
+// In-App Login Required Modal (100% reliable, never suppressed by browser)
+function showLoginRequiredModal(message = '해당 서비스는 로그인 후 이용하실 수 있습니다.') {
+  const existing = document.getElementById('login-required-modal');
+  if (existing) existing.remove();
+
+  const current = (window.location.hash.replace('#', '').split('?')[0]) || 'home';
+
+  const modalHtml = `
+    <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" id="login-required-modal" onclick="if(event.target===this)window.__closeLoginRequiredModal()">
+      <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200 border border-slate-100">
+        <div class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+          <span class="material-symbols-outlined text-3xl">lock</span>
+        </div>
+        
+        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-2">로그인이 필요합니다</h3>
+        <p class="text-xs text-gray-500 mb-6 leading-relaxed whitespace-pre-line">${message}</p>
+
+        <div class="space-y-2">
+          <button onclick="window.__goToLoginFromModal('${current}')" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs hover:bg-primary-container shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+            <span class="material-symbols-outlined text-base">login</span>
+            <span>로그인 페이지로 이동</span>
+          </button>
+          <button onclick="window.__closeLoginRequiredModal()" class="w-full py-2.5 bg-slate-100 text-slate-600 font-semibold rounded-xl text-xs hover:bg-slate-200 transition-colors cursor-pointer">
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+window.__closeLoginRequiredModal = () => {
+  const modal = document.getElementById('login-required-modal');
+  if (modal) modal.remove();
+};
+
+window.__goToLoginFromModal = (redirectTarget = 'home') => {
+  window.__closeLoginRequiredModal();
+  window.location.hash = `#profile?redirect=${redirectTarget}`;
+};
+
+// Returns true if logged in; otherwise displays the in-app login modal
+function requireLogin(message = '해당 서비스는 로그인 후 이용하실 수 있습니다.') {
+  if (isLoggedIn()) return true;
+  showLoginRequiredModal(message);
+  return false;
 }
 
 function isAdmin() {
-  return currentUser?.isAdmin === true;
+  return currentUser?.isAdmin === true || (currentUser?.email && currentUser.email === ADMIN_EMAIL);
 }
 
 function onAuthStateChanged(callback) {
@@ -203,12 +258,15 @@ function waitForAuth(timeoutMs = 4000) {
 export {
   signUpWithEmail,
   signInWithEmail,
+  sendPasswordReset,
   signInWithGoogle,
   signInWithApple,
   continueAsGuest,
   signOut,
   getCurrentAuthUser,
   isLoggedIn,
+  requireLogin,
+  showLoginRequiredModal,
   isAdmin,
   onAuthStateChanged,
   waitForAuth,
