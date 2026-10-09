@@ -127,11 +127,30 @@ setTimeout(() => {
   ensureInitialFirestoreData(DEFAULT_BOX_TIERS, DEFAULT_SUPER_RAFFLES);
 }, 300);
 
-// Get Catalog Boxes (100% Firestore Cloud DB backed)
+// Get Catalog Boxes (100% Firestore Cloud DB backed with resilient defaults fallback)
 export function getRandomBoxTiers() {
   const serverTiers = getBoxCatalogCache();
   if (serverTiers && Array.isArray(serverTiers) && serverTiers.length > 0) {
-    return serverTiers;
+    return serverTiers.map(st => {
+      const defaultTier = DEFAULT_BOX_TIERS.find(dt => dt.id === st.id) || {};
+      const mergedItems = Array.isArray(st.items) && st.items.length > 0 ? st.items.map((it, idx) => {
+        const defaultItem = (defaultTier.items && defaultTier.items[idx]) || {};
+        return {
+          ...defaultItem,
+          ...it,
+          image: it.image || defaultItem.image || 'assets/products/powerbank_10000mah.jpg'
+        };
+      }) : (defaultTier.items || []);
+
+      return {
+        ...defaultTier,
+        ...st,
+        boxImage: st.boxImage || defaultTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
+        color: st.color || defaultTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
+        accentColor: st.accentColor || defaultTier.accentColor || '#3b82f6',
+        items: mergedItems
+      };
+    });
   }
   return DEFAULT_BOX_TIERS;
 }
@@ -140,11 +159,18 @@ export function saveRandomBoxTiers(tiers) {
   saveBoxCatalogToFirestore(tiers);
 }
 
-// Get Super Raffles (100% Firestore Cloud DB backed)
+// Get Super Raffles (100% Firestore Cloud DB backed with resilient defaults fallback)
 export function getSuperRaffles() {
   const serverRaffles = getSuperRafflesCache();
   if (serverRaffles && Array.isArray(serverRaffles) && serverRaffles.length > 0) {
-    return serverRaffles;
+    return serverRaffles.map(sr => {
+      const defaultRaffle = DEFAULT_SUPER_RAFFLES.find(dr => dr.id === sr.id) || {};
+      return {
+        ...defaultRaffle,
+        ...sr,
+        imageUrl: sr.imageUrl || defaultRaffle.imageUrl || ''
+      };
+    });
   }
   return DEFAULT_SUPER_RAFFLES;
 }

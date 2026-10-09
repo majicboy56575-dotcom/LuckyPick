@@ -90,7 +90,7 @@ export function startUnboxingFlow(boxId) {
     <div class="fixed inset-0 z-[90] flex items-center justify-center p-4 modal-backdrop" id="unboxing-confirm-modal" onclick="if(event.target===this)window.__closeConfirmModal()">
       <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
         <div class="relative w-28 h-28 mx-auto mb-4">
-          <img src="${tier.boxImage}" class="w-full h-full object-cover rounded-2xl shadow-lg border-2 border-primary/20 float-anim" alt="${tier.name}">
+          <img src="${tier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-cover rounded-2xl shadow-lg border-2 border-primary/20 float-anim" alt="${tier.name}">
           <span class="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md">
             골든티켓 +${tier.goldenTickets}장 적립
           </span>
@@ -232,7 +232,7 @@ export async function executeUnboxingAnimation(boxId, payMethod = 'points') {
       <div class="relative z-10 text-center text-white max-w-md w-full" id="unboxing-stage-content">
         <div id="anim-stage-1" class="space-y-6">
           <div class="relative w-44 h-44 mx-auto">
-            <img src="${tier.boxImage}" class="w-full h-full object-cover rounded-3xl shadow-2xl border-4 border-amber-400 box-shake-anim" alt="Opening Box">
+            <img src="${tier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-cover rounded-3xl shadow-2xl border-4 border-amber-400 box-shake-anim" alt="Opening Box">
           </div>
           <div class="space-y-2">
             <h2 class="text-2xl font-black text-amber-300 animate-pulse tracking-wider">럭키박스 개봉 중...</h2>

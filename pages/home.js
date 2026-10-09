@@ -69,7 +69,7 @@ function renderRandomBoxCard(box) {
       <!-- Box Image & Glow Header -->
       <div class="relative h-56 w-full overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200/60 flex items-center justify-center">
         <div class="absolute inset-0 bg-gradient-to-r ${box.color} opacity-10 group-hover:opacity-20 transition-opacity"></div>
-        <img src="${box.boxImage}" alt="${box.name}" class="w-36 h-36 object-cover rounded-2xl shadow-xl border-2 border-white group-hover:scale-105 transition-transform duration-300 float-anim">
+        <img src="${box.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" alt="${box.name}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-36 h-36 object-cover rounded-2xl shadow-xl border-2 border-white group-hover:scale-105 transition-transform duration-300 float-anim">
       </div>
 
       <!-- Content Details -->
@@ -164,7 +164,7 @@ function renderSuperRaffleCard(raffle, index) {
 
         <div class="flex gap-4 items-center mb-5">
           <div class="relative">
-            <img src="${raffle.imageUrl}" alt="${raffle.title}" class="w-24 h-24 object-cover rounded-2xl border-2 ${isClosed ? 'border-slate-700 opacity-90' : 'border-amber-400/50'} shadow-md">
+            <img src="${raffle.imageUrl || 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80'}" alt="${raffle.title}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80';" class="w-24 h-24 object-cover rounded-2xl border-2 ${isClosed ? 'border-slate-700 opacity-90' : 'border-amber-400/50'} shadow-md">
             ${isClosed ? `
               <span class="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center font-black text-amber-300 text-xs tracking-wider">
                 마감
