@@ -19,6 +19,8 @@ import {
   openLuckyBoxServer,
   convertVaultItemToPointsServer,
   applyGoldenRaffleServer,
+  cancelGoldenRaffleServer,
+  forceDrawRaffleServer,
   requestVaultShippingServer
 } from './firestore.js';
 import { getCurrentAuthUser } from './auth.js';
@@ -370,11 +372,13 @@ export function getRaffleGroupData(raffle, currentUserId) {
 // Apply Golden Tickets to a Super Raffle (Server-Backed Atomic Deduction & Entry)
 export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, userInfo = {}) {
   try {
-    const res = await applyGoldenRaffleServer(raffleId);
+    const count = Math.max(1, parseInt(ticketCount, 10) || 1);
+    const res = await applyGoldenRaffleServer(raffleId, count);
     return {
-      appliedCount: 1,
-      totalGoldenTickets: res.newTickets,
-      newTickets: [res.entry]
+      appliedCount: res.appliedCount || count,
+      remainingTickets: res.newTickets,
+      newTickets: res.entries || [],
+      raffle: res.raffle || { id: raffleId, title: '골든 래플' }
     };
   } catch (err) {
     console.error('[Raffle] applyGoldenRaffleServer error:', err);
@@ -382,62 +386,31 @@ export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, user
   }
 }
 
-// Cancel User's Ticket & FIFO Slot Shifting (Requirement 4)
-export function cancelGoldenTicketApplication(raffleId, ticketId) {
-  const raffles = getSuperRaffles();
-  const targetRaffle = raffles.find(r => r.id === raffleId);
-  if (!targetRaffle || !targetRaffle.entries) throw new Error('해당 래플을 찾을 수 없습니다.');
-
-  if (targetRaffle.status === 'closed') {
-    throw new Error('이미 마감된 래플의 응모는 취소할 수 없습니다.');
+// Cancel User's Ticket & FIFO Slot Shifting (Server-Backed)
+export async function cancelGoldenTicketApplication(raffleId, ticketId) {
+  try {
+    const res = await cancelGoldenRaffleServer(raffleId, ticketId);
+    return {
+      refundedTickets: 1,
+      newAvailableBalance: res.newTickets,
+      removedEntry: res.removedEntry
+    };
+  } catch (err) {
+    console.error('[Raffle] cancelGoldenRaffleServer error:', err);
+    throw new Error(err.message || '골든티켓 응모 취소 중 오류가 발생했습니다.');
   }
-
-  const index = targetRaffle.entries.findIndex(e => e.ticketId === ticketId);
-  if (index === -1) throw new Error('해당 응모 내역을 찾을 수 없습니다.');
-
-  // Check if ticket is in a completed group
-  const unitSize = targetRaffle.unitSize || 200;
-  const groupIndex = Math.floor(index / unitSize);
-  const groupStart = groupIndex * unitSize;
-  const groupCount = Math.min(unitSize, targetRaffle.entries.length - groupStart);
-  if (groupCount >= unitSize && (groupStart + unitSize) <= targetRaffle.entries.length && index < (groupStart + unitSize)) {
-    // If the group is already 100% full and locked
-    const isCompletedGroup = (groupIndex + 1) * unitSize <= targetRaffle.entries.length;
-    if (isCompletedGroup) {
-      throw new Error('이미 목표 인원을 100% 달성하여 추첨이 확정된 그룹은 응모를 취소할 수 없습니다.');
-    }
-  }
-
-  // Remove the cancelled ticket
-  const removedEntry = targetRaffle.entries.splice(index, 1)[0];
-
-  // Re-index all subsequent slots sequentially (FIFO Shift Forward)
-  targetRaffle.entries.forEach((entry, idx) => {
-    entry.slotIndex = idx + 1;
-  });
-
-  saveSuperRaffles(raffles);
-
-  // Refund ticket back to wallet
-  const currentAvailable = getAvailableGoldenTicketsCount();
-  const newBalance = currentAvailable + 1;
-  setAvailableGoldenTicketsCount(newBalance);
-
-  return {
-    remainingActiveCount: targetRaffle.entries.length,
-    refundedTickets: 1,
-    newAvailableBalance: newBalance,
-    removedEntry,
-    raffle: targetRaffle
-  };
 }
 
-// Force Draw and Auto-Refund Raffle (Admin & Expiration Resolver)
-export function forceDrawAndResolveRaffle(raffleId) {
-  const raffles = getSuperRaffles();
-  const raffle = raffles.find(r => String(r.id) === String(raffleId));
-  if (!raffle) throw new Error('해당 스페셜 래플을 찾을 수 없습니다.');
-  if (raffle.status === 'closed') throw new Error('이미 추첨 및 마감 처리가 완료된 래플입니다.');
+// Force Draw and Auto-Refund Raffle (Admin Server-Backed)
+export async function forceDrawAndResolveRaffle(raffleId) {
+  try {
+    const res = await forceDrawRaffleServer(raffleId);
+    return res;
+  } catch (err) {
+    console.error('[Raffle] forceDrawRaffleServer error:', err);
+    throw new Error(err.message || '추첨 처리 중 오류가 발생했습니다.');
+  }
+}
 
   if (!raffle.entries || raffle.entries.length === 0) {
     initializeSuperRafflesSeed([raffle]);

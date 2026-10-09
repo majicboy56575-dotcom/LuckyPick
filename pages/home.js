@@ -587,18 +587,19 @@ export function render() {
     if (modal) modal.remove();
   };
 
-  window.__confirmApplyTickets = (raffleId) => {
+  window.__confirmApplyTickets = async (raffleId) => {
     if (!requireLogin()) return;
     const input = document.getElementById('apply-ticket-input');
     const count = parseInt(input?.value || '1', 10);
 
     try {
-      const res = applyGoldenTicketsToRaffle(raffleId, count);
-      alert(`🎉 [${res.raffle.title}] 상품에 골든 티켓 ${count}장 응모가 완료되었습니다!\n(잔여 보유 티켓: ${res.remainingTickets}장)`);
+      const res = await applyGoldenTicketsToRaffle(raffleId, count);
+      const title = res.raffle?.title || '스페셜 래플';
+      alert(`🎉 [${title}] 상품에 골든 티켓 ${count}장 응모가 완료되었습니다!\n(잔여 보유 티켓: ${res.remainingTickets}장)`);
       window.__closeApplyTicketModal();
       window.location.reload();
     } catch (err) {
-      alert(err.message);
+      alert(err.message || '응모에 실패했습니다.');
     }
   };
 
@@ -614,15 +615,16 @@ export function render() {
     if (modal) modal.remove();
   };
 
-  window.__cancelTicket = (raffleId, ticketId) => {
+  window.__cancelTicket = async (raffleId, ticketId) => {
     if (!requireLogin()) return;
     if (!confirm('이 골든 티켓 응모를 취소하시겠습니까?\n취소 시 티켓은 내 지갑으로 즉시 반환되며, 뒤 순서 참여자의 순번이 1칸씩 자동으로 앞당겨집니다.')) return;
     try {
-      const res = cancelGoldenTicketApplication(raffleId, ticketId);
+      const res = await cancelGoldenTicketApplication(raffleId, ticketId);
       alert(`✓ 골든 티켓 응모가 취소되어 내 지갑으로 환불 반환되었습니다.\n순번이 자동으로 재배열되었습니다. (잔여 보유 티켓: ${res.newAvailableBalance}장)`);
-      window.__openTransparencyModal(raffleId);
+      window.__closeTransparencyModal();
+      window.location.reload();
     } catch (err) {
-      alert(err.message);
+      alert(err.message || '취소 처리에 실패했습니다.');
     }
   };
 

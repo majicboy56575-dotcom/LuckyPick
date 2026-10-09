@@ -1259,18 +1259,19 @@ exports.convertVaultItemToPoints = onCall({ region: "asia-northeast3" }, async (
 });
 
 // ============================================
-// 16. applyGoldenRaffle (Callable) - Server Ticket Deduction & Queueing
+// 16. applyGoldenRaffle (Callable) - Server Ticket Deduction & Queueing (Multi-Ticket Support)
 // ============================================
 exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
   }
   const uid = request.auth.uid;
-  const { raffleId } = request.data;
+  const { raffleId, count = 1 } = request.data;
   if (!raffleId) {
     throw new HttpsError("invalid-argument", "래플 ID가 필요합니다.");
   }
 
+  const applyCount = Math.max(1, parseInt(count, 10) || 1);
   const callerEmail = request.auth.token.email || "user@example.com";
   const callerName = request.auth.token.name || callerEmail.split("@")[0] || "참여자";
 
@@ -1286,33 +1287,245 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
 
     const userData = userDoc.exists ? userDoc.data() : { goldenTickets: 0 };
     const curTickets = Number(userData.goldenTickets) || 0;
-    if (curTickets < 1) {
-      throw new HttpsError("failed-precondition", "보유 골든티켓이 부족합니다.");
+    if (curTickets < applyCount) {
+      throw new HttpsError("failed-precondition", `보유 골든티켓이 부족합니다. (보유: ${curTickets}장 / 요청: ${applyCount}장)`);
     }
 
     const raffle = raffleDoc.data();
+    if (raffle.status === "closed") {
+      throw new HttpsError("failed-precondition", "이미 마감된 래플입니다.");
+    }
+
     const entries = raffle.entries || [];
-    const nextSlot = entries.length + 1;
-    const ticketNumber = `#${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    const createdEntries = [];
 
-    const newEntry = {
-      ticketId: "t_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
-      ticketNumber,
-      userId: uid,
-      userName: maskName(callerName),
-      userEmail: maskEmail(callerEmail),
-      appliedAt: Date.now(),
-      slotIndex: nextSlot,
-      status: "active"
-    };
+    for (let i = 0; i < applyCount; i++) {
+      const nextSlot = entries.length + 1;
+      const ticketNumber = `#${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      const newEntry = {
+        ticketId: "t_" + Date.now() + "_" + i + "_" + Math.random().toString(36).substr(2, 4),
+        ticketNumber,
+        userId: uid,
+        userName: maskName(callerName),
+        userEmail: maskEmail(callerEmail),
+        appliedAt: Date.now(),
+        slotIndex: nextSlot,
+        status: "active"
+      };
+      entries.push(newEntry);
+      createdEntries.push(newEntry);
+    }
 
-    entries.push(newEntry);
-    const newTickets = curTickets - 1;
+    const newTickets = curTickets - applyCount;
 
     transaction.update(userRef, { goldenTickets: newTickets, updatedAt: Date.now() });
     transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
 
-    return { newTickets, entry: newEntry };
+    return { 
+      newTickets, 
+      appliedCount: applyCount, 
+      entries: createdEntries,
+      raffle: { id: raffleId, title: raffle.title, retailPrice: raffle.retailPrice }
+    };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 16-1. cancelGoldenRaffle (Callable) - Server Ticket Cancellation & FIFO Shift
+// ============================================
+exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const { raffleId, ticketId } = request.data;
+  if (!raffleId || !ticketId) {
+    throw new HttpsError("invalid-argument", "래플 ID와 티켓 ID가 필요합니다.");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+  const raffleRef = db.collection("super_raffles").doc(raffleId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const raffleDoc = await transaction.get(raffleRef);
+    if (!raffleDoc.exists) throw new HttpsError("not-found", "해당 골든 래플을 찾을 수 없습니다.");
+
+    const raffle = raffleDoc.data();
+    if (raffle.status === "closed") throw new HttpsError("failed-precondition", "이미 마감된 래플의 응모는 취소할 수 없습니다.");
+
+    const entries = raffle.entries || [];
+    const index = entries.findIndex((e) => e.ticketId === ticketId);
+    if (index === -1) throw new HttpsError("not-found", "해당 티켓 응모 내역을 찾을 수 없습니다.");
+
+    const entry = entries[index];
+    if (entry.userId !== uid) throw new HttpsError("permission-denied", "본인의 티켓만 취소할 수 있습니다.");
+
+    // Completed Group Check
+    const unitSize = raffle.unitSize || 200;
+    const groupIndex = Math.floor(index / unitSize);
+    const isCompletedGroup = (groupIndex + 1) * unitSize <= entries.length;
+    if (isCompletedGroup) {
+      throw new HttpsError("failed-precondition", "이미 목표 인원을 100% 달성하여 추첨이 확정된 그룹은 취소할 수 없습니다.");
+    }
+
+    // Remove entry and shift
+    const [removedEntry] = entries.splice(index, 1);
+    entries.forEach((e, idx) => {
+      e.slotIndex = idx + 1;
+    });
+
+    const userData = userDoc.exists ? userDoc.data() : { goldenTickets: 0 };
+    const newTickets = (Number(userData.goldenTickets) || 0) + 1;
+
+    transaction.update(userRef, { goldenTickets: newTickets, updatedAt: Date.now() });
+    transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
+
+    return { newTickets, removedEntry };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 16-2. forceDrawRaffle (Callable) - Draw Winners & Auto-Refund
+// ============================================
+exports.forceDrawRaffle = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 추첨을 진행할 수 있습니다.");
+  }
+
+  const { raffleId } = request.data;
+  if (!raffleId) throw new HttpsError("invalid-argument", "래플 ID가 필요합니다.");
+
+  const raffleRef = db.collection("super_raffles").doc(raffleId);
+  const raffleDoc = await raffleRef.get();
+  if (!raffleDoc.exists) throw new HttpsError("not-found", "해당 래플을 찾을 수 없습니다.");
+
+  const raffle = raffleDoc.data();
+  if (raffle.status === "closed") throw new HttpsError("failed-precondition", "이미 마감된 래플입니다.");
+
+  const entries = raffle.entries || [];
+  const unitSize = raffle.unitSize || 200;
+  const fullGroupsCount = Math.floor(entries.length / unitSize);
+  const remainderCount = entries.length % unitSize;
+
+  const winners = [];
+  for (let g = 0; g < fullGroupsCount; g++) {
+    const groupEntries = entries.slice(g * unitSize, (g + 1) * unitSize);
+    const winnerEntry = groupEntries[Math.floor(Math.random() * groupEntries.length)];
+    winners.push({
+      groupNumber: g + 1,
+      startSlot: g * unitSize + 1,
+      endSlot: (g + 1) * unitSize,
+      winner: winnerEntry,
+      wonAt: Date.now()
+    });
+
+    // Deliver to winner's vault
+    if (winnerEntry.userId) {
+      const winnerUserRef = db.collection("users").doc(winnerEntry.userId);
+      const userDoc = await winnerUserRef.get();
+      if (userDoc.exists) {
+        const vault = userDoc.data().vault || [];
+        vault.unshift({
+          id: "vault_raffle_" + Date.now() + "_" + g,
+          tierId: "super_raffle",
+          tierName: `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`,
+          itemId: raffle.id,
+          title: raffle.title,
+          imageUrl: raffle.imageUrl || "",
+          retailPrice: raffle.retailPrice || 1000000,
+          grade: "LEGENDARY",
+          refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
+          status: "in_vault",
+          wonAt: Date.now()
+        });
+        await winnerUserRef.update({ vault, updatedAt: Date.now() });
+      }
+    }
+  }
+
+  // Refund remainder tickets to users
+  if (remainderCount > 0) {
+    const incompleteEntries = entries.slice(fullGroupsCount * unitSize);
+    const refundCounts = {};
+    incompleteEntries.forEach(e => {
+      if (e.userId) {
+        refundCounts[e.userId] = (refundCounts[e.userId] || 0) + 1;
+      }
+    });
+
+    for (const [userId, count] of Object.entries(refundCounts)) {
+      const uRef = db.collection("users").doc(userId);
+      await uRef.update({
+        goldenTickets: FieldValue.increment(count),
+        updatedAt: Date.now()
+      }).catch(err => console.warn(`Refund ticket update failed for ${userId}:`, err));
+    }
+  }
+
+  await raffleRef.update({
+    status: "closed",
+    winners,
+    refundCount: remainderCount,
+    closedAt: Date.now(),
+    updatedAt: Date.now()
+  });
+
+  return {
+    success: true,
+    fullGroupsCount,
+    remainderCount,
+    winners,
+    raffle: { id: raffleId, title: raffle.title }
+  };
+});
+
+// ============================================
+// 16-3. chargeUserPoints (Callable) - User Point Top-Up
+// ============================================
+exports.chargeUserPoints = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const uid = request.auth.uid;
+  const { points, method = "toss", paymentKey } = request.data;
+  const chargeAmount = Number(points);
+  if (!chargeAmount || chargeAmount <= 0) {
+    throw new HttpsError("invalid-argument", "충전할 포인트 금액이 올바르지 않습니다.");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const userData = userDoc.exists ? userDoc.data() : { points: 0 };
+    const curPts = Number(userData.points) || 0;
+    const newPts = curPts + chargeAmount;
+
+    transaction.set(userRef, {
+      points: newPts,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    const txRef = db.collection("transactions").doc("tx_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4));
+    transaction.set(txRef, {
+      uid,
+      type: "charge",
+      points: chargeAmount,
+      method,
+      paymentKey: paymentKey || "",
+      createdAt: Date.now()
+    });
+
+    return { newPoints: newPts, addedPoints: chargeAmount };
   });
 
   return { success: true, ...result };
@@ -1365,9 +1578,9 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
       productTitle: item.title || item.name || "보관함 상품",
       imageUrl: item.imageUrl || "",
       winnerUid: uid,
-      winnerName: shippingData.recipientName || userData.displayName || "회원",
-      recipientName: shippingData.recipientName,
-      recipientPhone: shippingData.recipientPhone,
+      winnerName: shippingData.name || shippingData.recipientName || userData.displayName || "회원",
+      recipientName: shippingData.name || shippingData.recipientName,
+      recipientPhone: shippingData.phone || shippingData.recipientPhone,
       shippingAddress: shippingData.address + (shippingData.detail ? " " + shippingData.detail : ""),
       zipCode: shippingData.zipCode || "",
       shippingMemo: shippingData.memo || "",

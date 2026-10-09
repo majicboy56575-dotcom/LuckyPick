@@ -3,7 +3,7 @@
 // Clean Individual Item Shipping & Instant Points Conversion
 // ============================================
 import { t } from '../i18n.js';
-import { getCurrentUser, convertVaultItemToPointsServer, requestVaultShippingServer, grantUserBalanceServer } from '../services/firestore.js';
+import { getCurrentUser, convertVaultItemToPointsServer, requestVaultShippingServer, chargeUserPointsServer, grantUserBalanceServer } from '../services/firestore.js';
 import { signInWithGoogle, signInWithApple, signInWithEmail, signUpWithEmail, sendPasswordReset, signOut, getCurrentAuthUser } from '../services/auth.js';
 import { 
   getUserPoints, 
@@ -1054,9 +1054,8 @@ export function render() {
 
   window.__executeChargePayment = async (points, method) => {
     try {
-      const current = getUserPoints();
-      await grantUserBalanceServer(null, null, current + points, null);
-      alert(`🎉 [${method} 결제 완료]\n₩${points.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${(current + points).toLocaleString()}P`);
+      const res = await chargeUserPointsServer(points, method);
+      alert(`🎉 [${method} 결제 완료]\n₩${points.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${res.newPoints.toLocaleString()}P`);
       window.__closeChargePayModal();
       window.location.reload();
     } catch (err) {
@@ -1090,14 +1089,14 @@ export function render() {
     window.open(`https://m.search.naver.com/search.naver?query=${query}`, '_blank');
   };
 
-  window.__cancelTicketFromProfile = (raffleId, ticketId) => {
+  window.__cancelTicketFromProfile = async (raffleId, ticketId) => {
     if (!confirm('이 골든 티켓 응모를 취소하시겠습니까?\n취소 시 티켓은 내 지갑으로 즉시 반환되며, 뒤 순서 참여자의 순번이 1칸씩 자동으로 앞당겨집니다.')) return;
     try {
-      const res = cancelGoldenTicketApplication(raffleId, ticketId);
+      const res = await cancelGoldenTicketApplication(raffleId, ticketId);
       alert(`✓ 골든 티켓 응모가 취소되어 내 지갑으로 환불 반환되었습니다.\n잔여 보유 티켓: ${res.newAvailableBalance}장`);
-      window.__switchProfileTab('tickets');
+      window.location.reload();
     } catch (err) {
-      alert(err.message);
+      alert(err.message || '취소 처리에 실패했습니다.');
     }
   };
 

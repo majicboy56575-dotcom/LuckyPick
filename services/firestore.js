@@ -605,10 +605,31 @@ async function convertVaultItemToPointsServer(vaultId) {
   return result.data;
 }
 
-async function applyGoldenRaffleServer(raffleId) {
+async function applyGoldenRaffleServer(raffleId, count = 1) {
   if (!functions) throw new Error('Firebase Functions not initialized');
   const callable = httpsCallable(functions, 'applyGoldenRaffle');
+  const result = await callable({ raffleId, count });
+  return result.data;
+}
+
+async function cancelGoldenRaffleServer(raffleId, ticketId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'cancelGoldenRaffle');
+  const result = await callable({ raffleId, ticketId });
+  return result.data;
+}
+
+async function forceDrawRaffleServer(raffleId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'forceDrawRaffle');
   const result = await callable({ raffleId });
+  return result.data;
+}
+
+async function chargeUserPointsServer(points, method = 'toss', paymentKey = '') {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'chargeUserPoints');
+  const result = await callable({ points, method, paymentKey });
   return result.data;
 }
 
@@ -755,6 +776,9 @@ export {
   openLuckyBoxServer,
   convertVaultItemToPointsServer,
   applyGoldenRaffleServer,
+  cancelGoldenRaffleServer,
+  forceDrawRaffleServer,
+  chargeUserPointsServer,
   requestVaultShippingServer,
   grantUserBalanceServer,
 };

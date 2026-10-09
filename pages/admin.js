@@ -1204,9 +1204,9 @@ export function render() {
   };
 
   // --- Force Draw & Auto-Refund End-to-End ---
-  window.__forceDrawRaffle = (raffleId) => {
+  window.__forceDrawRaffle = async (raffleId) => {
     try {
-      const result = forceDrawAndResolveRaffle(raffleId);
+      const result = await forceDrawAndResolveRaffle(raffleId);
       // 1. Refresh background tab to show closed state
       const tabContent = document.getElementById('admin-tab-content');
       if (tabContent) tabContent.innerHTML = renderRafflesTab();
