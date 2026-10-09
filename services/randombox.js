@@ -49,40 +49,40 @@ export const DEFAULT_BOX_TIERS = [
     id: 'box_premium',
     name: '프리미엄 럭키박스',
     nameEn: 'Premium LuckyBox',
-    tagline: '스마트 IT & 라이프스타일 프리미엄 (골든티켓 4장)',
-    price: 15000,
-    minGuaranteedValue: 13900,
+    tagline: '만원의 행복! 스마트 IT & 라이프스타일 (골든티켓 5장)',
+    price: 10000,
+    minGuaranteedValue: 7500,
     color: 'from-purple-600 via-fuchsia-600 to-indigo-800',
     accentColor: '#a855f7',
     boxImage: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=80',
-    goldenTickets: 4,
+    goldenTickets: 5,
     badge: 'HOT CHOICE',
     items: [
-      { id: 'p_item_1', name: '블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰', retailPrice: 29900, wholesalePrice: 13500, prob: 0.010, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'p_item_2', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 23900, wholesalePrice: 9800, prob: 0.030, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'p_item_3', name: 'GaN 65W 3포트 초고속 멀티 충전기', retailPrice: 18900, wholesalePrice: 7500, prob: 0.100, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'p_item_4', name: '맥세이프 15W 3in1 무선 고속 충전패드', retailPrice: 15900, wholesalePrice: 6200, prob: 0.340, image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
-      { id: 'p_item_5', name: '고속 충전 대용량 슬림 보조배터리 10,000mAh', retailPrice: 13900, wholesalePrice: 5500, prob: 0.520, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'p_item_1', name: '블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰', retailPrice: 19900, wholesalePrice: 8900, prob: 0.010, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
+      { id: 'p_item_2', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 15900, wholesalePrice: 6800, prob: 0.030, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'p_item_3', name: 'GaN 45W 초고속 듀얼 충전기', retailPrice: 12900, wholesalePrice: 5200, prob: 0.100, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'p_item_4', name: '맥세이프 15W 3in1 무선 고속 충전패드', retailPrice: 9900, wholesalePrice: 3900, prob: 0.340, image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
+      { id: 'p_item_5', name: '고속 충전 대용량 슬림 보조배터리 10,000mAh', retailPrice: 7500, wholesalePrice: 2900, prob: 0.520, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
     ]
   },
   {
     id: 'box_vip',
     name: 'VIP 하이엔드 럭키박스',
     nameEn: 'VIP High-End LuckyBox',
-    tagline: '하이엔드 가전 및 프리미엄 라이프 굿즈 100% 지급',
-    price: 30000,
-    minGuaranteedValue: 27900,
+    tagline: '하이엔드 프리미엄 라이프 굿즈 100% 지급 (골든티켓 11장)',
+    price: 20000,
+    minGuaranteedValue: 15000,
     color: 'from-amber-500 via-yellow-600 to-amber-800',
     accentColor: '#eab308',
     boxImage: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=600&auto=format&fit=crop&q=80',
-    goldenTickets: 8,
+    goldenTickets: 11,
     badge: '👑 HIGH-END',
     items: [
-      { id: 'v_item_1', name: '스마트 터치 무드등 블루투스 스피커 & 무선충전기', retailPrice: 59000, wholesalePrice: 24000, prob: 0.010, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
-      { id: 'v_item_2', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 49000, wholesalePrice: 18500, prob: 0.030, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'v_item_3', name: '무선 고출력 딥티슈 전동 마사지건 (헤드 4종)', retailPrice: 39000, wholesalePrice: 14000, prob: 0.100, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'v_item_4', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 32000, wholesalePrice: 12500, prob: 0.340, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'v_item_5', name: '초고속 프리미엄 PD 100W 30,000mAh 보조배터리', retailPrice: 27900, wholesalePrice: 11000, prob: 0.520, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_1', name: '무선 고출력 딥티슈 전동 마사지건 (헤드 4종)', retailPrice: 39900, wholesalePrice: 16500, prob: 0.010, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
+      { id: 'v_item_2', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 29900, wholesalePrice: 12000, prob: 0.030, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
+      { id: 'v_item_3', name: '스마트 터치 무드등 블루투스 스피커 & 무선충전기', retailPrice: 24900, wholesalePrice: 9800, prob: 0.100, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_4', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 19900, wholesalePrice: 7800, prob: 0.340, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_5', name: '초고속 프리미엄 PD 65W 20,000mAh 보조배터리', retailPrice: 15000, wholesalePrice: 5900, prob: 0.520, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
     ]
   }
 ];
@@ -131,23 +131,30 @@ setTimeout(() => {
 export function getRandomBoxTiers() {
   const serverTiers = getBoxCatalogCache();
   if (serverTiers && Array.isArray(serverTiers) && serverTiers.length > 0) {
-    return serverTiers.map(st => {
-      const defaultTier = DEFAULT_BOX_TIERS.find(dt => dt.id === st.id) || {};
-      const mergedItems = Array.isArray(st.items) && st.items.length > 0 ? st.items.map((it, idx) => {
-        const defaultItem = (defaultTier.items && defaultTier.items[idx]) || {};
+    return DEFAULT_BOX_TIERS.map(defaultTier => {
+      const serverTier = serverTiers.find(st => st.id === defaultTier.id) || {};
+      const mergedItems = (defaultTier.items || []).map((defaultItem, idx) => {
+        const serverItem = (serverTier.items && serverTier.items[idx]) || {};
         return {
           ...defaultItem,
-          ...it,
-          image: it.image || defaultItem.image || 'assets/products/powerbank_10000mah.jpg'
+          ...serverItem,
+          retailPrice: defaultItem.retailPrice,
+          wholesalePrice: defaultItem.wholesalePrice,
+          prob: defaultItem.prob,
+          image: defaultItem.image || serverItem.image || 'assets/products/powerbank_10000mah.jpg'
         };
-      }) : (defaultTier.items || []);
+      });
 
       return {
         ...defaultTier,
-        ...st,
-        boxImage: st.boxImage || defaultTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
-        color: st.color || defaultTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
-        accentColor: st.accentColor || defaultTier.accentColor || '#3b82f6',
+        ...serverTier,
+        price: defaultTier.price,
+        goldenTickets: defaultTier.goldenTickets,
+        minGuaranteedValue: defaultTier.minGuaranteedValue,
+        tagline: defaultTier.tagline,
+        boxImage: defaultTier.boxImage || serverTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
+        color: defaultTier.color || serverTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
+        accentColor: defaultTier.accentColor || serverTier.accentColor || '#3b82f6',
         items: mergedItems
       };
     });

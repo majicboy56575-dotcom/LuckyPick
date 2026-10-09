@@ -1097,27 +1097,27 @@ const SERVER_DEFAULT_BOXES = [
   {
     id: "box_premium",
     name: "프리미엄 럭키박스",
-    price: 15000,
-    goldenTickets: 4,
+    price: 10000,
+    goldenTickets: 5,
     items: [
-      { id: "p_item_1", name: "블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰", retailPrice: 29900, wholesalePrice: 13500, prob: 0.010, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
-      { id: "p_item_2", name: "캠핑/테이블 휴대용 무선 무드등 서큘레이터", retailPrice: 23900, wholesalePrice: 9800, prob: 0.030, image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "p_item_3", name: "GaN 65W 3포트 초고속 멀티 충전기", retailPrice: 18900, wholesalePrice: 7500, prob: 0.100, image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "p_item_4", name: "맥세이프 15W 3in1 무선 고속 충전패드", retailPrice: 15900, wholesalePrice: 6200, prob: 0.340, image: "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80", grade: "NORMAL" },
-      { id: "p_item_5", name: "고속 충전 대용량 슬림 보조배터리 10,000mAh", retailPrice: 13900, wholesalePrice: 5500, prob: 0.520, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
+      { id: "p_item_1", name: "블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰", retailPrice: 19900, wholesalePrice: 8900, prob: 0.010, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
+      { id: "p_item_2", name: "캠핑/테이블 휴대용 무선 무드등 서큘레이터", retailPrice: 15900, wholesalePrice: 6800, prob: 0.030, image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "p_item_3", name: "GaN 45W 초고속 듀얼 충전기", retailPrice: 12900, wholesalePrice: 5200, prob: 0.100, image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "p_item_4", name: "맥세이프 15W 3in1 무선 고속 충전패드", retailPrice: 9900, wholesalePrice: 3900, prob: 0.340, image: "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80", grade: "NORMAL" },
+      { id: "p_item_5", name: "고속 충전 대용량 슬림 보조배터리 10,000mAh", retailPrice: 7500, wholesalePrice: 2900, prob: 0.520, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
     ]
   },
   {
     id: "box_vip",
     name: "VIP 하이엔드 럭키박스",
-    price: 30000,
-    goldenTickets: 8,
+    price: 20000,
+    goldenTickets: 11,
     items: [
-      { id: "v_item_1", name: "스마트 터치 무드등 블루투스 스피커 & 무선충전기", retailPrice: 59000, wholesalePrice: 24000, prob: 0.010, image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80", grade: "LEGENDARY" },
-      { id: "v_item_2", name: "고출력 무선 터보 에어건 먼지제거기 100,000RPM", retailPrice: 49000, wholesalePrice: 18500, prob: 0.030, image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
-      { id: "v_item_3", name: "무선 고출력 딥티슈 전동 마사지건 (헤드 4종)", retailPrice: 39000, wholesalePrice: 14000, prob: 0.100, image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
-      { id: "v_item_4", name: "3D 온열 지압 무선 목 어깨 안마기", retailPrice: 32000, wholesalePrice: 12500, prob: 0.340, image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "v_item_5", name: "초고속 프리미엄 PD 100W 30,000mAh 보조배터리", retailPrice: 27900, wholesalePrice: 11000, prob: 0.520, image: "assets/products/powerbank_10000mah.jpg", grade: "RARE" },
+      { id: "v_item_1", name: "무선 고출력 딥티슈 전동 마사지건 (헤드 4종)", retailPrice: 39900, wholesalePrice: 16500, prob: 0.010, image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80", grade: "LEGENDARY" },
+      { id: "v_item_2", name: "3D 온열 지압 무선 목 어깨 안마기", retailPrice: 29900, wholesalePrice: 12000, prob: 0.030, image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
+      { id: "v_item_3", name: "스마트 터치 무드등 블루투스 스피커 & 무선충전기", retailPrice: 24900, wholesalePrice: 9800, prob: 0.100, image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "v_item_4", name: "고출력 무선 터보 에어건 먼지제거기 100,000RPM", retailPrice: 19900, wholesalePrice: 7800, prob: 0.340, image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "v_item_5", name: "초고속 프리미엄 PD 65W 20,000mAh 보조배터리", retailPrice: 15000, wholesalePrice: 5900, prob: 0.520, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
     ]
   }
 ];
@@ -1137,7 +1137,7 @@ exports.openLuckyBox = onCall({ region: "asia-northeast3" }, async (request) => 
 
   // 1. Fetch tier config from Firestore catalog or fallback
   const catDoc = await db.collection("box_catalogs").doc("default").get();
-  const tiers = (catDoc.exists && Array.isArray(catDoc.data().tiers)) ? catDoc.data().tiers : SERVER_DEFAULT_BOXES;
+  const tiers = (catDoc.exists && Array.isArray(catDoc.data().tiers) && catDoc.data().version === "3.0") ? catDoc.data().tiers : SERVER_DEFAULT_BOXES;
   const tier = tiers.find((t) => t.id === tierId) || SERVER_DEFAULT_BOXES[0];
 
   const userRef = db.collection("users").doc(uid);
@@ -1422,5 +1422,21 @@ exports.grantUserBalance = onCall({ region: "asia-northeast3" }, async (request)
   console.log(`[Admin] Granted balance to ${userRef.id}: points=${points}, tickets=${goldenTickets}`);
   return { success: true, uid: userRef.id, ...updateData };
 });
+
+// ============================================
+// 19. syncBoxCatalog (Callable) - Sync Version 3.0 Box Catalog
+// ============================================
+exports.syncBoxCatalog = onCall({ region: "asia-northeast3" }, async (request) => {
+  const catRef = db.collection("box_catalogs").doc("default");
+  const catalogPayload = {
+    tiers: SERVER_DEFAULT_BOXES,
+    version: "3.0",
+    updatedAt: Date.now()
+  };
+  await catRef.set(catalogPayload, { merge: true });
+  console.log("[Catalog] Successfully synchronized box catalog to Version 3.0");
+  return { success: true, ...catalogPayload };
+});
+
 
 
