@@ -383,6 +383,19 @@ async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
   }
   if (!boxCatalogCache || boxCatalogCache.length === 0) {
     boxCatalogCache = defaultBoxes;
+  } else {
+    // Sync 1%, 2%, 8%, 30%, 59% probability template across all box tiers
+    const targetProbs = [0.010, 0.020, 0.080, 0.300, 0.590];
+    boxCatalogCache.forEach(tier => {
+      if (Array.isArray(tier.items) && tier.items.length === 5) {
+        tier.items.forEach((item, idx) => {
+          item.prob = targetProbs[idx];
+        });
+      }
+    });
+    try {
+      localStorage.setItem('lp_box_catalog', JSON.stringify(boxCatalogCache));
+    } catch (e) {}
   }
 
   if (!superRafflesCache || superRafflesCache.length === 0) {
