@@ -134,43 +134,23 @@ setTimeout(() => {
 export function getRandomBoxTiers() {
   const serverTiers = getBoxCatalogCache();
   if (serverTiers && Array.isArray(serverTiers) && serverTiers.length > 0) {
-    return DEFAULT_BOX_TIERS.map(defaultTier => {
-      const serverTier = serverTiers.find(st => st.id === defaultTier.id) || {};
-      const serverItems = Array.isArray(serverTier.items) ? [...serverTier.items] : [];
-      const mergedItems = [];
-      const processedServerItemIds = new Set();
-
-      (defaultTier.items || []).forEach((defaultItem, idx) => {
-        const serverItem = serverItems.find(si => si.id === defaultItem.id) || serverItems[idx] || {};
-        if (serverItem.id) processedServerItemIds.add(serverItem.id);
-
-        mergedItems.push({
-          ...defaultItem,
-          ...serverItem,
-          name: serverItem.name || defaultItem.name,
-          retailPrice: (serverItem.retailPrice !== undefined && serverItem.retailPrice !== null) ? Number(serverItem.retailPrice) : defaultItem.retailPrice,
-          wholesalePrice: (serverItem.wholesalePrice !== undefined && serverItem.wholesalePrice !== null) ? Number(serverItem.wholesalePrice) : defaultItem.wholesalePrice,
-          prob: (serverItem.prob !== undefined && serverItem.prob !== null) ? Number(serverItem.prob) : defaultItem.prob,
-          grade: serverItem.grade || defaultItem.grade,
-          moq: serverItem.moq || defaultItem.moq,
-          image: serverItem.image || defaultItem.image || 'assets/products/powerbank_10000mah.jpg'
-        });
-      });
-
-      // Add any custom items added by admin that didn't exist in defaultTier
-      serverItems.forEach(serverItem => {
-        if (serverItem.id && !processedServerItemIds.has(serverItem.id)) {
-          mergedItems.push({
-            id: serverItem.id,
-            name: serverItem.name || '새 품목',
-            grade: serverItem.grade || 'NORMAL',
-            moq: serverItem.moq || '1개',
-            retailPrice: Number(serverItem.retailPrice) || 10000,
-            wholesalePrice: Number(serverItem.wholesalePrice) || 2500,
-            prob: Number(serverItem.prob) || 0.1,
-            image: serverItem.image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=400'
-          });
-        }
+    return serverTiers.map(serverTier => {
+      // Find fallback default tier for missing styling/theme attributes (e.g., color gradients)
+      const defaultTier = DEFAULT_BOX_TIERS.find(dt => dt.id === serverTier.id) || {};
+      
+      // Map items strictly based on serverTier.items so deleted items are NOT resurrected
+      const items = (serverTier.items || []).map(serverItem => {
+        const defaultItem = (defaultTier.items || []).find(di => di.id === serverItem.id) || {};
+        return {
+          id: serverItem.id || 'item_' + Date.now(),
+          name: serverItem.name || defaultItem.name || '새 품목',
+          retailPrice: (serverItem.retailPrice !== undefined && serverItem.retailPrice !== null) ? Number(serverItem.retailPrice) : (defaultItem.retailPrice || 10000),
+          wholesalePrice: (serverItem.wholesalePrice !== undefined && serverItem.wholesalePrice !== null) ? Number(serverItem.wholesalePrice) : (defaultItem.wholesalePrice || 2500),
+          prob: (serverItem.prob !== undefined && serverItem.prob !== null) ? Number(serverItem.prob) : (defaultItem.prob !== undefined ? defaultItem.prob : 0.1),
+          grade: serverItem.grade || defaultItem.grade || 'NORMAL',
+          moq: serverItem.moq || defaultItem.moq || '1개',
+          image: serverItem.image || defaultItem.image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=400'
+        };
       });
 
       return {
@@ -184,7 +164,8 @@ export function getRandomBoxTiers() {
         boxImage: serverTier.boxImage || defaultTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
         color: serverTier.color || defaultTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
         accentColor: serverTier.accentColor || defaultTier.accentColor || '#3b82f6',
-        items: mergedItems
+        badge: serverTier.badge || defaultTier.badge || 'HOT',
+        items
       };
     });
   }
