@@ -126,9 +126,18 @@ if (isFirebaseConfigured()) {
       doc(db, 'box_catalogs', 'default'),
       (snap) => {
         if (snap.exists() && snap.data()?.tiers) {
-          boxCatalogCache = snap.data().tiers;
-          window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
-          window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+          const serverData = snap.data();
+          const localUpdatedAt = parseInt(localStorage.getItem('lp_box_catalog_updatedAt') || '0', 10);
+          const serverUpdatedAt = serverData.updatedAt || 0;
+          if (serverUpdatedAt >= localUpdatedAt || !localStorage.getItem('lp_box_catalog')) {
+            boxCatalogCache = serverData.tiers;
+            try {
+              localStorage.setItem('lp_box_catalog', JSON.stringify(serverData.tiers));
+              localStorage.setItem('lp_box_catalog_updatedAt', String(serverUpdatedAt));
+            } catch (e) {}
+            window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
+            window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+          }
         }
       },
       (error) => {
@@ -303,10 +312,14 @@ function getBoxCatalogCache() {
 }
 
 async function saveBoxCatalogToFirestore(tiers) {
+  const now = Date.now();
   boxCatalogCache = tiers;
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
-  } catch (e) {}
+    localStorage.setItem('lp_box_catalog_updatedAt', String(now));
+  } catch (e) {
+    console.warn('[Firestore] localStorage quota exceeded or error:', e);
+  }
   window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
 

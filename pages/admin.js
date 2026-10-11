@@ -665,13 +665,16 @@ export function render() {
   };
 
   // Image Upload Handler (Laptop File -> Compressed Canvas DataURL)
-  window.__handleImageUpload = (e, targetInputId, previewImgId) => {
+  window.__handleImageUpload = (e, targetInputId, previewImgId, btnId) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      alert('이미지 파일 용량은 15MB 이하만 등록 가능합니다.');
+    if (file.size > 20 * 1024 * 1024) {
+      alert('이미지 파일 용량은 20MB 이하만 등록 가능합니다.');
       return;
     }
+
+    const btn = btnId ? document.getElementById(btnId) : null;
+    if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">sync</span> 사진 압축 중...`;
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -704,13 +707,22 @@ export function render() {
 
         const input = document.getElementById(targetInputId);
         const preview = document.getElementById(previewImgId);
-        if (input) input.value = compressedDataUrl;
+        if (input) {
+          input.value = compressedDataUrl;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
         if (preview) preview.src = compressedDataUrl;
+        if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm text-emerald-400">check_circle</span> 사진 변경 완료`;
       };
       img.onerror = () => {
-        alert('이미지 파일을 읽을 수 없습니다.');
+        if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm">upload_file</span> 내 노트북에서 사진 올리기`;
+        alert('이미지 파일을 디코딩할 수 없습니다. 다른 사진(JPG/PNG)을 선택해주세요.');
       };
       img.src = ev.target.result;
+    };
+    reader.onerror = () => {
+      if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm">upload_file</span> 내 노트북에서 사진 올리기`;
+      alert('파일을 읽는 중 오류가 발생했습니다.');
     };
     reader.readAsDataURL(file);
   };
@@ -864,11 +876,11 @@ export function render() {
                   <img id="modal-item-preview" src="https://images.unsplash.com/photo-1544816155-12df9643f363?w=400" class="w-full h-full object-cover" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
-                  <button type="button" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
+                  <button type="button" id="modal-add-item-upload-btn" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
                     <span class="material-symbols-outlined text-sm">upload_file</span>
                     내 노트북에서 사진 올리기
                   </button>
-                  <input type="file" id="modal-item-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'modal-item-img', 'modal-item-preview')">
+                  <input type="file" id="modal-item-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'modal-item-img', 'modal-item-preview', 'modal-add-item-upload-btn'); this.value = '';">
                   <input type="text" id="modal-item-img" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-gray-600" value="https://images.unsplash.com/photo-1544816155-12df9643f363?w=400" placeholder="또는 웹 이미지 URL 입력">
                 </div>
               </div>
@@ -945,11 +957,11 @@ export function render() {
                   <img id="modal-item-preview" src="${item.image}" class="w-full h-full object-cover" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
-                  <button type="button" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
+                  <button type="button" id="modal-item-upload-btn" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
                     <span class="material-symbols-outlined text-sm">upload_file</span>
                     내 노트북에서 사진 올리기
                   </button>
-                  <input type="file" id="modal-item-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'modal-item-img', 'modal-item-preview')">
+                  <input type="file" id="modal-item-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'modal-item-img', 'modal-item-preview', 'modal-item-upload-btn'); this.value = '';">
                   <input type="text" id="modal-item-img" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-gray-600" value="${item.image}" placeholder="또는 웹 이미지 URL 입력">
                 </div>
               </div>
@@ -1080,11 +1092,11 @@ export function render() {
                   <img id="raffle-preview" src="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600" class="w-full h-full object-cover" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
-                  <button type="button" onclick="document.getElementById('raffle-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
+                  <button type="button" id="raffle-add-upload-btn" onclick="document.getElementById('raffle-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
                     <span class="material-symbols-outlined text-sm">upload_file</span>
                     내 노트북에서 사진 올리기
                   </button>
-                  <input type="file" id="raffle-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'raffle-img', 'raffle-preview')">
+                  <input type="file" id="raffle-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'raffle-img', 'raffle-preview', 'raffle-add-upload-btn'); this.value = '';">
                   <input type="text" id="raffle-img" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-gray-600" value="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600" placeholder="또는 웹 이미지 URL 입력">
                 </div>
               </div>
@@ -1148,11 +1160,11 @@ export function render() {
                   <img id="raffle-preview" src="${raffle.imageUrl}" class="w-full h-full object-cover" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
-                  <button type="button" onclick="document.getElementById('raffle-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
+                  <button type="button" id="raffle-edit-upload-btn" onclick="document.getElementById('raffle-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
                     <span class="material-symbols-outlined text-sm">upload_file</span>
                     내 노트북에서 사진 올리기
                   </button>
-                  <input type="file" id="raffle-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'raffle-img', 'raffle-preview')">
+                  <input type="file" id="raffle-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'raffle-img', 'raffle-preview', 'raffle-edit-upload-btn'); this.value = '';">
                   <input type="text" id="raffle-img" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-gray-600" value="${raffle.imageUrl}" placeholder="또는 웹 이미지 URL 입력">
                 </div>
               </div>
