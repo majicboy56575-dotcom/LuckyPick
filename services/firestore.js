@@ -242,6 +242,12 @@ async function saveUserDocData(data) {
 }
 
 function getSuperRafflesCache() {
+  if (!superRafflesCache || superRafflesCache.length === 0) {
+    try {
+      const saved = localStorage.getItem('lp_super_raffles');
+      if (saved) superRafflesCache = JSON.parse(saved);
+    } catch (e) {}
+  }
   return superRafflesCache;
 }
 
@@ -253,27 +259,63 @@ async function saveSuperRaffleToFirestore(raffle) {
   } else {
     superRafflesCache.push(raffle);
   }
+  try {
+    localStorage.setItem('lp_super_raffles', JSON.stringify(superRafflesCache));
+  } catch (e) {}
   window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+  // Persist to Cloud Functions / Firestore backend
+  try {
+    await saveSuperRaffleServer(raffle);
+  } catch (err) {
+    console.warn('[Firestore] saveSuperRaffleServer warning:', err.message);
+  }
   return true;
 }
 
 async function deleteSuperRaffleFromFirestore(raffleId) {
   if (!raffleId) return false;
   superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
+  try {
+    localStorage.setItem('lp_super_raffles', JSON.stringify(superRafflesCache));
+  } catch (e) {}
   window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+  // Persist deletion to Cloud Functions / Firestore backend
+  try {
+    await deleteSuperRaffleServer(raffleId);
+  } catch (err) {
+    console.warn('[Firestore] deleteSuperRaffleServer warning:', err.message);
+  }
   return true;
 }
 
 function getBoxCatalogCache() {
+  if (!boxCatalogCache) {
+    try {
+      const saved = localStorage.getItem('lp_box_catalog');
+      if (saved) boxCatalogCache = JSON.parse(saved);
+    } catch (e) {}
+  }
   return boxCatalogCache;
 }
 
 async function saveBoxCatalogToFirestore(tiers) {
   boxCatalogCache = tiers;
+  try {
+    localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
+  } catch (e) {}
   window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+  // Persist to Cloud Functions / Firestore backend
+  try {
+    await saveBoxCatalogServer(tiers);
+  } catch (err) {
+    console.warn('[Firestore] saveBoxCatalogServer warning:', err.message);
+  }
   return true;
 }
 
@@ -304,6 +346,11 @@ async function updateShippingStatusInFirestore(shippingId, status, carrier = '',
     item.updatedAt = Date.now();
     window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   }
+  try {
+    await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+  } catch (err) {
+    console.warn('[Firestore] updateShippingStatus cloud warning:', err.message);
+  }
   return true;
 }
 
@@ -314,11 +361,24 @@ async function deleteShippingInfoFromFirestore(shippingId) {
 }
 
 async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
-  // Safe in-memory fallback without direct setDoc to server
-  if ((!boxCatalogCache || boxCatalogCache.length === 0) && defaultBoxes && defaultBoxes.length > 0) {
+  // Check local cache first, fallback to resilient defaults
+  if (!boxCatalogCache || boxCatalogCache.length === 0) {
+    try {
+      const saved = localStorage.getItem('lp_box_catalog');
+      if (saved) boxCatalogCache = JSON.parse(saved);
+    } catch (e) {}
+  }
+  if (!boxCatalogCache || boxCatalogCache.length === 0) {
     boxCatalogCache = defaultBoxes;
   }
-  if ((!superRafflesCache || superRafflesCache.length === 0) && defaultRaffles && defaultRaffles.length > 0) {
+
+  if (!superRafflesCache || superRafflesCache.length === 0) {
+    try {
+      const saved = localStorage.getItem('lp_super_raffles');
+      if (saved) superRafflesCache = JSON.parse(saved);
+    } catch (e) {}
+  }
+  if (!superRafflesCache || superRafflesCache.length === 0) {
     superRafflesCache = defaultRaffles;
   }
 }
@@ -647,6 +707,27 @@ async function grantUserBalanceServer(targetUid, targetEmail, points, goldenTick
   return result.data;
 }
 
+async function saveBoxCatalogServer(tiers) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'saveBoxCatalogAdmin');
+  const result = await callable({ tiers });
+  return result.data;
+}
+
+async function saveSuperRaffleServer(raffle) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'saveSuperRaffleAdmin');
+  const result = await callable({ raffle });
+  return result.data;
+}
+
+async function deleteSuperRaffleServer(raffleId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'deleteSuperRaffleAdmin');
+  const result = await callable({ raffleId });
+  return result.data;
+}
+
 /**
  * Compute group/slot info for a product.
  * @param {object} product - The active product object.
@@ -781,4 +862,7 @@ export {
   chargeUserPointsServer,
   requestVaultShippingServer,
   grantUserBalanceServer,
+  saveBoxCatalogServer,
+  saveSuperRaffleServer,
+  deleteSuperRaffleServer,
 };

@@ -664,21 +664,53 @@ export function render() {
     window.__switchAdminTab('shipping');
   };
 
-  // Image Upload Handler (Laptop File -> Base64 DataURL)
+  // Image Upload Handler (Laptop File -> Compressed Canvas DataURL)
   window.__handleImageUpload = (e, targetInputId, previewImgId) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert('이미지 파일 용량은 5MB 이하만 등록 가능합니다.');
+    if (file.size > 15 * 1024 * 1024) {
+      alert('이미지 파일 용량은 15MB 이하만 등록 가능합니다.');
       return;
     }
+
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      const input = document.getElementById(targetInputId);
-      const preview = document.getElementById(previewImgId);
-      if (input) input.value = dataUrl;
-      if (preview) preview.src = dataUrl;
+      const img = new Image();
+      img.onload = () => {
+        const MAX_SIZE = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to high quality JPEG (< 100KB)
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        const input = document.getElementById(targetInputId);
+        const preview = document.getElementById(previewImgId);
+        if (input) input.value = compressedDataUrl;
+        if (preview) preview.src = compressedDataUrl;
+      };
+      img.onerror = () => {
+        alert('이미지 파일을 읽을 수 없습니다.');
+      };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   };

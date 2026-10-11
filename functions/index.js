@@ -1651,5 +1651,85 @@ exports.syncBoxCatalog = onCall({ region: "asia-northeast3" }, async (request) =
   return { success: true, ...catalogPayload };
 });
 
+// ============================================
+// 20. saveBoxCatalogAdmin (Callable) - Save Box Tiers from Admin
+// ============================================
+exports.saveBoxCatalogAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 박스 카탈로그를 수정할 수 있습니다.");
+  }
+
+  const { tiers } = request.data;
+  if (!tiers || !Array.isArray(tiers)) {
+    throw new HttpsError("invalid-argument", "올바른 럭키박스 카탈로그 데이터가 필요합니다.");
+  }
+
+  const catRef = db.collection("box_catalogs").doc("default");
+  const payload = {
+    tiers,
+    version: "3.0",
+    updatedAt: Date.now()
+  };
+  await catRef.set(payload, { merge: true });
+  console.log("[Admin] Successfully saved box catalog to Firestore (tiers:", tiers.length, ")");
+  return { success: true, count: tiers.length };
+});
+
+// ============================================
+// 21. saveSuperRaffleAdmin (Callable) - Save/Create Super Raffle from Admin
+// ============================================
+exports.saveSuperRaffleAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 스페셜 래플을 등록/수정할 수 있습니다.");
+  }
+
+  const { raffle } = request.data;
+  if (!raffle || !raffle.id) {
+    throw new HttpsError("invalid-argument", "올바른 스페셜 래플 정보가 필요합니다.");
+  }
+
+  const raffleRef = db.collection("super_raffles").doc(raffle.id);
+  const payload = {
+    ...raffle,
+    updatedAt: Date.now()
+  };
+  await raffleRef.set(payload, { merge: true });
+  console.log(`[Admin] Successfully saved super raffle ${raffle.id} to Firestore`);
+  return { success: true, raffleId: raffle.id };
+});
+
+// ============================================
+// 22. deleteSuperRaffleAdmin (Callable) - Delete Super Raffle from Admin
+// ============================================
+exports.deleteSuperRaffleAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev && callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", "관리자만 스페셜 래플을 삭제할 수 있습니다.");
+  }
+
+  const { raffleId } = request.data;
+  if (!raffleId) {
+    throw new HttpsError("invalid-argument", "삭제할 래플 ID가 필요합니다.");
+  }
+
+  await db.collection("super_raffles").doc(raffleId).delete();
+  console.log(`[Admin] Successfully deleted super raffle ${raffleId} from Firestore`);
+  return { success: true, deletedRaffleId: raffleId };
+});
+
 
 

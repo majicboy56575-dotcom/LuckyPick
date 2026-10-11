@@ -21,7 +21,8 @@ import {
   applyGoldenRaffleServer,
   cancelGoldenRaffleServer,
   forceDrawRaffleServer,
-  requestVaultShippingServer
+  requestVaultShippingServer,
+  grantUserBalanceServer
 } from './firestore.js';
 import { getCurrentAuthUser } from './auth.js';
 
@@ -135,28 +136,54 @@ export function getRandomBoxTiers() {
   if (serverTiers && Array.isArray(serverTiers) && serverTiers.length > 0) {
     return DEFAULT_BOX_TIERS.map(defaultTier => {
       const serverTier = serverTiers.find(st => st.id === defaultTier.id) || {};
-      const mergedItems = (defaultTier.items || []).map((defaultItem, idx) => {
-        const serverItem = (serverTier.items && serverTier.items[idx]) || {};
-        return {
+      const serverItems = Array.isArray(serverTier.items) ? [...serverTier.items] : [];
+      const mergedItems = [];
+      const processedServerItemIds = new Set();
+
+      (defaultTier.items || []).forEach((defaultItem, idx) => {
+        const serverItem = serverItems.find(si => si.id === defaultItem.id) || serverItems[idx] || {};
+        if (serverItem.id) processedServerItemIds.add(serverItem.id);
+
+        mergedItems.push({
           ...defaultItem,
           ...serverItem,
-          retailPrice: defaultItem.retailPrice,
-          wholesalePrice: defaultItem.wholesalePrice,
-          prob: defaultItem.prob,
-          image: defaultItem.image || serverItem.image || 'assets/products/powerbank_10000mah.jpg'
-        };
+          name: serverItem.name || defaultItem.name,
+          retailPrice: (serverItem.retailPrice !== undefined && serverItem.retailPrice !== null) ? Number(serverItem.retailPrice) : defaultItem.retailPrice,
+          wholesalePrice: (serverItem.wholesalePrice !== undefined && serverItem.wholesalePrice !== null) ? Number(serverItem.wholesalePrice) : defaultItem.wholesalePrice,
+          prob: (serverItem.prob !== undefined && serverItem.prob !== null) ? Number(serverItem.prob) : defaultItem.prob,
+          grade: serverItem.grade || defaultItem.grade,
+          moq: serverItem.moq || defaultItem.moq,
+          image: serverItem.image || defaultItem.image || 'assets/products/powerbank_10000mah.jpg'
+        });
+      });
+
+      // Add any custom items added by admin that didn't exist in defaultTier
+      serverItems.forEach(serverItem => {
+        if (serverItem.id && !processedServerItemIds.has(serverItem.id)) {
+          mergedItems.push({
+            id: serverItem.id,
+            name: serverItem.name || '새 품목',
+            grade: serverItem.grade || 'NORMAL',
+            moq: serverItem.moq || '1개',
+            retailPrice: Number(serverItem.retailPrice) || 10000,
+            wholesalePrice: Number(serverItem.wholesalePrice) || 2500,
+            prob: Number(serverItem.prob) || 0.1,
+            image: serverItem.image || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=400'
+          });
+        }
       });
 
       return {
         ...defaultTier,
         ...serverTier,
-        price: defaultTier.price,
-        goldenTickets: defaultTier.goldenTickets,
-        minGuaranteedValue: defaultTier.minGuaranteedValue,
-        tagline: defaultTier.tagline,
-        boxImage: defaultTier.boxImage || serverTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
-        color: defaultTier.color || serverTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
-        accentColor: defaultTier.accentColor || serverTier.accentColor || '#3b82f6',
+        name: serverTier.name || defaultTier.name,
+        price: (serverTier.price !== undefined && serverTier.price !== null) ? Number(serverTier.price) : defaultTier.price,
+        goldenTickets: (serverTier.goldenTickets !== undefined && serverTier.goldenTickets !== null) ? Number(serverTier.goldenTickets) : defaultTier.goldenTickets,
+        minGuaranteedValue: (serverTier.minGuaranteedValue !== undefined && serverTier.minGuaranteedValue !== null) ? Number(serverTier.minGuaranteedValue) : defaultTier.minGuaranteedValue,
+        tagline: serverTier.tagline || defaultTier.tagline,
+        boxImage: serverTier.boxImage || defaultTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
+        color: serverTier.color || defaultTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
+        accentColor: serverTier.accentColor || defaultTier.accentColor || '#3b82f6',
         items: mergedItems
       };
     });
@@ -210,6 +237,10 @@ export function getUserPoints() {
 export function setUserPoints(points) {
   saveUserDocData({ points });
   window.dispatchEvent(new CustomEvent('pointsUpdated', { detail: { points } }));
+  try {
+    const authUser = getCurrentAuthUser();
+    grantUserBalanceServer(authUser?.uid || null, authUser?.email || null, Number(points), null).catch(() => {});
+  } catch (e) {}
 }
 
 // User Vault (100% Firestore User Doc vault backed)
@@ -234,6 +265,10 @@ export function getAvailableGoldenTicketsCount() {
 export function setAvailableGoldenTicketsCount(count) {
   saveUserDocData({ goldenTickets: count });
   window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count } }));
+  try {
+    const authUser = getCurrentAuthUser();
+    grantUserBalanceServer(authUser?.uid || null, authUser?.email || null, null, Number(count)).catch(() => {});
+  } catch (e) {}
 }
 
 // User is initialized directly via Cloud Functions / Firestore cache
