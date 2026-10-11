@@ -1,13 +1,13 @@
 # LuckyPick 관리자 페이지 데이터 영구 보존 및 이미지 업로드 아키텍처 가이드
 
-**문서 버전**: 1.0  
+**문서 버전**: 1.1 (V11)  
 **최종 업데이트**: 2026-10-11  
-**관련 커밋**: `564c6e8`
+**관련 커밋**: `564c6e8`, `6099823`
 
 ---
 
 ## 1. 개요
-LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키박스 품목 사진/가격/확률, 박스 기본설정, 스페셜 골든래플, 배송 운송장 번호, 회원 포인트/골든티켓)는 **Firebase Firestore Cloud DB**와 **브라우저 로컬 캐시**의 이중 보존 레이어를 통해 영구 저장됩니다.
+LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키박스 품목 사진/가격/확률, 박스 기본설정, 스페셜 골든래플, 배송 운송장 번호, 회원 포인트/골든티켓)는 **Firebase Firestore Cloud DB**와 **브라우저 로컬 캐시**의 이중 보존 레이어를 통해 영구 저장되며, 프론트엔드는 백엔드 데이터를 1순위 단일 진실 공급원(Single Source of Truth)으로 화면에 직통 렌더링합니다.
 
 ---
 
@@ -21,12 +21,13 @@ LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키�
         ▼
 [서비스 레이어: services/randombox.js]
         │
-        ├─▶ getRandomBoxTiers(): 서버/관리자 수정값 최우선 반영 (serverItem || defaultItem)
+        ├─▶ getRandomBoxTiers(): serverTiers를 1순위로 온전히 매핑 (삭제 품목 부활 방지)
         │
         ▼
 [Firestore 레이어: services/firestore.js]
         │
         ├─▶ 1. localStorage 즉시 캐싱 (새로고침/오프라인 방어)
+        ├─▶ 2. ensureInitialFirestoreData(): 기존 관리자 설정/확률 보존 (강제 덮어쓰기 금지)
         │
         ▼
 [백엔드: functions/index.js (Cloud Functions)]
