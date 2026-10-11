@@ -9,7 +9,7 @@ import { handleTossSuccess } from './services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from './services/unboxing-modal.js';
 
-import * as homePage from './pages/home.js';
+import * as homePage from './pages/home.js?v=20261011_hero1';
 import * as historyPage from './pages/history.js';
 import * as profilePage from './pages/profile.js';
 import * as adminPage from './pages/admin.js';

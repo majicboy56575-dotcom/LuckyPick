@@ -139,44 +139,60 @@ function renderSuperRaffleCard(raffle, index) {
       <div class="absolute -right-12 -top-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div>
-        <div class="flex justify-between items-center mb-4">
-          ${isClosed ? `
-            <span class="bg-slate-800 text-amber-300 border border-amber-400/40 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              추첨 마감 완료 (CLOSED)
-            </span>
-          ` : `
-            <span class="bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
-              ${raffle.badge}
-            </span>
-          `}
-          
-          <div class="flex items-center gap-1.5 text-xs text-amber-300 font-mono bg-white/5 px-3 py-1 rounded-full border border-white/10">
+        <!-- Large Showcase Product Hero -->
+        <div class="relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden bg-slate-950/90 border-2 ${isClosed ? 'border-slate-700' : 'border-amber-400/50'} shadow-xl mb-4 group">
+          <img src="${raffle.imageUrl || 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80'}" alt="${raffle.title}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/30 pointer-events-none"></div>
+
+          <!-- Top Floating Badges over Image -->
+          <div class="absolute top-3 left-3 z-10">
             ${isClosed ? `
-              <span class="material-symbols-outlined text-[14px]">emoji_events</span>
-              <span>추첨 완료 (${raffle.winners?.length || 0}명 당첨)</span>
+              <span class="bg-slate-900/90 backdrop-blur-md text-amber-300 border border-amber-400/40 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                추첨 마감 (CLOSED)
+              </span>
             ` : `
-              <span class="material-symbols-outlined text-[14px]">timer</span>
-              <span id="super-timer-${index}">${formatTime(remaining)}</span>
+              <span class="bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
+                ${raffle.badge}
+              </span>
             `}
           </div>
+
+          <div class="absolute top-3 right-3 z-10">
+            <div class="flex items-center gap-1.5 text-xs text-amber-300 font-mono bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-amber-400/30 shadow-md">
+              ${isClosed ? `
+                <span class="material-symbols-outlined text-[14px]">emoji_events</span>
+                <span>추첨 완료 (${raffle.winners?.length || 0}명)</span>
+              ` : `
+                <span class="material-symbols-outlined text-[14px]">timer</span>
+                <span id="super-timer-${index}">${formatTime(remaining)}</span>
+              `}
+            </div>
+          </div>
+
+          <!-- Bottom Floating Bonus Badge over Image -->
+          <div class="absolute bottom-3 left-3 right-3 z-10 flex justify-between items-end">
+            <span class="text-[11px] text-emerald-300 font-bold bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 shadow-sm flex items-center gap-1">
+              <span>🎁</span>
+              <span>${raffle.winnerBonus}</span>
+            </span>
+          </div>
+
+          ${isClosed ? `
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
+              <span class="px-5 py-2 bg-slate-900/90 text-amber-300 border-2 border-amber-400 font-black text-sm tracking-widest rounded-2xl shadow-2xl">
+                🏁 추첨 마감 완료
+              </span>
+            </div>
+          ` : ''}
         </div>
 
-        <div class="flex gap-4 items-center mb-5">
-          <div class="relative">
-            <img src="${raffle.imageUrl || 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80'}" alt="${raffle.title}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80';" class="w-24 h-24 object-cover rounded-2xl border-2 ${isClosed ? 'border-slate-700 opacity-90' : 'border-amber-400/50'} shadow-md">
-            ${isClosed ? `
-              <span class="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center font-black text-amber-300 text-xs tracking-wider">
-                마감
-              </span>
-            ` : ''}
-          </div>
-          <div class="min-w-0">
-            <h4 class="font-extrabold text-lg text-white leading-snug">${raffle.title}</h4>
-            <p class="text-xs text-amber-300/90 mt-1">정가: <strong>₩${raffle.retailPrice.toLocaleString()}원 상당</strong></p>
-            <span class="inline-block mt-1 text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-              🎁 ${raffle.winnerBonus}
-            </span>
+        <!-- Product Title & Retail Price -->
+        <div class="mb-4">
+          <h4 class="font-black text-xl sm:text-2xl text-white tracking-tight leading-snug">${raffle.title}</h4>
+          <div class="flex items-baseline gap-2 mt-1">
+            <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">RETAIL VALUE</span>
+            <span class="text-base sm:text-lg font-black text-amber-300 font-mono">₩${raffle.retailPrice.toLocaleString()}원 상당</span>
           </div>
         </div>
 
@@ -220,39 +236,39 @@ function renderSuperRaffleCard(raffle, index) {
             </div>
           </div>
         ` : `
-          <!-- Multi-Group Slots Status Bar -->
-          <div class="space-y-3 mb-6 bg-white/5 p-4 rounded-2xl border border-white/10">
-            <div class="flex justify-between items-center">
-              <button onclick="window.__openTransparencyModal('${raffle.id}')" class="text-xs font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 underline underline-offset-2">
+          <!-- Compact Multi-Group Slots Status Bar -->
+          <div class="space-y-2 mb-4 bg-white/5 p-3 rounded-2xl border border-white/10">
+            <div class="flex justify-between items-center text-xs">
+              <button onclick="window.__openTransparencyModal('${raffle.id}')" class="text-[11px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 underline underline-offset-2">
                 <span class="material-symbols-outlined text-sm">groups</span>
-                참여자 투명 공개 (${groupData.totalParticipants}명 참여 중) ↗
+                참여자 투명 공개 (${groupData.totalParticipants}명) ↗
               </button>
-              <span class="text-[11px] text-slate-300 font-mono">
+              <span class="text-[10px] text-slate-300 font-mono">
                 ${groupData.completedGroupsCount > 0 ? `<span class="text-emerald-400 font-bold">✓ ${groupData.completedGroupsCount}개 그룹 달성</span>` : `그룹당 목표: ${groupData.unitSize}명`}
               </span>
             </div>
 
-            <!-- Group Grid Display -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <!-- Compact Group Grid Display -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               ${groupData.groups.map(g => `
-                <div class="p-2.5 rounded-xl border ${g.hasMyTicket ? 'border-amber-400 bg-amber-400/10' : g.isComplete ? 'border-emerald-500/40 bg-emerald-950/30' : 'border-white/10 bg-white/5'} text-center text-xs relative">
-                  ${g.hasMyTicket ? `<span class="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 text-[8px] font-black px-1.5 py-0.2 rounded-full whitespace-nowrap shadow-xs">🎯 내 티켓 ${g.myTicketCount}장</span>` : ''}
-                  <div class="flex justify-between items-center text-[10px] font-bold text-slate-400 mb-1">
+                <div class="p-2 rounded-xl border ${g.hasMyTicket ? 'border-amber-400 bg-amber-400/10' : g.isComplete ? 'border-emerald-500/40 bg-emerald-950/30' : 'border-white/10 bg-white/5'} text-center text-xs relative">
+                  ${g.hasMyTicket ? `<span class="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 text-[7.5px] font-black px-1.5 py-0.2 rounded-full whitespace-nowrap shadow-xs">🎯 내 티켓 ${g.myTicketCount}장</span>` : ''}
+                  <div class="flex justify-between items-center text-[9px] font-bold text-slate-400 mb-0.5">
                     <span>그룹 ${g.groupNumber}</span>
-                    <span class="${g.isComplete ? 'text-emerald-400' : 'text-slate-300'} font-mono">${g.count}/${g.unitSize}</span>
+                    <span class="${g.isComplete ? 'text-emerald-400 font-bold' : 'text-slate-300'} font-mono">${g.count}/${g.unitSize}</span>
                   </div>
-                  <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
                     <div class="h-full ${g.isComplete ? 'bg-emerald-400' : 'bg-gradient-to-r from-amber-500 to-yellow-400'} rounded-full" style="width: ${g.fillPercentage}%"></div>
                   </div>
-                  <span class="text-[9px] mt-1 block font-mono ${g.isComplete ? 'text-emerald-400 font-bold' : 'text-slate-400'}">
-                    ${g.isComplete ? '추첨 확정 ✓' : '모집 진행 중'}
+                  <span class="text-[8.5px] mt-0.5 block font-mono ${g.isComplete ? 'text-emerald-400 font-bold' : 'text-slate-400'}">
+                    ${g.isComplete ? '추첨 확정 ✓' : '모집 중'}
                   </span>
                 </div>
               `).join('')}
             </div>
 
-            <p class="text-[10px] text-slate-400 leading-relaxed italic">
-              ※ 마감 시 목표인원(그룹당 ${groupData.unitSize}명)을 채운 그룹은 즉시 당첨자를 선발하며, 미달된 그룹은 <strong>골든 티켓이 100% 자동 환불 반환</strong>됩니다.
+            <p class="text-[9.5px] text-slate-400 leading-snug">
+              ※ 목표 달성 시 즉시 추첨 · 미달 그룹은 골든 티켓 100% 자동 환불 반환
             </p>
           </div>
         `}
