@@ -133,18 +133,17 @@ if (isFirebaseConfigured()) {
       (snap) => {
         if (snap.exists() && snap.data()?.tiers) {
           const serverData = snap.data();
-          const localUpdatedAt = parseInt(localStorage.getItem('lp_box_catalog_updatedAt') || '0', 10);
-          const serverUpdatedAt = serverData.updatedAt || 0;
-          if (serverUpdatedAt >= localUpdatedAt || !localStorage.getItem('lp_box_catalog')) {
-            boxCatalogCache = serverData.tiers;
-            try {
-              localStorage.setItem('lp_box_catalog', JSON.stringify(serverData.tiers));
-              localStorage.setItem('lp_box_catalog_updatedAt', String(serverUpdatedAt));
-              localStorage.setItem('lp_box_catalog_version', '3.0_V12');
-            } catch (e) {}
-            window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
-            window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-          }
+          const serverUpdatedAt = serverData.updatedAt || Date.now();
+          // Server (Firestore) is the single source of truth: always apply snapshot.
+          // (Previously a newer local timestamp from a failed admin save could block server data forever.)
+          boxCatalogCache = serverData.tiers;
+          try {
+            localStorage.setItem('lp_box_catalog', JSON.stringify(serverData.tiers));
+            localStorage.setItem('lp_box_catalog_updatedAt', String(serverUpdatedAt));
+            localStorage.setItem('lp_box_catalog_version', '3.0_V12');
+          } catch (e) {}
+          window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
+          window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
         }
       },
       (error) => {
