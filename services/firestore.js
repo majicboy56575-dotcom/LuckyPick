@@ -59,9 +59,15 @@ if (isFirebaseConfigured()) {
     db = getFirestore(app);
     functions = getFunctions(app, 'asia-northeast3');
 
-    // Log active environment
+    // Log active environment & connect to emulators on localhost
     if (isLocalDev()) {
-      console.log('[Firestore] Connected to DEV PROJECT (lucky-pick-dev)');
+      try {
+        connectFirestoreEmulator(db, '127.0.0.1', 8181);
+        connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+        console.log('[Firestore] Connected to LOCAL EMULATORS (Firestore: 8181, Functions: 5001)');
+      } catch (e) {
+        console.warn('[Firestore] Emulator connection warning:', e.message);
+      }
     } else {
       console.log('[Firestore] Connected to PRODUCTION (luckypick-ec4cf)');
     }
@@ -134,6 +140,7 @@ if (isFirebaseConfigured()) {
             try {
               localStorage.setItem('lp_box_catalog', JSON.stringify(serverData.tiers));
               localStorage.setItem('lp_box_catalog_updatedAt', String(serverUpdatedAt));
+              localStorage.setItem('lp_box_catalog_version', '3.0_V12');
             } catch (e) {}
             window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
             window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
@@ -304,8 +311,27 @@ async function deleteSuperRaffleFromFirestore(raffleId) {
 function getBoxCatalogCache() {
   if (!boxCatalogCache) {
     try {
+      const savedVersion = localStorage.getItem('lp_box_catalog_version');
       const saved = localStorage.getItem('lp_box_catalog');
-      if (saved) boxCatalogCache = JSON.parse(saved);
+      if (saved && savedVersion === '3.0_V12') {
+        const parsed = JSON.parse(saved);
+        const vipTier = parsed.find(t => t.id === 'box_vip');
+        // Validate against obsolete pricing (30,000) or outdated tickets (8)
+        if (vipTier && (vipTier.price === 30000 || vipTier.goldenTickets === 8)) {
+          console.warn('[Firestore] Purging obsolete 30k VIP box cache from localStorage');
+          localStorage.removeItem('lp_box_catalog');
+          localStorage.removeItem('lp_box_catalog_updatedAt');
+          localStorage.removeItem('lp_box_catalog_version');
+        } else {
+          boxCatalogCache = parsed;
+        }
+      } else if (saved) {
+        // Outdated schema/version detected -> purge obsolete cache
+        console.warn('[Firestore] Outdated catalog version detected in localStorage. Purging cache.');
+        localStorage.removeItem('lp_box_catalog');
+        localStorage.removeItem('lp_box_catalog_updatedAt');
+        localStorage.setItem('lp_box_catalog_version', '3.0_V12');
+      }
     } catch (e) {}
   }
   return boxCatalogCache;
@@ -317,6 +343,7 @@ async function saveBoxCatalogToFirestore(tiers) {
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(now));
+    localStorage.setItem('lp_box_catalog_version', '3.0_V12');
   } catch (e) {
     console.warn('[Firestore] localStorage quota exceeded or error:', e);
   }
@@ -374,13 +401,9 @@ async function deleteShippingInfoFromFirestore(shippingId) {
 }
 
 async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
-  // Check local cache first, fallback to resilient defaults
-  if (!boxCatalogCache || boxCatalogCache.length === 0) {
-    try {
-      const saved = localStorage.getItem('lp_box_catalog');
-      if (saved) boxCatalogCache = JSON.parse(saved);
-    } catch (e) {}
-  }
+  // Check and purge any stale local cache first
+  getBoxCatalogCache();
+
   if (!boxCatalogCache || boxCatalogCache.length === 0) {
     boxCatalogCache = defaultBoxes;
   }
@@ -393,6 +416,20 @@ async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
   }
   if (!superRafflesCache || superRafflesCache.length === 0) {
     superRafflesCache = defaultRaffles;
+  }
+
+  // Auto-sync backend if box catalog document is missing in Firestore
+  if (db && functions) {
+    try {
+      const catRef = doc(db, 'box_catalogs', 'default');
+      const catSnap = await getDoc(catRef);
+      if (!catSnap.exists() || !catSnap.data()?.tiers || catSnap.data()?.version !== '3.0') {
+        console.log('[Firestore] No server catalog doc found in Firestore. Requesting backend sync...');
+        await syncBoxCatalogServer();
+      }
+    } catch (err) {
+      console.warn('[Firestore] Auto-seed sync warning:', err.message);
+    }
   }
 }
 
@@ -741,6 +778,13 @@ async function deleteSuperRaffleServer(raffleId) {
   return result.data;
 }
 
+async function syncBoxCatalogServer() {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'syncBoxCatalog');
+  const result = await callable();
+  return result.data;
+}
+
 /**
  * Compute group/slot info for a product.
  * @param {object} product - The active product object.
@@ -878,4 +922,5 @@ export {
   saveBoxCatalogServer,
   saveSuperRaffleServer,
   deleteSuperRaffleServer,
+  syncBoxCatalogServer,
 };

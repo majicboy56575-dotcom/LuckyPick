@@ -30,9 +30,14 @@ if (isFirebaseConfigured()) {
     firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
     firebaseAuth = getAuth(firebaseApp);
 
-    // Log active environment
+    // Log active environment & connect to emulators on localhost
     if (isLocalDev()) {
-      console.log('[Firebase Auth] Connected to DEV PROJECT (lucky-pick-dev)');
+      try {
+        connectAuthEmulator(firebaseAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+        console.log('[Firebase Auth] Connected to LOCAL AUTH EMULATOR (127.0.0.1:9099)');
+      } catch (e) {
+        console.warn('[Firebase Auth] Emulator connection warning:', e.message);
+      }
     } else {
       console.log('[Firebase Auth] Connected to PRODUCTION (luckypick-ec4cf)');
     }

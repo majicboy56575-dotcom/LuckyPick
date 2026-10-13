@@ -24,13 +24,13 @@ const firebaseConfigDev = {
   appId: "1:813005388637:web:a684e2dab6533f0e03c6b4"
 };
 
-// Check if running on localhost (uses Dev Firebase project)
+// Check if running on localhost (uses local Firebase emulators)
 const isLocalDev = () => {
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 };
 
-// Automatically select Dev config for localhost, Prod config for live deployment
-const firebaseConfig = isLocalDev() ? firebaseConfigDev : firebaseConfigProd;
+// Use the canonical luckypick-ec4cf config across both local emulators and live deployment
+const firebaseConfig = firebaseConfigProd;
 
 // Check if real Firebase credentials are set
 const isFirebaseConfigured = () => {
