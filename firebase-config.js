@@ -29,8 +29,8 @@ const isLocalDev = () => {
   return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 };
 
-// Use the canonical luckypick-ec4cf config across both local emulators and live deployment
-const firebaseConfig = firebaseConfigProd;
+// Automatically select Dev config for localhost, Prod config for live deployment
+const firebaseConfig = isLocalDev() ? firebaseConfigDev : firebaseConfigProd;
 
 // Check if real Firebase credentials are set
 const isFirebaseConfigured = () => {

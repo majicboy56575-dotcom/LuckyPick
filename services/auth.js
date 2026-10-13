@@ -16,7 +16,6 @@ import {
   updateProfile,
   signOut as firebaseSignOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  connectAuthEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 
 const ADMIN_EMAIL = 'majicboy56575@gmail.com';
@@ -30,14 +29,9 @@ if (isFirebaseConfigured()) {
     firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
     firebaseAuth = getAuth(firebaseApp);
 
-    // Log active environment & connect to emulators on localhost
+    // Log active environment
     if (isLocalDev()) {
-      try {
-        connectAuthEmulator(firebaseAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
-        console.log('[Firebase Auth] Connected to LOCAL AUTH EMULATOR (127.0.0.1:9099)');
-      } catch (e) {
-        console.warn('[Firebase Auth] Emulator connection warning:', e.message);
-      }
+      console.log('[Firebase Auth] Connected to DEV PROJECT (lucky-pick-dev)');
     } else {
       console.log('[Firebase Auth] Connected to PRODUCTION (luckypick-ec4cf)');
     }

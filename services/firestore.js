@@ -15,13 +15,11 @@ import {
   where,
   orderBy,
   onSnapshot,
-  connectFirestoreEmulator,
   getDocs,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import {
   getFunctions,
   httpsCallable,
-  connectFunctionsEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
 // ============================================
@@ -59,15 +57,9 @@ if (isFirebaseConfigured()) {
     db = getFirestore(app);
     functions = getFunctions(app, 'asia-northeast3');
 
-    // Log active environment & connect to emulators on localhost
+    // Log active environment
     if (isLocalDev()) {
-      try {
-        connectFirestoreEmulator(db, '127.0.0.1', 8181);
-        connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-        console.log('[Firestore] Connected to LOCAL EMULATORS (Firestore: 8181, Functions: 5001)');
-      } catch (e) {
-        console.warn('[Firestore] Emulator connection warning:', e.message);
-      }
+      console.log('[Firestore] Connected to DEV PROJECT (lucky-pick-dev)');
     } else {
       console.log('[Firestore] Connected to PRODUCTION (luckypick-ec4cf)');
     }
