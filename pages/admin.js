@@ -680,7 +680,7 @@ export function render() {
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const MAX_SIZE = 600;
+        const MAX_SIZE = 400;
         let width = img.width;
         let height = img.height;
 
@@ -702,8 +702,8 @@ export function render() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Compress to high quality JPEG (< 100KB)
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        // Compress to lightweight web JPEG (~20-30KB) to ensure Firestore 1MB doc limit is never exceeded
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
 
         const input = document.getElementById(targetInputId);
         const preview = document.getElementById(previewImgId);
@@ -780,7 +780,7 @@ export function render() {
     document.getElementById('admin-modal-container').innerHTML = modalHtml;
   };
 
-  window.__saveEditedBoxTier = (boxId) => {
+  window.__saveEditedBoxTier = async (boxId) => {
     const name = document.getElementById('tier-name')?.value?.trim();
     const tagline = document.getElementById('tier-tagline')?.value?.trim();
     const price = parseInt(document.getElementById('tier-price')?.value, 10);
@@ -792,23 +792,29 @@ export function render() {
       return;
     }
 
-    updateBoxTierSettings(boxId, { name, tagline, price, goldenTickets, minGuaranteedValue });
-    window.__closeAdminModal();
-    alert('✓ 럭키박스 기본 설정이 수정되었습니다.');
-    window.__switchAdminTab('boxes');
-  };
-
-  window.__autoBalanceProbs = (boxId) => {
     try {
-      autoBalanceBoxProbabilities(boxId);
-      alert('✓ 모든 품목의 확률 합계가 정확히 100%로 균등 조정되었습니다.');
+      await updateBoxTierSettings(boxId, { name, tagline, price, goldenTickets, minGuaranteedValue });
+      window.__closeAdminModal();
+      alert('✓ 럭키박스 기본 설정이 서버 DB에 정상 저장되었습니다.');
       window.__switchAdminTab('boxes');
     } catch (err) {
-      alert(err.message);
+      console.error('[Admin] saveEditedBoxTier error:', err);
+      alert('❌ 서버 DB 저장 실패: ' + err.message);
     }
   };
 
-  window.__deleteBoxItem = (boxId, itemId) => {
+  window.__autoBalanceProbs = async (boxId) => {
+    try {
+      await autoBalanceBoxProbabilities(boxId);
+      alert('✓ 모든 품목의 확률 합계가 정확히 100%로 균등 조정되어 서버 DB에 저장되었습니다.');
+      window.__switchAdminTab('boxes');
+    } catch (err) {
+      console.error('[Admin] autoBalanceProbs error:', err);
+      alert('❌ 확률 서버 저장 실패: ' + err.message);
+    }
+  };
+
+  window.__deleteBoxItem = async (boxId, itemId) => {
     const boxes = getRandomBoxTiers();
     const box = boxes.find(b => b.id === boxId);
     if (!box) return;
@@ -817,10 +823,15 @@ export function render() {
 
     if (!confirm(`정말 [${itemName}] 품목을 삭제하시겠습니까?`)) return;
 
-    box.items = box.items.filter(it => it.id !== itemId);
-    saveRandomBoxTiers(boxes);
-    alert('✓ 품목이 삭제되었습니다.');
-    window.__switchAdminTab('boxes');
+    try {
+      box.items = box.items.filter(it => it.id !== itemId);
+      await saveRandomBoxTiers(boxes);
+      alert('✓ 품목이 서버 DB에서 정상 삭제되었습니다.');
+      window.__switchAdminTab('boxes');
+    } catch (err) {
+      console.error('[Admin] deleteBoxItem error:', err);
+      alert('❌ 품목 삭제 실패: ' + err.message);
+    }
   };
 
   window.__openAddItemModal = (boxId) => {
@@ -981,7 +992,7 @@ export function render() {
     if (container) container.innerHTML = '';
   };
 
-  window.__saveNewItem = (boxId) => {
+  window.__saveNewItem = async (boxId) => {
     const name = document.getElementById('modal-item-name')?.value?.trim();
     const retail = parseFloat(document.getElementById('modal-item-retail')?.value) || 10000;
     const wholesale = parseFloat(document.getElementById('modal-item-wholesale')?.value) || 2500;
@@ -1005,14 +1016,19 @@ export function render() {
         prob,
         image: img || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=400'
       });
-      saveRandomBoxTiers(boxes);
-      window.__closeAdminModal();
-      alert('✓ 새 품목이 성공적으로 추가되었습니다.');
-      window.__switchAdminTab('boxes');
+      try {
+        await saveRandomBoxTiers(boxes);
+        window.__closeAdminModal();
+        alert('✓ 새 품목이 서버 DB에 정상 추가되었습니다.');
+        window.__switchAdminTab('boxes');
+      } catch (err) {
+        console.error('[Admin] saveNewItem error:', err);
+        alert('❌ 서버 DB 추가 실패: ' + err.message);
+      }
     }
   };
 
-  window.__saveEditedItem = (boxId, itemId) => {
+  window.__saveEditedItem = async (boxId, itemId) => {
     const name = document.getElementById('modal-item-name')?.value?.trim();
     const retail = parseFloat(document.getElementById('modal-item-retail')?.value) || 10000;
     const wholesale = parseFloat(document.getElementById('modal-item-wholesale')?.value) || 2500;
@@ -1035,10 +1051,15 @@ export function render() {
         item.moq = moq;
         item.prob = prob;
         item.image = img || item.image;
-        saveRandomBoxTiers(boxes);
-        window.__closeAdminModal();
-        alert('✓ 품목 세부 정보가 성공적으로 수정되었습니다.');
-        window.__switchAdminTab('boxes');
+        try {
+          await saveRandomBoxTiers(boxes);
+          window.__closeAdminModal();
+          alert('✓ 품목 세부 정보가 서버 DB에 성공적으로 저장되었습니다.');
+          window.__switchAdminTab('boxes');
+        } catch (err) {
+          console.error('[Admin] saveEditedItem error:', err);
+          alert('❌ 서버 DB 저장 실패: ' + err.message);
+        }
       }
     }
   };
@@ -1179,7 +1200,7 @@ export function render() {
     document.getElementById('admin-modal-container').innerHTML = modalHtml;
   };
 
-  window.__saveNewRaffle = () => {
+  window.__saveNewRaffle = async () => {
     const title = document.getElementById('raffle-title')?.value?.trim();
     const retail = parseFloat(document.getElementById('raffle-retail')?.value) || 1000000;
     const unitSize = parseInt(document.getElementById('raffle-unit-size')?.value, 10) || 200;
@@ -1191,7 +1212,7 @@ export function render() {
     if (!title) { alert('래플 상품명을 입력해주세요.'); return; }
 
     const raffles = getSuperRaffles();
-    raffles.push({
+    const newRaffle = {
       id: 'super_' + Date.now(),
       title,
       retailPrice: retail,
@@ -1202,14 +1223,20 @@ export function render() {
       badge,
       status: 'active',
       entries: []
-    });
-    saveSuperRaffles(raffles);
-    window.__closeAdminModal();
-    alert('✓ 새 스페셜 골든래플이 등록되었습니다.');
-    window.__switchAdminTab('raffles');
+    };
+    raffles.push(newRaffle);
+    try {
+      await saveSuperRaffles(raffles);
+      window.__closeAdminModal();
+      alert('✓ 새 스페셜 골든래플이 서버 DB에 정상 등록되었습니다.');
+      window.__switchAdminTab('raffles');
+    } catch (err) {
+      console.error('[Admin] saveNewRaffle error:', err);
+      alert('❌ 래플 등록 실패: ' + err.message);
+    }
   };
 
-  window.__saveEditedRaffle = (raffleId) => {
+  window.__saveEditedRaffle = async (raffleId) => {
     const title = document.getElementById('raffle-title')?.value?.trim();
     const retail = parseFloat(document.getElementById('raffle-retail')?.value) || 1000000;
     const unitSize = parseInt(document.getElementById('raffle-unit-size')?.value, 10) || 200;
@@ -1228,23 +1255,33 @@ export function render() {
       raffle.badge = badge;
       raffle.winnerBonus = bonus;
       if (img) raffle.imageUrl = img;
-      saveSuperRaffles(raffles);
-      window.__closeAdminModal();
-      alert('✓ 스페셜 래플 정보가 수정되었습니다.');
-      window.__switchAdminTab('raffles');
+      try {
+        await saveSuperRaffles(raffles);
+        window.__closeAdminModal();
+        alert('✓ 스페셜 래플 정보가 서버 DB에 정상 수정되었습니다.');
+        window.__switchAdminTab('raffles');
+      } catch (err) {
+        console.error('[Admin] saveEditedRaffle error:', err);
+        alert('❌ 래플 수정 실패: ' + err.message);
+      }
     }
   };
 
-  window.__deleteRaffle = (raffleId) => {
+  window.__deleteRaffle = async (raffleId) => {
     const raffles = getSuperRaffles();
     const raffle = raffles.find(r => r.id === raffleId);
     if (!raffle) return;
 
     if (!confirm(`정말 [${raffle.title}] 스페셜 래플을 삭제하시겠습니까?`)) return;
 
-    deleteSuperRaffle(raffleId);
-    alert('✓ 스페셜 래플이 서버에서 성공적으로 삭제되었습니다.');
-    window.__switchAdminTab('raffles');
+    try {
+      await deleteSuperRaffle(raffleId);
+      alert('✓ 스페셜 래플이 서버 DB에서 성공적으로 삭제되었습니다.');
+      window.__switchAdminTab('raffles');
+    } catch (err) {
+      console.error('[Admin] deleteRaffle error:', err);
+      alert('❌ 래플 삭제 실패: ' + err.message);
+    }
   };
 
   // --- Force Draw & Auto-Refund End-to-End ---
@@ -1442,21 +1479,31 @@ export function render() {
   };
 
   // --- 3. Shipping Management ---
-  window.__updateTracking = (shippingId) => {
+  window.__updateTracking = async (shippingId) => {
     const carrier = document.getElementById(`carrier-${shippingId}`)?.value || 'CJ대한통운';
     const track = document.getElementById(`track-${shippingId}`)?.value?.trim();
     if (!track) { alert('운송장 번호를 입력해주세요.'); return; }
 
-    updateShippingRequestStatus(shippingId, 'shipped', carrier, track);
-    alert(`🎉 송장 번호(${carrier} ${track})가 등록되었습니다!\n고객 보관함에서 실시간 배송 조회가 즉시 가능합니다.`);
-    window.__switchAdminTab('shipping');
+    try {
+      await updateShippingRequestStatus(shippingId, 'shipped', carrier, track);
+      alert(`🎉 송장 번호(${carrier} ${track})가 서버 DB에 정상 등록되었습니다!\n고객 보관함에서 실시간 배송 조회가 즉시 가능합니다.`);
+      window.__switchAdminTab('shipping');
+    } catch (err) {
+      console.error('[Admin] updateTracking error:', err);
+      alert('❌ 운송장 저장 실패: ' + err.message);
+    }
   };
 
-  window.__deleteShipping = (shippingId) => {
+  window.__deleteShipping = async (shippingId) => {
     if (!confirm('이 배송 요청을 목록에서 삭제하시겠습니까?')) return;
-    deleteShippingRequest(shippingId);
-    alert('✓ 배송 요청이 삭제되었습니다.');
-    window.__switchAdminTab('shipping');
+    try {
+      await deleteShippingRequest(shippingId);
+      alert('✓ 배송 요청이 서버 DB에서 성공적으로 삭제되었습니다.');
+      window.__switchAdminTab('shipping');
+    } catch (err) {
+      console.error('[Admin] deleteShipping error:', err);
+      alert('❌ 배송 요청 삭제 실패: ' + err.message);
+    }
   };
 
   window.__createDemoShipping = () => {
@@ -1466,21 +1513,31 @@ export function render() {
   };
 
   // --- 4. User Wallet & Points Management ---
-  window.__adminGrantPoints = (pts) => {
+  window.__adminGrantPoints = async (pts) => {
     const cur = getUserPoints();
-    setUserPoints(cur + pts);
-    alert(`포인트 ₩${pts.toLocaleString()}P 가 정상 지급되었습니다.`);
-    window.__switchAdminTab('users');
+    try {
+      await setUserPoints(cur + pts);
+      alert(`포인트 ₩${pts.toLocaleString()}P 가 서버 DB에 정상 지급되었습니다.`);
+      window.__switchAdminTab('users');
+    } catch (err) {
+      console.error('[Admin] grantPoints error:', err);
+      alert('❌ 포인트 지급 실패: ' + err.message);
+    }
   };
 
-  window.__adminGrantTickets = (tCount) => {
+  window.__adminGrantTickets = async (tCount) => {
     const cur = getAvailableGoldenTicketsCount();
-    setAvailableGoldenTicketsCount(cur + tCount);
-    alert(`골든 티켓 ${tCount}장이 정상 지급되었습니다.`);
-    window.__switchAdminTab('users');
+    try {
+      await setAvailableGoldenTicketsCount(cur + tCount);
+      alert(`골든 티켓 ${tCount}장이 서버 DB에 정상 지급되었습니다.`);
+      window.__switchAdminTab('users');
+    } catch (err) {
+      console.error('[Admin] grantTickets error:', err);
+      alert('❌ 골든티켓 지급 실패: ' + err.message);
+    }
   };
 
-  window.__adminDirectPoints = (multiplier) => {
+  window.__adminDirectPoints = async (multiplier) => {
     const input = document.getElementById('custom-points-input');
     const val = parseInt(input?.value || '0', 10);
     if (isNaN(val) || val <= 0) {
@@ -1489,12 +1546,17 @@ export function render() {
     }
     const cur = getUserPoints();
     const target = Math.max(0, cur + val * multiplier);
-    setUserPoints(target);
-    alert(`포인트가 ₩${target.toLocaleString()}P 로 조정되었습니다.`);
-    window.__switchAdminTab('users');
+    try {
+      await setUserPoints(target);
+      alert(`포인트가 ₩${target.toLocaleString()}P 로 서버 DB에 정상 조정되었습니다.`);
+      window.__switchAdminTab('users');
+    } catch (err) {
+      console.error('[Admin] directPoints error:', err);
+      alert('❌ 포인트 조정 실패: ' + err.message);
+    }
   };
 
-  window.__adminDirectTickets = (multiplier) => {
+  window.__adminDirectTickets = async (multiplier) => {
     const input = document.getElementById('custom-tickets-input');
     const val = parseInt(input?.value || '0', 10);
     if (isNaN(val) || val <= 0) {
@@ -1503,17 +1565,27 @@ export function render() {
     }
     const cur = getAvailableGoldenTicketsCount();
     const target = Math.max(0, cur + val * multiplier);
-    setAvailableGoldenTicketsCount(target);
-    alert(`골든 티켓이 ${target}장으로 조정되었습니다.`);
-    window.__switchAdminTab('users');
+    try {
+      await setAvailableGoldenTicketsCount(target);
+      alert(`골든 티켓이 ${target}장으로 서버 DB에 정상 조정되었습니다.`);
+      window.__switchAdminTab('users');
+    } catch (err) {
+      console.error('[Admin] directTickets error:', err);
+      alert('❌ 골든티켓 조정 실패: ' + err.message);
+    }
   };
 
-  window.__resetAllTestData = () => {
+  window.__resetAllTestData = async () => {
     if (!confirm('⚠️ 모든 테스트 데이터(보관함, 잔액, 래플 상태)를 초기화하시겠습니까?')) return;
-    setUserPoints(35000);
-    setAvailableGoldenTicketsCount(500);
-    alert('✓ 모든 테스트 데이터가 성공적으로 리셋되었습니다.');
-    window.__switchAdminTab('users');
+    try {
+      await setUserPoints(35000);
+      await setAvailableGoldenTicketsCount(500);
+      alert('✓ 모든 테스트 데이터가 서버 DB에 성공적으로 리셋되었습니다.');
+      window.__switchAdminTab('users');
+    } catch (err) {
+      console.error('[Admin] resetAllTestData error:', err);
+      alert('❌ 데이터 리셋 실패: ' + err.message);
+    }
   };
 
   return html;

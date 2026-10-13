@@ -82,10 +82,10 @@ export const DEFAULT_BOX_TIERS = [
     badge: '👑 HIGH-END',
     items: [
       { id: 'v_item_1', name: '무선 고출력 딥티슈 전동 마사지건 (헤드 4종)', retailPrice: 39900, wholesalePrice: 16500, prob: 0.010, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
-      { id: 'v_item_2', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 29900, wholesalePrice: 12000, prob: 0.020, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'v_item_3', name: '스마트 터치 무드등 블루투스 스피커 & 무선충전기', retailPrice: 24900, wholesalePrice: 9800, prob: 0.080, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'v_item_4', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 19900, wholesalePrice: 7800, prob: 0.300, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'v_item_5', name: '초고속 프리미엄 PD 65W 20,000mAh 보조배터리', retailPrice: 15000, wholesalePrice: 5900, prob: 0.590, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'v_item_2', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 29900, wholesalePrice: 12000, prob: 0.030, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
+      { id: 'v_item_3', name: '스마트 터치 무드등 블루투스 스피커 & 무선충전기', retailPrice: 24900, wholesalePrice: 9800, prob: 0.050, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_4', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 19900, wholesalePrice: 7800, prob: 0.150, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
+      { id: 'v_item_5', name: '초고속 프리미엄 PD 65W 20,000mAh 보조배터리', retailPrice: 15000, wholesalePrice: 5900, prob: 0.760, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
     ]
   }
 ];
@@ -172,8 +172,8 @@ export function getRandomBoxTiers() {
   return DEFAULT_BOX_TIERS;
 }
 
-export function saveRandomBoxTiers(tiers) {
-  saveBoxCatalogToFirestore(tiers);
+export async function saveRandomBoxTiers(tiers) {
+  return await saveBoxCatalogToFirestore(tiers);
 }
 
 // Get Super Raffles (100% Firestore Cloud DB backed with resilient defaults fallback)
@@ -192,14 +192,16 @@ export function getSuperRaffles() {
   return DEFAULT_SUPER_RAFFLES;
 }
 
-export function saveSuperRaffles(raffles) {
+export async function saveSuperRaffles(raffles) {
   if (Array.isArray(raffles)) {
-    raffles.forEach(r => saveSuperRaffleToFirestore(r));
+    for (const r of raffles) {
+      await saveSuperRaffleToFirestore(r);
+    }
   }
 }
 
-export function deleteSuperRaffle(raffleId) {
-  deleteSuperRaffleFromFirestore(raffleId);
+export async function deleteSuperRaffle(raffleId) {
+  return await deleteSuperRaffleFromFirestore(raffleId);
 }
 
 export const RANDOM_BOX_TIERS = getRandomBoxTiers();
@@ -215,13 +217,11 @@ export function getUserPoints() {
   return 0;
 }
 
-export function setUserPoints(points) {
+export async function setUserPoints(points) {
+  const authUser = getCurrentAuthUser();
+  await grantUserBalanceServer(authUser?.uid || null, authUser?.email || null, Number(points), null);
   saveUserDocData({ points });
   window.dispatchEvent(new CustomEvent('pointsUpdated', { detail: { points } }));
-  try {
-    const authUser = getCurrentAuthUser();
-    grantUserBalanceServer(authUser?.uid || null, authUser?.email || null, Number(points), null).catch(() => {});
-  } catch (e) {}
 }
 
 // User Vault (100% Firestore User Doc vault backed)
@@ -243,13 +243,11 @@ export function getAvailableGoldenTicketsCount() {
   return 0;
 }
 
-export function setAvailableGoldenTicketsCount(count) {
+export async function setAvailableGoldenTicketsCount(count) {
+  const authUser = getCurrentAuthUser();
+  await grantUserBalanceServer(authUser?.uid || null, authUser?.email || null, null, Number(count));
   saveUserDocData({ goldenTickets: count });
   window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count } }));
-  try {
-    const authUser = getCurrentAuthUser();
-    grantUserBalanceServer(authUser?.uid || null, authUser?.email || null, null, Number(count)).catch(() => {});
-  } catch (e) {}
 }
 
 // User is initialized directly via Cloud Functions / Firestore cache
@@ -443,7 +441,7 @@ export function reopenRaffle(raffleId, extendDays = 3) {
 }
 
 // Update Box Tier Settings
-export function updateBoxTierSettings(boxId, newSettings) {
+export async function updateBoxTierSettings(boxId, newSettings) {
   const boxes = getRandomBoxTiers();
   const box = boxes.find(b => b.id === boxId);
   if (!box) throw new Error('해당 럭키박스를 찾을 수 없습니다.');
@@ -455,12 +453,12 @@ export function updateBoxTierSettings(boxId, newSettings) {
   if (newSettings.minGuaranteedValue !== undefined) box.minGuaranteedValue = Number(newSettings.minGuaranteedValue);
   if (newSettings.boxImage) box.boxImage = newSettings.boxImage;
 
-  saveRandomBoxTiers(boxes);
+  await saveRandomBoxTiers(boxes);
   return box;
 }
 
 // Auto-balance Box Probabilities to 100%
-export function autoBalanceBoxProbabilities(boxId) {
+export async function autoBalanceBoxProbabilities(boxId) {
   const boxes = getRandomBoxTiers();
   const box = boxes.find(b => b.id === boxId);
   if (!box || !box.items || box.items.length === 0) throw new Error('품목이 존재하지 않습니다.');
@@ -478,7 +476,7 @@ export function autoBalanceBoxProbabilities(boxId) {
     }
   });
 
-  saveRandomBoxTiers(boxes);
+  await saveRandomBoxTiers(boxes);
   return box;
 }
 
@@ -607,9 +605,9 @@ export function getAllShippingRequests() {
   return [];
 }
 
-export function updateShippingRequestStatus(shippingId, status, carrier = '', trackingNumber = '') {
-  // Update central shipping_infos collection
-  updateShippingStatusInFirestore(shippingId, status, carrier, trackingNumber);
+export async function updateShippingRequestStatus(shippingId, status, carrier = '', trackingNumber = '') {
+  // Update central shipping_infos collection in Firestore
+  await updateShippingStatusInFirestore(shippingId, status, carrier, trackingNumber);
 
   // Update in user vault if applicable
   const vault = getUserVault();
@@ -625,8 +623,8 @@ export function updateShippingRequestStatus(shippingId, status, carrier = '', tr
   return { shippingId, status, carrier, trackingNumber };
 }
 
-export function deleteShippingRequest(shippingId) {
-  deleteShippingInfoFromFirestore(shippingId);
+export async function deleteShippingRequest(shippingId) {
+  return await deleteShippingInfoFromFirestore(shippingId);
 }
 
 export function createDemoShippingRequest() {

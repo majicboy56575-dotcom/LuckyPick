@@ -243,14 +243,15 @@ exports.submitShippingInfo = onCall({ region: "asia-northeast3" }, async (reques
 // 4. updateShippingStatus (Callable) - Admin Only
 // ============================================
 exports.updateShippingStatus = onCall({ region: "asia-northeast3" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-
-  const callerEmail = request.auth.token.email || "";
   const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev && callerEmail !== ADMIN_EMAIL) {
-    throw new HttpsError("permission-denied", "관리자만 배송 상태를 변경할 수 있습니다.");
+  if (!isDev) {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerEmail = request.auth.token.email || "";
+    if (callerEmail !== ADMIN_EMAIL) {
+      throw new HttpsError("permission-denied", "관리자만 배송 상태를 변경할 수 있습니다.");
+    }
   }
 
   const { shippingId, newStatus, carrier, trackingNumber } = request.data;
@@ -1114,10 +1115,10 @@ const SERVER_DEFAULT_BOXES = [
     goldenTickets: 11,
     items: [
       { id: "v_item_1", name: "무선 고출력 딥티슈 전동 마사지건 (헤드 4종)", retailPrice: 39900, wholesalePrice: 16500, prob: 0.010, image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80", grade: "LEGENDARY" },
-      { id: "v_item_2", name: "3D 온열 지압 무선 목 어깨 안마기", retailPrice: 29900, wholesalePrice: 12000, prob: 0.020, image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
-      { id: "v_item_3", name: "스마트 터치 무드등 블루투스 스피커 & 무선충전기", retailPrice: 24900, wholesalePrice: 9800, prob: 0.080, image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "v_item_4", name: "고출력 무선 터보 에어건 먼지제거기 100,000RPM", retailPrice: 19900, wholesalePrice: 7800, prob: 0.300, image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "v_item_5", name: "초고속 프리미엄 PD 65W 20,000mAh 보조배터리", retailPrice: 15000, wholesalePrice: 5900, prob: 0.590, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
+      { id: "v_item_2", name: "3D 온열 지압 무선 목 어깨 안마기", retailPrice: 29900, wholesalePrice: 12000, prob: 0.030, image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
+      { id: "v_item_3", name: "스마트 터치 무드등 블루투스 스피커 & 무선충전기", retailPrice: 24900, wholesalePrice: 9800, prob: 0.050, image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "v_item_4", name: "고출력 무선 터보 에어건 먼지제거기 100,000RPM", retailPrice: 19900, wholesalePrice: 7800, prob: 0.150, image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
+      { id: "v_item_5", name: "초고속 프리미엄 PD 65W 20,000mAh 보조배터리", retailPrice: 15000, wholesalePrice: 5900, prob: 0.760, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
     ]
   }
 ];
@@ -1603,13 +1604,15 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
 // 18. grantUserBalance (Callable) - Admin Only Balance Grant
 // ============================================
 exports.grantUserBalance = onCall({ region: "asia-northeast3" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-  const callerEmail = request.auth.token.email || "";
   const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev && callerEmail !== ADMIN_EMAIL) {
-    throw new HttpsError("permission-denied", "관리자만 재화를 지급할 수 있습니다.");
+  if (!isDev) {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerEmail = request.auth.token.email || "";
+    if (callerEmail !== ADMIN_EMAIL) {
+      throw new HttpsError("permission-denied", "관리자만 재화를 지급할 수 있습니다.");
+    }
   }
 
   const { targetEmail, targetUid, points, goldenTickets } = request.data;
@@ -1655,13 +1658,15 @@ exports.syncBoxCatalog = onCall({ region: "asia-northeast3" }, async (request) =
 // 20. saveBoxCatalogAdmin (Callable) - Save Box Tiers from Admin
 // ============================================
 exports.saveBoxCatalogAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-  const callerEmail = request.auth.token.email || "";
   const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev && callerEmail !== ADMIN_EMAIL) {
-    throw new HttpsError("permission-denied", "관리자만 박스 카탈로그를 수정할 수 있습니다.");
+  if (!isDev) {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerEmail = request.auth.token.email || "";
+    if (callerEmail !== ADMIN_EMAIL) {
+      throw new HttpsError("permission-denied", "관리자만 박스 카탈로그를 수정할 수 있습니다.");
+    }
   }
 
   const { tiers } = request.data;
@@ -1684,13 +1689,15 @@ exports.saveBoxCatalogAdmin = onCall({ region: "asia-northeast3" }, async (reque
 // 21. saveSuperRaffleAdmin (Callable) - Save/Create Super Raffle from Admin
 // ============================================
 exports.saveSuperRaffleAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-  const callerEmail = request.auth.token.email || "";
   const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev && callerEmail !== ADMIN_EMAIL) {
-    throw new HttpsError("permission-denied", "관리자만 스페셜 래플을 등록/수정할 수 있습니다.");
+  if (!isDev) {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerEmail = request.auth.token.email || "";
+    if (callerEmail !== ADMIN_EMAIL) {
+      throw new HttpsError("permission-denied", "관리자만 스페셜 래플을 등록/수정할 수 있습니다.");
+    }
   }
 
   const { raffle } = request.data;
@@ -1712,13 +1719,15 @@ exports.saveSuperRaffleAdmin = onCall({ region: "asia-northeast3" }, async (requ
 // 22. deleteSuperRaffleAdmin (Callable) - Delete Super Raffle from Admin
 // ============================================
 exports.deleteSuperRaffleAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-  const callerEmail = request.auth.token.email || "";
   const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev && callerEmail !== ADMIN_EMAIL) {
-    throw new HttpsError("permission-denied", "관리자만 스페셜 래플을 삭제할 수 있습니다.");
+  if (!isDev) {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerEmail = request.auth.token.email || "";
+    if (callerEmail !== ADMIN_EMAIL) {
+      throw new HttpsError("permission-denied", "관리자만 스페셜 래플을 삭제할 수 있습니다.");
+    }
   }
 
   const { raffleId } = request.data;
@@ -1729,6 +1738,31 @@ exports.deleteSuperRaffleAdmin = onCall({ region: "asia-northeast3" }, async (re
   await db.collection("super_raffles").doc(raffleId).delete();
   console.log(`[Admin] Successfully deleted super raffle ${raffleId} from Firestore`);
   return { success: true, deletedRaffleId: raffleId };
+});
+
+// ============================================
+// 23. deleteShippingAdmin (Callable) - Delete Shipping Request from Admin
+// ============================================
+exports.deleteShippingAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
+  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
+  if (!isDev) {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    const callerEmail = request.auth.token.email || "";
+    if (callerEmail !== ADMIN_EMAIL) {
+      throw new HttpsError("permission-denied", "관리자만 배송 내역을 삭제할 수 있습니다.");
+    }
+  }
+
+  const { shippingId } = request.data;
+  if (!shippingId) {
+    throw new HttpsError("invalid-argument", "삭제할 배송 ID가 필요합니다.");
+  }
+
+  await db.collection("shipping_infos").doc(shippingId).delete();
+  console.log(`[Admin] Successfully deleted shipping info ${shippingId} from Firestore`);
+  return { success: true, deletedShippingId: shippingId };
 });
 
 

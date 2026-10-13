@@ -260,6 +260,10 @@ function getSuperRafflesCache() {
 
 async function saveSuperRaffleToFirestore(raffle) {
   if (!raffle?.id) return false;
+  // 1. Persist to Cloud Functions / Firestore backend first
+  await saveSuperRaffleServer(raffle);
+
+  // 2. Update real-time cache upon success
   const idx = superRafflesCache.findIndex(r => r.id === raffle.id);
   if (idx >= 0) {
     superRafflesCache[idx] = { ...superRafflesCache[idx], ...raffle };
@@ -271,31 +275,21 @@ async function saveSuperRaffleToFirestore(raffle) {
   } catch (e) {}
   window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-
-  // Persist to Cloud Functions / Firestore backend
-  try {
-    await saveSuperRaffleServer(raffle);
-  } catch (err) {
-    console.warn('[Firestore] saveSuperRaffleServer warning:', err.message);
-  }
   return true;
 }
 
 async function deleteSuperRaffleFromFirestore(raffleId) {
   if (!raffleId) return false;
+  // 1. Persist deletion to Cloud Functions / Firestore backend first
+  await deleteSuperRaffleServer(raffleId);
+
+  // 2. Remove from cache upon success
   superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
   try {
     localStorage.setItem('lp_super_raffles', JSON.stringify(superRafflesCache));
   } catch (e) {}
   window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-
-  // Persist deletion to Cloud Functions / Firestore backend
-  try {
-    await deleteSuperRaffleServer(raffleId);
-  } catch (err) {
-    console.warn('[Firestore] deleteSuperRaffleServer warning:', err.message);
-  }
   return true;
 }
 
@@ -329,24 +323,21 @@ function getBoxCatalogCache() {
 }
 
 async function saveBoxCatalogToFirestore(tiers) {
+  // 1. Persist to Cloud Functions / Firestore backend first
+  await saveBoxCatalogServer(tiers);
+
+  // 2. Update real-time cache and backup upon success
   const now = Date.now();
   boxCatalogCache = tiers;
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(now));
-    localStorage.setItem('lp_box_catalog_version', '3.0_V12');
+    localStorage.setItem('lp_box_catalog_version', '3.0_V13');
   } catch (e) {
     console.warn('[Firestore] localStorage quota exceeded or error:', e);
   }
   window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-
-  // Persist to Cloud Functions / Firestore backend
-  try {
-    await saveBoxCatalogServer(tiers);
-  } catch (err) {
-    console.warn('[Firestore] saveBoxCatalogServer warning:', err.message);
-  }
   return true;
 }
 
@@ -369,6 +360,10 @@ async function submitShippingInfoToFirestore(data) {
 }
 
 async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '') {
+  // 1. Persist to Cloud Functions / Firestore backend first
+  await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+
+  // 2. Update cache upon success
   const item = shippingCache.find(s => s.id === shippingId || s.shippingId === shippingId);
   if (item) {
     item.status = status;
@@ -377,15 +372,14 @@ async function updateShippingStatusInFirestore(shippingId, status, carrier = '',
     item.updatedAt = Date.now();
     window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   }
-  try {
-    await updateShippingStatus(shippingId, status, carrier, trackingNumber);
-  } catch (err) {
-    console.warn('[Firestore] updateShippingStatus cloud warning:', err.message);
-  }
   return true;
 }
 
 async function deleteShippingInfoFromFirestore(shippingId) {
+  // 1. Persist deletion to Cloud Functions / Firestore backend first
+  await deleteShippingServer(shippingId);
+
+  // 2. Remove from cache upon success
   shippingCache = shippingCache.filter(s => s.id !== shippingId && s.shippingId !== shippingId);
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   return true;
@@ -776,6 +770,13 @@ async function syncBoxCatalogServer() {
   return result.data;
 }
 
+async function deleteShippingServer(shippingId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'deleteShippingAdmin');
+  const result = await callable({ shippingId });
+  return result.data;
+}
+
 /**
  * Compute group/slot info for a product.
  * @param {object} product - The active product object.
@@ -914,4 +915,5 @@ export {
   saveSuperRaffleServer,
   deleteSuperRaffleServer,
   syncBoxCatalogServer,
+  deleteShippingServer,
 };
