@@ -7,8 +7,8 @@ const PAYPAL_CONFIG = {
   environment: 'live'
 };
 
-// Toss Payments Client Key (사용자 테스트 클라이언트 키)
-const TOSS_CLIENT_KEY = 'test_ck_ALnQvDd2VJPBwJDy4W0Y8Mj7X41m';
+// Toss Payments Client Key (라이브 실결제 클라이언트 키)
+const TOSS_CLIENT_KEY = 'live_gck_GjLJoQ1aVZX5RWeOzlz58w6KYe2R';
 
 /**
  * Trigger standard Meta Pixel Events

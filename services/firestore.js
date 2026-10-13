@@ -317,7 +317,7 @@ function getBoxCatalogCache() {
     try {
       const savedVersion = localStorage.getItem('lp_box_catalog_version');
       const saved = localStorage.getItem('lp_box_catalog');
-      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15' || savedVersion === '3.0_V16' || savedVersion === '3.0_V17')) {
+      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15' || savedVersion === '3.0_V16' || savedVersion === '3.0_V17' || savedVersion === '3.0_V18')) {
         boxCatalogCache = JSON.parse(saved);
       }
     } catch (e) {}
@@ -349,7 +349,7 @@ async function saveBoxCatalogToFirestore(tiers) {
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(Date.now()));
-    localStorage.setItem('lp_box_catalog_version', '3.0_V17');
+    localStorage.setItem('lp_box_catalog_version', '3.0_V18');
   } catch (e) {
     console.warn('[Firestore] localStorage quota exceeded or error:', e);
   }
