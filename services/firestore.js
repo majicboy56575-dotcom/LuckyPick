@@ -317,7 +317,7 @@ function getBoxCatalogCache() {
     try {
       const savedVersion = localStorage.getItem('lp_box_catalog_version');
       const saved = localStorage.getItem('lp_box_catalog');
-      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15' || savedVersion === '3.0_V16')) {
+      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15' || savedVersion === '3.0_V16' || savedVersion === '3.0_V17')) {
         boxCatalogCache = JSON.parse(saved);
       }
     } catch (e) {}
@@ -349,7 +349,7 @@ async function saveBoxCatalogToFirestore(tiers) {
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(Date.now()));
-    localStorage.setItem('lp_box_catalog_version', '3.0_V16');
+    localStorage.setItem('lp_box_catalog_version', '3.0_V17');
   } catch (e) {
     console.warn('[Firestore] localStorage quota exceeded or error:', e);
   }
@@ -746,17 +746,119 @@ async function convertVaultItemToPointsServer(vaultId) {
 }
 
 async function applyGoldenRaffleServer(raffleId, count = 1) {
-  if (!functions) throw new Error('Firebase Functions not initialized');
-  const callable = httpsCallable(functions, 'applyGoldenRaffle');
-  const result = await callable({ raffleId, count });
-  return result.data;
+  if (functions) {
+    try {
+      const callable = httpsCallable(functions, 'applyGoldenRaffle');
+      const result = await callable({ raffleId, count });
+      return result.data;
+    } catch (e) {
+      console.warn('[Firestore] Cloud function applyGoldenRaffle failed, attempting direct Firestore entry:', e.message);
+    }
+  }
+
+  // Direct Firestore fallback (works seamlessly on dev servers)
+  if (db) {
+    const authUser = getCurrentAuthUser();
+    if (!authUser || !authUser.uid) throw new Error('로그인이 필요합니다.');
+    const uid = authUser.uid;
+    const userRef = doc(db, 'users', uid);
+    const raffleRef = doc(db, 'super_raffles', raffleId);
+
+    const userSnap = await getDoc(userRef);
+    const raffleSnap = await getDoc(raffleRef);
+    if (!raffleSnap.exists()) throw new Error('해당 골든 래플을 찾을 수 없습니다.');
+
+    const userData = userSnap.exists() ? userSnap.data() : { goldenTickets: 0 };
+    const curTickets = Number(userData.goldenTickets) || 0;
+    if (curTickets < count) throw new Error(`보유 골든티켓이 부족합니다. (보유: ${curTickets}장 / 요청: ${count}장)`);
+
+    const raffle = raffleSnap.data();
+    if (raffle.status === 'closed') throw new Error('이미 마감된 래플입니다.');
+
+    const entries = raffle.entries || [];
+    const createdEntries = [];
+    for (let i = 0; i < count; i++) {
+      const nextSlot = entries.length + 1;
+      const ticketNumber = `#${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      const newEntry = {
+        ticketId: 't_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 4),
+        ticketNumber,
+        userId: uid,
+        userName: maskName(authUser.displayName || '참여자'),
+        userEmail: maskEmail(authUser.email || ''),
+        appliedAt: Date.now(),
+        slotIndex: nextSlot,
+        status: 'active'
+      };
+      entries.push(newEntry);
+      createdEntries.push(newEntry);
+    }
+
+    const newTickets = curTickets - count;
+    await setDoc(userRef, { goldenTickets: newTickets, updatedAt: Date.now() }, { merge: true });
+    await setDoc(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() }, { merge: true });
+
+    if (currentUserDocCache) currentUserDocCache.goldenTickets = newTickets;
+    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+    return {
+      newTickets,
+      appliedCount: count,
+      entries: createdEntries,
+      raffle: { id: raffleId, title: raffle.title, retailPrice: raffle.retailPrice }
+    };
+  }
+
+  throw new Error('골든티켓 응모 처리 중 오류가 발생했습니다.');
 }
 
 async function cancelGoldenRaffleServer(raffleId, ticketId) {
-  if (!functions) throw new Error('Firebase Functions not initialized');
-  const callable = httpsCallable(functions, 'cancelGoldenRaffle');
-  const result = await callable({ raffleId, ticketId });
-  return result.data;
+  if (functions) {
+    try {
+      const callable = httpsCallable(functions, 'cancelGoldenRaffle');
+      const result = await callable({ raffleId, ticketId });
+      return result.data;
+    } catch (e) {
+      console.warn('[Firestore] Cloud function cancelGoldenRaffle failed, attempting direct Firestore cancel:', e.message);
+    }
+  }
+
+  // Direct Firestore fallback
+  if (db) {
+    const authUser = getCurrentAuthUser();
+    if (!authUser || !authUser.uid) throw new Error('로그인이 필요합니다.');
+    const uid = authUser.uid;
+    const userRef = doc(db, 'users', uid);
+    const raffleRef = doc(db, 'super_raffles', raffleId);
+
+    const userSnap = await getDoc(userRef);
+    const raffleSnap = await getDoc(raffleRef);
+    if (!raffleSnap.exists()) throw new Error('해당 골든 래플을 찾을 수 없습니다.');
+
+    const raffle = raffleSnap.data();
+    const entries = raffle.entries || [];
+    const idx = entries.findIndex(e => (e.ticketId === ticketId || e.id === ticketId) && e.userId === uid);
+    if (idx === -1) throw new Error('취소할 수 있는 응모 티켓을 찾을 수 없습니다.');
+
+    const removedEntry = entries.splice(idx, 1)[0];
+    const userData = userSnap.exists() ? userSnap.data() : { goldenTickets: 0 };
+    const newTickets = (Number(userData.goldenTickets) || 0) + 1;
+
+    await setDoc(userRef, { goldenTickets: newTickets, updatedAt: Date.now() }, { merge: true });
+    await setDoc(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() }, { merge: true });
+
+    if (currentUserDocCache) currentUserDocCache.goldenTickets = newTickets;
+    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+    return {
+      newTickets,
+      removedEntry
+    };
+  }
+
+  throw new Error('골든티켓 응모 취소 중 오류가 발생했습니다.');
 }
 
 async function forceDrawRaffleServer(raffleId) {
