@@ -1,8 +1,8 @@
 # LuckyPick 관리자 페이지 데이터 영구 보존 및 이미지 업로드 아키텍처 가이드
 
-**문서 버전**: 1.1 (V11)  
-**최종 업데이트**: 2026-10-11  
-**관련 커밋**: `564c6e8`, `6099823`
+**문서 버전**: 1.2 (V12)  
+**최종 업데이트**: 2026-10-13  
+**관련 커밋**: `564c6e8`, `6099823`, `b10326f`, `e816a44`
 
 ---
 
@@ -26,13 +26,15 @@ LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키�
         ▼
 [Firestore 레이어: services/firestore.js]
         │
-        ├─▶ 1. localStorage 즉시 캐싱 (새로고침/오프라인 방어)
-        ├─▶ 2. ensureInitialFirestoreData(): 기존 관리자 설정/확률 보존 (강제 덮어쓰기 금지)
+        ├─▶ 1. onSnapshot 수신 시 타임스탬프 차단 없이 서버 데이터를 100% 최우선 반영 (SSOT 확립)
+        ├─▶ 2. localStorage 구형 캐시(VIP 30,000원 등) 감지 시 자동 즉시 폐기(Purge)
+        ├─▶ 3. ensureInitialFirestoreData(): 서버 카탈로그 누락 시 backend syncBoxCatalog 자동 호출
         │
         ▼
 [백엔드: functions/index.js (Cloud Functions)]
         │
         ├─▶ saveBoxCatalogAdmin: box_catalogs/default 문서에 원자적 저장
+        ├─▶ syncBoxCatalog: SERVER_DEFAULT_BOXES (5k/10k/20k) 정규화 동기화
         ├─▶ saveSuperRaffleAdmin: super_raffles/{raffleId} 문서 저장
         ├─▶ deleteSuperRaffleAdmin: super_raffles 문서 삭제
         ├─▶ updateShippingStatus: shipping_infos 운송장/출고상태 저장
@@ -40,6 +42,9 @@ LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키�
         │
         ▼
 [Firebase Firestore Cloud DB] ──▶ onSnapshot 실시간 동기화로 전 접속자에게 브로드캐스트
+        │
+        ▼
+[로컬 에뮬레이터 디스크 영구 저장] ──▶ .firebase-emulator-data/ 디렉터리로 재시작 시 자동 복원
 ```
 
 ---
@@ -50,12 +55,16 @@ LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키�
    - `pages/admin.js`의 `__handleImageUpload`는 스마트폰/노트북 원본 사진(2~15MB)을 자동으로 600px 이하 및 100KB 이하로 압축하여 Firestore 1MB 단일 문서 제한을 초과하지 않도록 보장합니다.
 2. **보안 규칙 (Zero Client Write)**:
    - 프론트엔드에서 Firestore에 직접 쓰지 않고 항상 `Cloud Functions`를 통해 쓰기 작업을 수행합니다.
-3. **병합 우선순위**:
-   - `services/randombox.js`의 `getRandomBoxTiers()`는 항상 `serverItem` 속성을 `defaultItem`보다 우선순위로 둡니다.
+3. **병합 우선순위 (SSOT)**:
+   - `services/firestore.js`의 `onSnapshot`은 클라이언트 로컬 타임스탬프와 상관없이 서버 스냅샷을 100% 즉시 반영합니다.
+4. **브라우저 모듈 캐시 버스팅 (Import Map)**:
+   - `index.html`에 `<script type="importmap">`을 정의하여, 상대 경로로 import되는 공통 서비스 모듈(`firestore.js`, `auth.js` 등)이 브라우저 디스크 캐시에 갇히지 않고 최신 버전으로 즉시 갱신되도록 보장합니다.
+5. **로컬 에뮬레이터 데이터 보존**:
+   - `firebase emulators:start --import=./.firebase-emulator-data --export-on-exit=./.firebase-emulator-data` 플래그로 구동되어 개발 중 저장한 DB 데이터가 영구 보존됩니다.
 
 ---
 
-## 4. 확정 당첨 확률 체계 (2026-10-11 V10 기준)
+## 4. 확정 당첨 확률 체계 (2026-10-13 V12 기준)
 
 전 티어(5,000원 베이직, 10,000원 프리미엄, 20,000원 VIP 하이엔드)에 통일 적용된 확률 템플릿입니다.
 
@@ -75,4 +84,6 @@ LuckyPick 관리자 페이지(`#admin`)에서 변경하는 모든 정보(럭키�
 - `33b3196`: docs: 관리자 페이지 데이터 보존 및 이미지 압축 가이드 작성
 - `b89de12`: fix(admin): 실시간 스냅샷 덮어쓰기 방어 및 V9 캐시 버스팅 적용
 - `7ad1923`: feat(odds): 5,000원/10,000원/20,000원 전 럭키박스 당첨 확률(1%, 2%, 8%, 30%, 59%) 일괄 적용 (V10)
+- `b10326f`: fix(persistence): 로컬 에뮬레이터 연결 복구, 구형 캐시 자동 퍼지 및 디스크 영구 저장(`.firebase-emulator-data`) 적용
+- `e816a44`: fix(sync): 서버 스냅샷 무조건 반영(타임스탬프 가드 제거) 및 ImportMap 모듈 캐시 버스팅 적용 (V12)
 
