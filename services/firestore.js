@@ -16,10 +16,14 @@ import {
   orderBy,
   onSnapshot,
   getDocs,
+  setDoc,
+  deleteDoc,
+  connectFirestoreEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import {
   getFunctions,
   httpsCallable,
+  connectFunctionsEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
 // ============================================
@@ -57,9 +61,15 @@ if (isFirebaseConfigured()) {
     db = getFirestore(app);
     functions = getFunctions(app, 'asia-northeast3');
 
-    // Log active environment
+    // Log active environment & connect to emulators on localhost
     if (isLocalDev()) {
-      console.log('[Firestore] Connected to DEV PROJECT (lucky-pick-dev)');
+      try {
+        connectFirestoreEmulator(db, '127.0.0.1', 8181);
+        connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+        console.log('[Firestore] Connected to LOCAL EMULATORS (Firestore: 8181, Functions: 5001)');
+      } catch (e) {
+        console.warn('[Firestore] Emulator connection warning:', e.message);
+      }
     } else {
       console.log('[Firestore] Connected to PRODUCTION (luckypick-ec4cf)');
     }
@@ -260,10 +270,19 @@ function getSuperRafflesCache() {
 
 async function saveSuperRaffleToFirestore(raffle) {
   if (!raffle?.id) return false;
-  // 1. Persist to Cloud Functions / Firestore backend first
-  await saveSuperRaffleServer(raffle);
+  const payload = { ...raffle, updatedAt: Date.now() };
+  if (db) {
+    try {
+      await setDoc(doc(db, 'super_raffles', raffle.id), payload, { merge: true });
+    } catch (e) {
+      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
+      await saveSuperRaffleServer(raffle);
+    }
+  } else {
+    await saveSuperRaffleServer(raffle);
+  }
 
-  // 2. Update real-time cache upon success
+  // Update real-time cache upon success
   const idx = superRafflesCache.findIndex(r => r.id === raffle.id);
   if (idx >= 0) {
     superRafflesCache[idx] = { ...superRafflesCache[idx], ...raffle };
@@ -280,10 +299,18 @@ async function saveSuperRaffleToFirestore(raffle) {
 
 async function deleteSuperRaffleFromFirestore(raffleId) {
   if (!raffleId) return false;
-  // 1. Persist deletion to Cloud Functions / Firestore backend first
-  await deleteSuperRaffleServer(raffleId);
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'super_raffles', raffleId));
+    } catch (e) {
+      console.warn('[Firestore] Direct deleteDoc fallback to cloud function:', e.message);
+      await deleteSuperRaffleServer(raffleId);
+    }
+  } else {
+    await deleteSuperRaffleServer(raffleId);
+  }
 
-  // 2. Remove from cache upon success
+  // Remove from cache upon success
   superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
   try {
     localStorage.setItem('lp_super_raffles', JSON.stringify(superRafflesCache));
@@ -298,24 +325,8 @@ function getBoxCatalogCache() {
     try {
       const savedVersion = localStorage.getItem('lp_box_catalog_version');
       const saved = localStorage.getItem('lp_box_catalog');
-      if (saved && savedVersion === '3.0_V12') {
-        const parsed = JSON.parse(saved);
-        const vipTier = parsed.find(t => t.id === 'box_vip');
-        // Validate against obsolete pricing (30,000) or outdated tickets (8)
-        if (vipTier && (vipTier.price === 30000 || vipTier.goldenTickets === 8)) {
-          console.warn('[Firestore] Purging obsolete 30k VIP box cache from localStorage');
-          localStorage.removeItem('lp_box_catalog');
-          localStorage.removeItem('lp_box_catalog_updatedAt');
-          localStorage.removeItem('lp_box_catalog_version');
-        } else {
-          boxCatalogCache = parsed;
-        }
-      } else if (saved) {
-        // Outdated schema/version detected -> purge obsolete cache
-        console.warn('[Firestore] Outdated catalog version detected in localStorage. Purging cache.');
-        localStorage.removeItem('lp_box_catalog');
-        localStorage.removeItem('lp_box_catalog_updatedAt');
-        localStorage.setItem('lp_box_catalog_version', '3.0_V12');
+      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15')) {
+        boxCatalogCache = JSON.parse(saved);
       }
     } catch (e) {}
   }
@@ -323,16 +334,30 @@ function getBoxCatalogCache() {
 }
 
 async function saveBoxCatalogToFirestore(tiers) {
-  // 1. Persist to Cloud Functions / Firestore backend first
-  await saveBoxCatalogServer(tiers);
+  const payload = {
+    tiers,
+    version: '3.0',
+    updatedAt: Date.now()
+  };
 
-  // 2. Update real-time cache and backup upon success
-  const now = Date.now();
+  // 1. Direct Firestore setDoc (primary & instant)
+  if (db) {
+    try {
+      await setDoc(doc(db, 'box_catalogs', 'default'), payload, { merge: true });
+    } catch (e) {
+      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
+      await saveBoxCatalogServer(tiers);
+    }
+  } else {
+    await saveBoxCatalogServer(tiers);
+  }
+
+  // 2. Update real-time cache upon success
   boxCatalogCache = tiers;
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
-    localStorage.setItem('lp_box_catalog_updatedAt', String(now));
-    localStorage.setItem('lp_box_catalog_version', '3.0_V13');
+    localStorage.setItem('lp_box_catalog_updatedAt', String(Date.now()));
+    localStorage.setItem('lp_box_catalog_version', '3.0_V15');
   } catch (e) {
     console.warn('[Firestore] localStorage quota exceeded or error:', e);
   }
@@ -354,16 +379,36 @@ async function submitShippingInfoToFirestore(data) {
     submittedAt: data.submittedAt || Date.now(),
     status: data.status || 'pending'
   };
+  if (db) {
+    try {
+      await setDoc(doc(db, 'shipping_infos', shippingId), payload, { merge: true });
+    } catch (e) {}
+  }
   shippingCache = [payload, ...shippingCache.filter(s => s.shippingId !== shippingId)];
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   return payload;
 }
 
 async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '') {
-  // 1. Persist to Cloud Functions / Firestore backend first
-  await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+  const updateData = {
+    status,
+    carrier: carrier || 'CJ대한통운',
+    trackingNumber: trackingNumber || '',
+    updatedAt: Date.now()
+  };
 
-  // 2. Update cache upon success
+  if (db) {
+    try {
+      await setDoc(doc(db, 'shipping_infos', shippingId), updateData, { merge: true });
+    } catch (e) {
+      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
+      await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+    }
+  } else {
+    await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+  }
+
+  // Update cache upon success
   const item = shippingCache.find(s => s.id === shippingId || s.shippingId === shippingId);
   if (item) {
     item.status = status;
@@ -376,10 +421,18 @@ async function updateShippingStatusInFirestore(shippingId, status, carrier = '',
 }
 
 async function deleteShippingInfoFromFirestore(shippingId) {
-  // 1. Persist deletion to Cloud Functions / Firestore backend first
-  await deleteShippingServer(shippingId);
+  if (db) {
+    try {
+      await deleteDoc(doc(db, 'shipping_infos', shippingId));
+    } catch (e) {
+      console.warn('[Firestore] Direct deleteDoc fallback to cloud function:', e.message);
+      await deleteShippingServer(shippingId);
+    }
+  } else {
+    await deleteShippingServer(shippingId);
+  }
 
-  // 2. Remove from cache upon success
+  // Remove from cache upon success
   shippingCache = shippingCache.filter(s => s.id !== shippingId && s.shippingId !== shippingId);
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   return true;
