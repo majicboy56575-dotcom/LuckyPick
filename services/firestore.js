@@ -18,12 +18,10 @@ import {
   getDocs,
   setDoc,
   deleteDoc,
-  connectFirestoreEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import {
   getFunctions,
   httpsCallable,
-  connectFunctionsEmulator,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js';
 
 // ============================================
@@ -61,15 +59,9 @@ if (isFirebaseConfigured()) {
     db = getFirestore(app);
     functions = getFunctions(app, 'asia-northeast3');
 
-    // Log active environment & connect to emulators on localhost
+    // Log active environment
     if (isLocalDev()) {
-      try {
-        connectFirestoreEmulator(db, '127.0.0.1', 8181);
-        connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-        console.log('[Firestore] Connected to LOCAL EMULATORS (Firestore: 8181, Functions: 5001)');
-      } catch (e) {
-        console.warn('[Firestore] Emulator connection warning:', e.message);
-      }
+      console.log('[Firestore] Connected to DEV PROJECT (lucky-pick-dev)');
     } else {
       console.log('[Firestore] Connected to PRODUCTION (luckypick-ec4cf)');
     }
@@ -325,7 +317,7 @@ function getBoxCatalogCache() {
     try {
       const savedVersion = localStorage.getItem('lp_box_catalog_version');
       const saved = localStorage.getItem('lp_box_catalog');
-      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15')) {
+      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15' || savedVersion === '3.0_V16')) {
         boxCatalogCache = JSON.parse(saved);
       }
     } catch (e) {}
@@ -357,7 +349,7 @@ async function saveBoxCatalogToFirestore(tiers) {
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(Date.now()));
-    localStorage.setItem('lp_box_catalog_version', '3.0_V15');
+    localStorage.setItem('lp_box_catalog_version', '3.0_V16');
   } catch (e) {
     console.warn('[Firestore] localStorage quota exceeded or error:', e);
   }
