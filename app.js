@@ -5,14 +5,14 @@ import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLangua
 // NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
 import { getClosedProducts, getCurrentUser, getCurrentUserDocCache } from './services/firestore.js';
-import { handleTossSuccess } from './services/payment.js';
+import { handleTossSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
-import { executeUnboxingAnimation } from './services/unboxing-modal.js';
+import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 
-import * as homePage from './pages/home.js?v=20261013_V18';
-import * as historyPage from './pages/history.js?v=20261013_V18';
-import * as profilePage from './pages/profile.js?v=20261013_V18';
-import * as adminPage from './pages/admin.js?v=20261013_V18';
+import * as homePage from './pages/home.js?v=20261014_V24';
+import * as historyPage from './pages/history.js?v=20261014_V24';
+import * as profilePage from './pages/profile.js?v=20261014_V24';
+import * as adminPage from './pages/admin.js?v=20261014_V24';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;
@@ -326,9 +326,10 @@ function navigate() {
       try {
         const result = await handleTossSuccess(tossPaymentKey, tossOrderId, tossAmount, tossProductId || pendingBoxId || 'box_basic');
         
-        if (pendingBoxId) {
+        if (pendingBoxId || result.isLuckyBox) {
           // Lucky box unboxing flow
-          executeUnboxingAnimation(pendingBoxId);
+          const targetBox = pendingBoxId || result.boxId || tossProductId || 'box_basic';
+          executeUnboxingAnimation(targetBox, 'toss');
         } else {
           // General golden raffle entry flow
           const countText = result.currentParticipants && result.maxParticipants

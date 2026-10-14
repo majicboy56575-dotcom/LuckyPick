@@ -17,9 +17,9 @@ const db = getFirestore();
 // ============================================
 const ADMIN_EMAIL = "majicboy56575@gmail.com";
 
-// Toss Payments Secret Key (loaded from functions/.env)
+// Toss Payments Secret Key (주문서형·결제창형 라이브 시크릿 키)
 const TOSS_SECRET_KEY =
-  process.env.TOSS_SECRET_KEY || "test_sk_yL0qZ4G1VOYGpLXpe4YB8oWb2MQY";
+  process.env.TOSS_SECRET_KEY || "live_gsk_DpexMgkW367LEY5O7wAMVGbR5ozO";
 
 // ============================================
 // Helper: Privacy Masking
@@ -883,7 +883,42 @@ exports.confirmTossPayment = onCall(
       );
     }
 
-    // 2. Record participation in Firestore via transaction
+    // Check if this payment is for a LuckyBox (e.g. box_basic, basic, etc.)
+    const isLuckyBox =
+      String(productId).startsWith("box_") ||
+      ["basic", "premium", "vip"].includes(String(productId));
+
+    if (isLuckyBox) {
+      // Record payment transaction in payments collection
+      const paymentRef = db.collection("payments").doc(paymentKey);
+      await paymentRef.set({
+        paymentKey,
+        orderId,
+        amount,
+        productId,
+        type: "luckybox",
+        uid,
+        userName: maskName(userName),
+        userEmail: maskEmail(userEmail),
+        status: "DONE",
+        method: "TOSS",
+        confirmedAt: Date.now(),
+      });
+
+      console.log(
+        `[Toss] LuckyBox payment confirmed for user ${uid}, box: ${productId}, amount: ${amount}`
+      );
+      return {
+        success: true,
+        paymentKey,
+        orderId,
+        status: paymentData.status,
+        isLuckyBox: true,
+        boxId: productId,
+      };
+    }
+
+    // 2. Record participation in Firestore via transaction (Golden Raffle products)
     const productRef = db.collection("products").doc(productId);
     const result = await db.runTransaction(async (transaction) => {
       const productDoc = await transaction.get(productRef);

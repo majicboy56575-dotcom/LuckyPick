@@ -7,7 +7,7 @@ const PAYPAL_CONFIG = {
   environment: 'live'
 };
 
-// Toss Payments Client Key (라이브 실결제 클라이언트 키)
+// Toss Payments Client Key (주문서형·결제창형 결제위젯 라이브 클라이언트 키)
 const TOSS_CLIENT_KEY = 'live_gck_GjLJoQ1aVZX5RWeOzlz58w6KYe2R';
 
 /**
@@ -131,68 +131,109 @@ function renderPayPalButtons(containerId, { productId, amount, orderName, onSucc
   }).render(`#${containerId}`);
 }
 
-// --- Toss Payments Integration ---
+// --- Toss Payments (Payment Widget v2) Integration ---
+let activeTossWidgets = null;
+
 /**
- * Request Toss Payment - opens the Toss payment popup.
- * On success, Toss redirects to successUrl with paymentKey, orderId, amount params.
+ * Render Toss Payment Widget in specified containers
  */
-async function requestTossPayment({ productId, productName, amount, userId, userEmail }) {
+async function renderTossPaymentWidget({
+  methodsSelector = '#toss-payment-methods',
+  agreementSelector = '#toss-agreement',
+  amount,
+  userId,
+  userEmail,
+  productId,
+  productName
+}) {
   if (!window.TossPayments) {
     throw new Error('토스페이먼츠 SDK가 로드되지 않았습니다.');
   }
 
-  const tossPayments = TossPayments(TOSS_CLIENT_KEY);
+  const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
+  const customerKey = userId
+    ? `usr_${String(userId).replace(/[^a-zA-Z0-9-_]/g, '_')}`
+    : (window.TossPayments.ANONYMOUS || 'ANONYMOUS');
 
-  // Store pending productId in sessionStorage so it survives redirects
-  sessionStorage.setItem('toss_pending_product', productId);
+  const widgets = tossPayments.widgets({ customerKey });
+  activeTossWidgets = {
+    widgets,
+    amount: Number(amount),
+    productId,
+    productName,
+    userId,
+    userEmail
+  };
+
+  // 1. Set Amount
+  await widgets.setAmount({
+    currency: 'KRW',
+    value: Number(amount)
+  });
+
+  // 2. Render Payment Methods and Agreements
+  const renderPromises = [];
+  if (document.querySelector(methodsSelector)) {
+    renderPromises.push(
+      widgets.renderPaymentMethods({ selector: methodsSelector }).catch(err => {
+        console.warn('[TossWidget] renderPaymentMethods default failed, retrying:', err);
+        return widgets.renderPaymentMethods({ selector: methodsSelector });
+      })
+    );
+  }
+  if (document.querySelector(agreementSelector)) {
+    renderPromises.push(
+      widgets.renderAgreement({ selector: agreementSelector }).catch(err => {
+        console.warn('[TossWidget] renderAgreement default failed, retrying:', err);
+        return widgets.renderAgreement({ selector: agreementSelector });
+      })
+    );
+  }
+
+  await Promise.all(renderPromises);
+  return widgets;
+}
+
+/**
+ * Request payment using the active Toss Payment Widget
+ */
+async function requestTossWidgetPayment(customParams = {}) {
+  if (!activeTossWidgets || !activeTossWidgets.widgets) {
+    throw new Error('토스 결제위젯이 초기화되지 않았습니다. 잠시 후 다시 시도해주세요.');
+  }
+
+  const { widgets, amount, productId, productName, userId, userEmail } = activeTossWidgets;
+  const pId = customParams.productId || productId;
+  const pName = customParams.productName || productName;
+  const amt = Number(customParams.amount || amount);
+
+  // Store pending box/product in sessionStorage for return flow
+  sessionStorage.setItem('toss_pending_product', pId);
+  sessionStorage.setItem('pending_unboxing_box_id', pId);
 
   // Generate unique order ID
   const orderId = `LP_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-  // Build success/fail URLs with query parameters
   const baseUrl = window.location.origin + window.location.pathname;
-  const successUrl = `${baseUrl}?toss=success&productId=${encodeURIComponent(productId)}`;
+  const successUrl = `${baseUrl}?toss=success&productId=${encodeURIComponent(pId)}`;
   const failUrl = `${baseUrl}?toss=fail`;
 
   // Track Meta Pixel InitiateCheckout
   trackMetaEvent('InitiateCheckout', {
-    content_name: productName,
-    content_ids: [productId],
-    value: amount,
+    content_name: pName,
+    content_ids: [pId],
+    value: amt,
     currency: 'KRW'
   });
 
-  // Toss SDK v2 vs v1 compatibility
-  if (typeof tossPayments.payment === 'function') {
-    // Toss Payments SDK v2 (standard)
-    const customerKey = userId ? `usr_${String(userId).replace(/[^a-zA-Z0-9-_]/g, '_')}` : (window.TossPayments?.ANONYMOUS || 'ANONYMOUS');
-    const payment = tossPayments.payment({ customerKey });
-
-    await payment.requestPayment({
-      method: 'CARD',
-      amount: {
-        currency: 'KRW',
-        value: amount
-      },
-      orderId: orderId,
-      orderName: `LuckyPick ${productName}`,
-      successUrl: successUrl,
-      failUrl: failUrl,
-      customerEmail: userEmail || undefined,
-      customerName: userId || undefined
-    });
-  } else if (typeof tossPayments.requestPayment === 'function') {
-    // Toss Payments SDK v1 fallback
-    await tossPayments.requestPayment('카드', {
-      amount: amount,
-      orderId: orderId,
-      orderName: `LuckyPick ${productName}`,
-      successUrl: successUrl,
-      failUrl: failUrl,
-      customerEmail: userEmail || '',
-      customerName: userId || 'guest'
-    });
-  }
+  await widgets.requestPayment({
+    orderId,
+    orderName: `LuckyPick ${pName}`,
+    successUrl,
+    failUrl,
+    customerEmail: customParams.userEmail || userEmail || undefined,
+    customerName: customParams.userId || userId || undefined
+  });
 }
 
 /**
@@ -230,6 +271,7 @@ export {
   selectPaymentMethod,
   getSelectedMethod,
   renderPayPalButtons,
-  requestTossPayment,
+  renderTossPaymentWidget,
+  requestTossWidgetPayment,
   handleTossSuccess,
 };
