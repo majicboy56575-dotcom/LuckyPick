@@ -519,40 +519,42 @@ function renderAnalyticsTab() {
   const vault = getUserVault();
   const boxes = getRandomBoxTiers();
   
-  // Calculate dynamic metrics from local activity
+  // Calculate dynamic metrics from pure real user transactions (Reset to 0-based clean start)
   const unboxedCount = vault.length;
   const convertedCount = vault.filter(v => v.status === 'converted_to_points').length;
   const shippedCount = vault.filter(v => v.status === 'shipping_requested' || v.status === 'shipped').length;
   
-  const estimatedGMV = 14850000 + (unboxedCount * 15000);
-  const estimatedCOGS = 4752000 + (unboxedCount * 3800);
-  const estimatedNet = estimatedGMV - estimatedCOGS;
-  const marginRate = Math.round((estimatedNet / estimatedGMV) * 100);
+  // Real transaction values (0 if no real transactions yet)
+  const totalGMV = vault.reduce((acc, v) => acc + (Number(v.boxPrice || v.price) || 0), 0);
+  const totalCOGS = vault.reduce((acc, v) => acc + (Number(v.wholesalePrice) || 0), 0);
+  const netProfit = totalGMV - totalCOGS;
+  const marginRate = totalGMV > 0 ? Math.round((netProfit / totalGMV) * 100) : 0;
+  const defenseRate = unboxedCount > 0 ? Math.round((convertedCount / unboxedCount) * 100) : 0;
 
   return `
     <div class="space-y-6">
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
           <span class="text-[10px] font-bold text-gray-400 uppercase">TOTAL GMV (총 결제액)</span>
-          <h4 class="font-black text-2xl text-gray-900 mt-2 font-mono">₩${estimatedGMV.toLocaleString()}원</h4>
-          <span class="text-[11px] text-emerald-600 font-bold mt-1 block">▲ 28% 활성 거래</span>
+          <h4 class="font-black text-2xl text-gray-900 mt-2 font-mono">₩${totalGMV.toLocaleString()}원</h4>
+          <span class="text-[11px] ${totalGMV > 0 ? 'text-emerald-600' : 'text-gray-400'} font-bold mt-1 block">${totalGMV > 0 ? '▲ 실결제 누적' : '실결제 대기 중'}</span>
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
           <span class="text-[10px] font-bold text-gray-400 uppercase">도매 사입 원가 (COGS)</span>
-          <h4 class="font-black text-2xl text-slate-700 mt-2 font-mono">₩${estimatedCOGS.toLocaleString()}원</h4>
-          <span class="text-[11px] text-gray-500 mt-1 block">원가율 ${(100 - marginRate).toFixed(1)}% (도매꾹 B2B)</span>
+          <h4 class="font-black text-2xl text-slate-700 mt-2 font-mono">₩${totalCOGS.toLocaleString()}원</h4>
+          <span class="text-[11px] text-gray-500 mt-1 block">원가율 ${totalGMV > 0 ? (100 - marginRate).toFixed(1) : '0.0'}% (도매 B2B)</span>
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
           <span class="text-[10px] font-bold text-gray-400 uppercase">플랫폼 순수익 (NET PROFIT)</span>
-          <h4 class="font-black text-2xl text-emerald-600 mt-2 font-mono">₩${estimatedNet.toLocaleString()}원</h4>
+          <h4 class="font-black text-2xl ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'} mt-2 font-mono">₩${netProfit.toLocaleString()}원</h4>
           <span class="text-[11px] text-emerald-700 font-bold mt-1 block">순마진율 ${marginRate}%</span>
         </div>
 
         <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
           <span class="text-[10px] font-bold text-gray-400 uppercase">포인트 전환 방어율</span>
-          <h4 class="font-black text-2xl text-primary mt-2 font-mono">${unboxedCount > 0 ? Math.round((convertedCount / unboxedCount) * 100) : 75}%</h4>
+          <h4 class="font-black text-2xl text-primary mt-2 font-mono">${defenseRate}%</h4>
           <span class="text-[11px] text-primary font-bold mt-1 block">물류비 0원 즉시 방어</span>
         </div>
       </div>
