@@ -125,9 +125,9 @@ export const LIVE_WINNING_FEED = [
   { icon: 'security', title: '구매안전서비스(에스크로) 가입', desc: '네이버파이낸셜 구매안전서비스 가입 안전 쇼핑몰' }
 ];
 
-// Trigger Initial Auto-Seeding to Firestore on startup
+// Trigger Initial Auto-Seeding to Firestore on startup (Box Catalog only)
 setTimeout(() => {
-  ensureInitialFirestoreData(DEFAULT_BOX_TIERS, DEFAULT_SUPER_RAFFLES);
+  ensureInitialFirestoreData(DEFAULT_BOX_TIERS);
 }, 300);
 
 // Get Catalog Boxes (100% Firestore Cloud DB backed with resilient defaults fallback)
@@ -176,20 +176,13 @@ export async function saveRandomBoxTiers(tiers) {
   return await saveBoxCatalogToFirestore(tiers);
 }
 
-// Get Super Raffles (100% Firestore Cloud DB backed with resilient defaults fallback)
+// Get Super Raffles (100% Pure Firestore Cloud DB - Zero Hardcoded Fallbacks)
 export function getSuperRaffles() {
   const serverRaffles = getSuperRafflesCache();
-  if (serverRaffles && Array.isArray(serverRaffles) && serverRaffles.length > 0) {
-    return serverRaffles.map(sr => {
-      const defaultRaffle = DEFAULT_SUPER_RAFFLES.find(dr => dr.id === sr.id) || {};
-      return {
-        ...defaultRaffle,
-        ...sr,
-        imageUrl: sr.imageUrl || defaultRaffle.imageUrl || ''
-      };
-    });
+  if (serverRaffles && Array.isArray(serverRaffles)) {
+    return serverRaffles;
   }
-  return DEFAULT_SUPER_RAFFLES;
+  return [];
 }
 
 export async function saveSuperRaffles(raffles) {

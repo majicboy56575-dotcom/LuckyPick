@@ -108,11 +108,9 @@ if (isFirebaseConfigured()) {
       (snapshot) => {
         const raffles = [];
         snapshot.forEach((doc) => raffles.push({ id: doc.id, ...doc.data() }));
-        if (raffles.length > 0) {
-          superRafflesCache = raffles;
-          window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: raffles }));
-          window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-        }
+        superRafflesCache = raffles;
+        window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: raffles }));
+        window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
       },
       (error) => {
         console.warn('[Firestore] super_raffles listener error:', error.message);
@@ -251,13 +249,7 @@ async function saveUserDocData(data) {
 }
 
 function getSuperRafflesCache() {
-  if (!superRafflesCache || superRafflesCache.length === 0) {
-    try {
-      const saved = localStorage.getItem('lp_super_raffles');
-      if (saved) superRafflesCache = JSON.parse(saved);
-    } catch (e) {}
-  }
-  return superRafflesCache;
+  return superRafflesCache || [];
 }
 
 async function saveSuperRaffleToFirestore(raffle) {
@@ -281,9 +273,6 @@ async function saveSuperRaffleToFirestore(raffle) {
   } else {
     superRafflesCache.push(raffle);
   }
-  try {
-    localStorage.setItem('lp_super_raffles', JSON.stringify(superRafflesCache));
-  } catch (e) {}
   window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   return true;
@@ -304,9 +293,6 @@ async function deleteSuperRaffleFromFirestore(raffleId) {
 
   // Remove from cache upon success
   superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
-  try {
-    localStorage.setItem('lp_super_raffles', JSON.stringify(superRafflesCache));
-  } catch (e) {}
   window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: superRafflesCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   return true;
@@ -430,22 +416,12 @@ async function deleteShippingInfoFromFirestore(shippingId) {
   return true;
 }
 
-async function ensureInitialFirestoreData(defaultBoxes, defaultRaffles) {
+async function ensureInitialFirestoreData(defaultBoxes) {
   // Check and purge any stale local cache first
   getBoxCatalogCache();
 
   if (!boxCatalogCache || boxCatalogCache.length === 0) {
     boxCatalogCache = defaultBoxes;
-  }
-
-  if (!superRafflesCache || superRafflesCache.length === 0) {
-    try {
-      const saved = localStorage.getItem('lp_super_raffles');
-      if (saved) superRafflesCache = JSON.parse(saved);
-    } catch (e) {}
-  }
-  if (!superRafflesCache || superRafflesCache.length === 0) {
-    superRafflesCache = defaultRaffles;
   }
 
   // Auto-sync backend if box catalog document is missing in Firestore
