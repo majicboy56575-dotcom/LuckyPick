@@ -2,8 +2,7 @@
 // LuckyPick - Interactive Unboxing & Payment Integration
 // ============================================
 import { getRandomBoxTiers, openRandomBox, convertVaultItemToPoints, getUserPoints, setUserPoints, getAvailableGoldenTicketsCount } from './randombox.js';
-import { openLuckyBoxServer, convertVaultItemToPointsServer } from './firestore.js';
-import { renderTossPaymentWidget, requestTossWidgetPayment, renderPayPalButtons } from '/services/payment.js';
+import { renderTossPaymentWidget, requestTossWidgetPayment } from '/services/payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
 
 export function showProbabilityModal(boxId) {
@@ -124,7 +123,7 @@ export function startUnboxingFlow(boxId) {
             </button>
             <button onclick="window.__openDirectPaymentModal('${tier.id}', ${tier.price})" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1">
               <span class="material-symbols-outlined text-sm">credit_card</span>
-              다른 결제수단(토스/카드/PayPal)으로 바로 구매
+              다른 결제수단(신용카드/간편결제)으로 바로 구매
             </button>
           </div>
         ` : `
@@ -185,18 +184,6 @@ export function openDirectPaymentModal(tierId, amount) {
                 </div>
               </div>
               <span class="material-symbols-outlined text-gray-400 group-hover:text-blue-600">chevron_right</span>
-            </button>
-
-            <!-- 2. PayPal -->
-            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'paypal')" class="w-full p-4 bg-indigo-50/60 hover:bg-indigo-100/80 border border-indigo-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
-              <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">PayPal</span>
-                <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-indigo-600">PayPal 해외 결제</h4>
-                  <p class="text-[11px] text-gray-500">Global Credit Cards & PayPal Balance</p>
-                </div>
-              </div>
-              <span class="material-symbols-outlined text-gray-400 group-hover:text-indigo-600">chevron_right</span>
             </button>
           </div>
         </div>
@@ -448,49 +435,6 @@ window.__processDirectPayment = async (tierId, amount, method) => {
           `;
         }
       }
-    }, 50);
-  } else if (method === 'paypal') {
-    const modalContent = document.querySelector('#direct-pay-modal .space-y-2\\.5');
-    if (!modalContent) return;
-
-    const usdAmount = Number((amount / 1350).toFixed(2)) || 3.70;
-
-    modalContent.innerHTML = `
-      <div class="space-y-3">
-        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
-          <span>결제 금액 (USD 환산)</span>
-          <span class="font-bold text-amber-950 font-mono text-sm">$${usdAmount} USD (₩${Number(amount).toLocaleString()}원)</span>
-        </div>
-        <div id="paypal-button-container" class="min-h-[140px] flex items-center justify-center">
-          <div class="text-xs text-gray-500 animate-pulse">PayPal 결제창 로딩 중...</div>
-        </div>
-        <button onclick="window.__openDirectPaymentModal('${tierId}', ${amount})" class="w-full py-2 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
-          <span class="material-symbols-outlined text-sm">arrow_back</span>
-          다른 결제 수단 선택
-        </button>
-      </div>
-    `;
-
-    setTimeout(() => {
-      renderPayPalButtons('paypal-button-container', {
-        productId: tierId,
-        amount: usdAmount,
-        orderName: `${tierName} (LuckyPick)`,
-        onSuccess: (details) => {
-          console.log('[PayPal] Payment success, triggering unbox:', details);
-          const modal = document.getElementById('direct-pay-modal');
-          if (modal) modal.remove();
-          executeUnboxingAnimation(tierId);
-        },
-        onError: (err) => {
-          console.error('[PayPal] Payment error:', err);
-          alert(`PayPal 결제 처리 중 오류가 발생했습니다: ${err.message || err}`);
-        },
-        onCancel: () => {
-          console.log('[PayPal] Payment cancelled by user');
-        }
-      });
-    }, 100);
   }
 };
 

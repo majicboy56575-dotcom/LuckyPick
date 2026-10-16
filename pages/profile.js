@@ -344,18 +344,6 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
                 </div>
                 <span class="material-symbols-outlined text-gray-400 text-sm">account_balance_wallet</span>
               </label>
-
-              <!-- Option 4: PayPal -->
-              <label class="flex items-center justify-between p-3 border-2 border-slate-200 hover:border-slate-300 rounded-2xl cursor-pointer transition-all bg-white">
-                <div class="flex items-center gap-3">
-                  <input type="radio" name="ship-pay-method" value="paypal" class="w-4 h-4 text-primary focus:ring-primary">
-                  <div>
-                    <span class="font-bold text-gray-900">PayPal 해외 결제</span>
-                    <p class="text-[11px] text-gray-500">Global Credit Card / PayPal Balance ($2.50)</p>
-                  </div>
-                </div>
-                <span class="material-symbols-outlined text-gray-400 text-sm">public</span>
-              </label>
             </div>
           </div>
           ` : ''}
@@ -439,18 +427,6 @@ function renderPointsPaymentModal(points, amount) {
                 </div>
               </div>
               <span class="material-symbols-outlined text-gray-400 group-hover:text-blue-600">chevron_right</span>
-            </button>
-
-            <!-- 2. PayPal -->
-            <button onclick="window.__executeChargePayment(${points}, 'PayPal')" class="w-full p-4 bg-indigo-50/60 hover:bg-indigo-100/80 border border-indigo-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
-              <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">PayPal</span>
-                <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-indigo-600">PayPal 해외 결제</h4>
-                  <p class="text-[11px] text-gray-500">Global Credit Card / PayPal</p>
-                </div>
-              </div>
-              <span class="material-symbols-outlined text-gray-400 group-hover:text-indigo-600">chevron_right</span>
             </button>
           </div>
         </div>
@@ -706,7 +682,7 @@ function renderChargeTab() {
     <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
       <div>
         <h3 class="font-black text-xl text-gray-900">포인트 즉시 충전 (1P = 1원)</h3>
-        <p class="text-xs text-gray-500 mt-1">원하는 결제수단(토스페이, 카드 간편결제, PayPal)으로 포인트를 충전하고 럭키박스를 개봉하세요.</p>
+        <p class="text-xs text-gray-500 mt-1">원하는 결제수단(신용카드, 간편결제)으로 포인트를 충전하고 럭키박스를 개봉하세요.</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

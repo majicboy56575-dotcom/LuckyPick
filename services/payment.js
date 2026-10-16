@@ -1,11 +1,4 @@
-import { createPayPalOrder, capturePayPalOrder, confirmTossPayment } from './firestore.js';
-
-const PAYPAL_CONFIG = {
-  clientId: 'BAAQd5qD8T0M-kWCigLv7lhFjYOCzRMShNtqn5HtqqBxPU09YUnDupVHiK1nCFZqXEE5oJGeW98XENwlbl',
-  clientSecret: '',
-  currency: 'USD',
-  environment: 'live'
-};
+import { confirmTossPayment } from './firestore.js';
 
 // Toss Payments Client Key (주문서형·결제창형 결제위젯 라이브 클라이언트 키)
 const TOSS_CLIENT_KEY = 'live_gck_GjLJoQ1aVZX5RWeOzlz58w6KYe2R';
@@ -25,11 +18,11 @@ export function trackMetaEvent(eventName, params = {}) {
 }
 
 const PAYMENT_METHODS = {
-  PAYPAL: 'paypal',
   TOSS: 'toss',
+  DANAL: 'danal',
 };
 
-let selectedMethod = PAYMENT_METHODS.TOSS; // Default to Toss for Korean users
+let selectedMethod = PAYMENT_METHODS.TOSS;
 
 function selectPaymentMethod(method) {
   selectedMethod = method;
@@ -37,98 +30,6 @@ function selectPaymentMethod(method) {
 
 function getSelectedMethod() {
   return selectedMethod;
-}
-
-// --- PayPal Integration ---
-function renderPayPalButtons(containerId, { productId, amount, orderName, onSuccess, onError, onCancel }) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = '';
-
-  if (!window.paypal) {
-    console.error('PayPal SDK not loaded');
-    if (onError) onError('PayPal SDK not loaded');
-    return;
-  }
-
-  window.paypal.Buttons({
-    style: {
-      layout: 'vertical',
-      color: 'gold',
-      shape: 'rect',
-      label: 'pay'
-    },
-    createOrder: async (data, actions) => {
-      try {
-        const res = await createPayPalOrder({
-          amount: amount || 50,
-          orderName: orderName || 'LuckyPick Entry Ticket',
-          productId: productId || ''
-        });
-        return res.orderId;
-      } catch (err) {
-        console.warn('[PayPal] Cloud Functions order creation fallback to client SDK:', err);
-        return actions.order.create({
-          purchase_units: [{
-            description: orderName || 'LuckyPick Entry Ticket',
-            amount: {
-              currency_code: PAYPAL_CONFIG.currency,
-              value: (amount || 50).toFixed(2)
-            }
-          }]
-        });
-      }
-    },
-    onApprove: async (data, actions) => {
-      try {
-        let details;
-        try {
-          details = await capturePayPalOrder({
-            orderId: data.orderID,
-            productId: productId || ''
-          });
-          details.isServerCaptured = true;
-        } catch (serverErr) {
-          console.warn('[PayPal] Cloud Functions capture fallback to client SDK:', serverErr);
-          const clientDetails = await actions.order.capture();
-          details = {
-            success: true,
-            paymentId: clientDetails.id,
-            amount: clientDetails.purchase_units[0]?.amount?.value || amount,
-            status: clientDetails.status,
-            payer: clientDetails.payer,
-            isServerCaptured: false
-          };
-        }
-
-        console.log('[PayPal] Transaction completed:', details);
-        if (onSuccess) {
-          onSuccess({
-            success: true,
-            paymentId: details.paymentId || details.id,
-            payer: details.payer,
-            method: 'PAYPAL',
-            amount: details.amount || amount,
-            status: details.status,
-            isServerCaptured: details.isServerCaptured,
-            currentParticipants: details.currentParticipants,
-            maxParticipants: details.maxParticipants
-          });
-        }
-      } catch (err) {
-        console.error('[PayPal] Capture error:', err);
-        if (onError) onError(err);
-      }
-    },
-    onCancel: (data) => {
-      console.log('[PayPal] Payment cancelled:', data);
-      if (onCancel) onCancel(data);
-    },
-    onError: (err) => {
-      console.error('[PayPal] Error:', err);
-      if (onError) onError(err);
-    }
-  }).render(`#${containerId}`);
 }
 
 // --- Toss Payments (Payment Widget v2) Integration ---
@@ -265,12 +166,10 @@ async function handleTossSuccess(paymentKey, orderId, amount, productId) {
 }
 
 export {
-  PAYPAL_CONFIG,
   PAYMENT_METHODS,
   TOSS_CLIENT_KEY,
   selectPaymentMethod,
   getSelectedMethod,
-  renderPayPalButtons,
   renderTossPaymentWidget,
   requestTossWidgetPayment,
   handleTossSuccess,
