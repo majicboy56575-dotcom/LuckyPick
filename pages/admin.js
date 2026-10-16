@@ -748,46 +748,56 @@ export function render() {
     window.__switchAdminTab('shipping');
   };
 
-  // Image Upload Handler (Laptop File -> Compressed Canvas DataURL)
+  // Image Upload Handler: Automatic 1:1 Square Center-Crop, 600x600 Resizing & Smart Lightweight Compression
   window.__handleImageUpload = (e, targetInputId, previewImgId, btnId) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    if (file.size > 20 * 1024 * 1024) {
-      alert('이미지 파일 용량은 20MB 이하만 등록 가능합니다.');
+    if (file.size > 25 * 1024 * 1024) {
+      alert('이미지 파일 용량은 25MB 이하만 등록 가능합니다.');
       return;
     }
 
     const btn = btnId ? document.getElementById(btnId) : null;
-    if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">sync</span> 사진 압축 중...`;
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">sync</span> 규격(1:1) 및 용량 자동 최적화 중...`;
+    }
 
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const MAX_SIZE = 400;
-        let width = img.width;
-        let height = img.height;
+        // 1. Standard E-Commerce Product Image Spec: 600x600 px (Crisp 1:1 Retina Display)
+        const TARGET_SIZE = 600;
 
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height = Math.round((height * MAX_SIZE) / width);
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width = Math.round((width * MAX_SIZE) / height);
-            height = MAX_SIZE;
-          }
-        }
+        // 2. Smart 1:1 Center-Crop: Calculate center coordinate for any aspect ratio (landscape or portrait)
+        const minSide = Math.min(img.width, img.height);
+        const cropX = Math.round((img.width - minSide) / 2);
+        const cropY = Math.round((img.height - minSide) / 2);
 
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = TARGET_SIZE;
+        canvas.height = TARGET_SIZE;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
 
-        // Compress to lightweight web JPEG (~20-30KB) to ensure Firestore 1MB doc limit is never exceeded
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        // High quality image downsampling & smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // Clean white background fill to prevent black background on transparent PNGs
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, TARGET_SIZE, TARGET_SIZE);
+
+        // Draw cropped 1:1 square from center
+        ctx.drawImage(img, cropX, cropY, minSide, minSide, 0, 0, TARGET_SIZE, TARGET_SIZE);
+
+        // 3. Compress to high-efficiency Web JPEG (~30-60KB) to ensure super-fast mobile loading and Firestore doc safety
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+        // Calculate size savings
+        const originalKb = Math.round(file.size / 1024);
+        const optimizedKb = Math.max(1, Math.round((compressedDataUrl.length * 3 / 4) / 1024));
+        const savedPercent = Math.max(0, Math.round((1 - optimizedKb / originalKb) * 100));
 
         const input = document.getElementById(targetInputId);
         const preview = document.getElementById(previewImgId);
@@ -795,17 +805,43 @@ export function render() {
           input.value = compressedDataUrl;
           input.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        if (preview) preview.src = compressedDataUrl;
-        if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm text-emerald-400">check_circle</span> 사진 변경 완료`;
+        if (preview) {
+          preview.src = compressedDataUrl;
+        }
+
+        // 4. Update button text with success feedback
+        if (btn) {
+          btn.innerHTML = `<span class="material-symbols-outlined text-sm text-emerald-400">check_circle</span> 600×600 규격 & ${optimizedKb}KB 최적화 완료!`;
+          btn.classList.add('bg-emerald-950', 'text-emerald-300', 'border', 'border-emerald-500/40');
+        }
+
+        // 5. Add or update real-time optimization info badge below the input
+        const container = input ? input.parentElement : null;
+        if (container) {
+          let badge = container.querySelector('.img-opt-badge');
+          if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'img-opt-badge flex items-center justify-between text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 mt-1.5 font-mono shadow-2xs';
+            container.appendChild(badge);
+          }
+          badge.innerHTML = `
+            <span class="flex items-center gap-1 font-bold text-emerald-900">
+              <span class="material-symbols-outlined text-xs text-emerald-600">aspect_ratio</span> 600×600 (1:1 정사각형)
+            </span>
+            <span class="text-emerald-700">
+              ${originalKb.toLocaleString()}KB ➔ <strong>${optimizedKb.toLocaleString()}KB</strong> <span class="bg-emerald-200/80 text-emerald-900 font-bold px-1 rounded text-[9px]">-${savedPercent}%</span>
+            </span>
+          `;
+        }
       };
       img.onerror = () => {
-        if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm">upload_file</span> 내 노트북에서 사진 올리기`;
-        alert('이미지 파일을 디코딩할 수 없습니다. 다른 사진(JPG/PNG)을 선택해주세요.');
+        if (btn) btn.innerHTML = originalBtnHtml;
+        alert('이미지 파일을 읽을 수 없습니다. 정상적인 사진 파일(JPG, PNG, WebP)을 선택해주세요.');
       };
       img.src = ev.target.result;
     };
     reader.onerror = () => {
-      if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-sm">upload_file</span> 내 노트북에서 사진 올리기`;
+      if (btn) btn.innerHTML = originalBtnHtml;
       alert('파일을 읽는 중 오류가 발생했습니다.');
     };
     reader.readAsDataURL(file);
