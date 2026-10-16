@@ -190,9 +190,10 @@ function renderSuperRaffleCard(raffle, index) {
         <!-- Product Title & Retail Price -->
         <div class="mb-4">
           <h4 class="font-black text-xl sm:text-2xl text-white tracking-tight leading-snug">${raffle.title}</h4>
-          <div class="flex items-baseline gap-2 mt-1">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-1">
             <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">RETAIL VALUE</span>
             <span class="text-base sm:text-lg font-black text-amber-300 font-mono">₩${raffle.retailPrice.toLocaleString()}원 상당</span>
+            <span class="text-[10px] text-slate-400 font-normal">(※ 5만 원 초과 경품으로 제세공과금 22% 당첨자 부담)</span>
           </div>
         </div>
 
@@ -417,6 +418,7 @@ function renderApplyTicketModal(raffleId, raffleTitle, userTickets) {
             <span class="font-black text-amber-700 font-mono text-base">${userTickets}장</span>
           </div>
           <p class="text-[11px] text-amber-900/80">원하는 수량만큼 골든 티켓을 자유롭게 분배하여 응모할 수 있습니다.</p>
+          <p class="text-[10px] text-amber-900/60 leading-tight">※ 5만 원 초과 경품 당첨 시 소득세법에 따라 제세공과금(22%)이 부과됩니다.</p>
         </div>
 
         ${userTickets > 0 ? `
@@ -482,21 +484,21 @@ export function render() {
           <div class="relative z-10 max-w-2xl">
             <div class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-full text-amber-300 font-extrabold text-xs mb-4 shadow-sm">
               <span class="material-symbols-outlined text-sm">verified_user</span>
-              100% 합법 & 전 품목 실물 당첨 보장 (꽝 없음)
+              100% 정품 보장 · 블라인드 큐레이션 쇼핑몰 (꽝 없음)
             </div>
 
             <h1 class="font-black text-3xl md:text-5xl leading-tight mb-4 tracking-tight">
-              꽝은 절대 없다!<br>
-              <span class="gold-gradient-text">100% 실물 득템</span> + <span class="text-amber-300">골든 래플 티켓</span>
+              꽝 없는 서프라이즈 쇼핑!<br>
+              <span class="gold-gradient-text">100% 정품 실물 득템</span> + <span class="text-amber-300">구매 사은 래플</span>
             </h1>
             <p class="text-sm md:text-base text-slate-300 mb-8 leading-relaxed">
-              엄선된 디지털 가전 & 프리미엄 실물 품목 100% 득템! 적립된 골든 티켓으로 <strong>원하는 스페셜 사은품(아이폰 16 Pro 등)에 직접 응모</strong>하세요. (인원 미달 시 골든 티켓 100% 자동 환불 반환)
+              소비자가 기준 최저 보장 가치 100% 보장! 엄선된 디지털·생활 잡화 전 품목 무료 배송 & 구매 사은 골든 티켓으로 <strong>스페셜 사은품(아이폰 16 Pro 등)에 자유롭게 응모</strong>하세요. (인원 미달 시 티켓 100% 자동 반환)
             </p>
 
             <div class="flex flex-wrap items-center gap-4">
               <a href="#box_lineup" class="px-8 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-2">
                 <span class="material-symbols-outlined">package_2</span>
-                럭키박스 라인업 둘러보기
+                블라인드 큐레이션 라인업 둘러보기
               </a>
               ${loggedIn ? `
               <div class="flex items-center gap-3 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-xs">
@@ -525,10 +527,10 @@ export function render() {
       <section class="mb-16">
         <div class="flex justify-between items-end mb-6">
           <div>
-            <span class="text-xs font-black text-amber-600 uppercase tracking-widest">BONUS MULTI-GROUP DRAW</span>
-            <h2 class="text-2xl md:text-3xl font-black text-gray-900 mt-1">스페셜 골든 래플 (멀티 그룹 큐 시스템)</h2>
+            <span class="text-xs font-black text-amber-600 uppercase tracking-widest">CUSTOMER APPRECIATION PROMOTION</span>
+            <h2 class="text-2xl md:text-3xl font-black text-gray-900 mt-1">구매 고객 사은 프로모션 (스페셜 래플)</h2>
           </div>
-          <span class="text-xs text-gray-500 hidden sm:block">목표 인원 도달 그룹별 당첨자 선발 · 미달 그룹 티켓 전액 환불</span>
+          <span class="text-xs text-gray-500 hidden sm:block">목표 달성 그룹별 당첨자 선발 · 5만원 초과 제세공과금(22%) 당첨자 부담 · 미달 시 100% 반환</span>
         </div>
 
         ${raffles.length === 0 ? `

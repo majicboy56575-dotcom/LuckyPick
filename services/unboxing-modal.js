@@ -309,14 +309,17 @@ export async function executeUnboxingAnimation(boxId, payMethod = 'points') {
             </button>
             
             <button onclick="window.__quickConvertPoints('${wonItem.id}')" class="w-full py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-2xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 text-xs">
-              <span class="material-symbols-outlined text-base">swap_horiz</span>
-              80% 포인트로 즉시 전환 (+₩${(wonItem.refundPoints || 0).toLocaleString()}P 환급)
+              <span class="material-symbols-outlined text-base">published_with_changes</span>
+              배송 대신 단순변심 반품 (+₩${(wonItem.refundPoints || 0).toLocaleString()}P 적립)
             </button>
 
             <button onclick="window.__closeStageModal()" class="w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl text-xs hover:bg-gray-200 transition-colors">
               보관함에 보관하고 계속 둘러보기
             </button>
           </div>
+          <p class="text-[10px] text-gray-400 text-center mt-2">
+            ※ 실물 배송을 희망하지 않으실 경우 전자상거래 반품 절차에 따라 80% 스토어 적립금으로 즉시 전환됩니다.
+          </p>
         </div>`;
     }, 1600);
   } catch (err) {

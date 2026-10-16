@@ -21,6 +21,7 @@ import {
   getAvailableGoldenTicketsCount,
   setAvailableGoldenTicketsCount,
   getUserVault,
+  deleteVaultItem,
   getRaffleGroupData
 } from '../services/randombox.js';
 
@@ -147,7 +148,7 @@ function renderBoxesTab() {
                 <th class="p-4">최소주문(MOQ)</th>
                 <th class="p-4">도매 사입가</th>
                 <th class="p-4">소비자 정가</th>
-                <th class="p-4">80% 환급액</th>
+                <th class="p-4">80% 반품적립액</th>
                 <th class="p-4">당첨 확률</th>
                 <th class="p-4 text-right">관리</th>
               </tr>
@@ -286,7 +287,7 @@ function renderRafflesTab() {
                 </div>
 
                 ${!isClosed ? `
-                  <button onclick="window.__forceDrawRaffle('${r.id}')" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-amber-300 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer">
+                  <button onclick="window.__forceDrawRaffle('${r.id}', this)" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-amber-300 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-95 cursor-pointer">
                     <span class="material-symbols-outlined text-base">casino</span>
                     완료 그룹 즉시 추첨 & 미달 그룹 티켓 자동 환불 실행
                   </button>
@@ -351,36 +352,112 @@ function renderShippingTab() {
         <div class="space-y-4">
           ${displayRequests.map(req => {
             const isShipped = req.status === 'shipped';
+            const isSpecial = Boolean(req.isSpecialGift || (Number(req.retailPrice) > 50000) || (Number(req.taxAmount) > 0));
+            const taxAmount = req.taxAmount || (isSpecial ? Math.round(Number(req.retailPrice) * 0.22) : 0);
+            const taxStatus = req.taxStatus || (isSpecial ? 'pending' : 'none');
+            const depositName = req.taxDepositName || req.recipientName || req.shippingData?.name || '';
+            const hasIdCard = Boolean(req.taxIdCardImage);
+            const title = req.itemTitle || req.productTitle || '사은품 상품';
+            const recipientName = req.shippingData?.name || req.recipientName || '홍길동';
+            const recipientPhone = req.shippingData?.phone || req.recipientPhone || '010-1234-5678';
+            const shippingAddress = req.shippingData?.address || req.shippingAddress || '배송지 정보';
+            const memo = req.shippingData?.memo || req.shippingMemo || '';
+
             return `
               <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
                 <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-100 pb-3">
                   <div class="flex items-center gap-3">
-                    <img src="${req.imageUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200" alt="">
+                    <img src="${req.imageUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-2xs" alt="">
                     <div>
-                      <span class="text-[10px] font-mono text-gray-400 block">${req.shippingId}</span>
-                      <h4 class="font-bold text-sm text-gray-900">${req.itemTitle}</h4>
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono text-gray-400 block">${req.shippingId}</span>
+                        ${isSpecial ? '<span class="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300">5만 원 초과 스페셜</span>' : ''}
+                      </div>
+                      <h4 class="font-bold text-sm text-gray-900">${title}</h4>
                       <p class="text-[11px] text-gray-500 font-mono">정가: ₩${req.retailPrice?.toLocaleString()}원</p>
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
+                    ${isSpecial ? `
+                      <span class="text-xs font-black px-2.5 py-1 rounded-full ${taxStatus === 'verified' ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs'}">
+                        ${taxStatus === 'verified' ? '✓ 제세공과금 승인 완료' : '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>제세공과금 입금 확인 필요'}
+                      </span>
+                    ` : ''}
                     <span class="text-xs font-black px-3 py-1 rounded-full ${isShipped ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}">
                       ${isShipped ? '✓ 출고 완료' : '⏳ 배송 접수 대기'}
                     </span>
-                    <button onclick="window.__deleteShipping('${req.shippingId}')" class="p-1 text-gray-400 hover:text-red-500 rounded" title="요청 삭제">
+                    <button onclick="window.__deleteShipping('${req.shippingId}')" class="p-1 text-gray-400 hover:text-red-500 rounded cursor-pointer" title="요청 삭제">
                       <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                   </div>
                 </div>
 
-                <div class="bg-slate-50 p-4 rounded-2xl text-xs space-y-1.5">
-                  <div class="flex flex-wrap justify-between items-center pb-1.5 border-b border-slate-200/60">
-                    <p><strong>수령인:</strong> ${req.shippingData?.name || '홍길동'} (${req.shippingData?.phone || '010-1234-5678'})</p>
-                    <span class="text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded-full font-mono">
-                      배송비 ₩${(req.shippingFee || 3000).toLocaleString()}원 (${req.shippingPayMethod === 'points' ? '포인트 결제' : req.shippingPayMethod === 'toss' ? '토스 결제' : req.shippingPayMethod === 'easy_pay' ? '간편결제' : req.shippingPayMethod === 'paypal' ? 'PayPal' : '결제 완료'})
+                ${isSpecial ? `
+                <!-- Special Gift Tax & ID Card Verification Panel -->
+                <div class="p-4 bg-amber-50/70 border-2 border-amber-300 rounded-2xl text-xs space-y-3">
+                  <div class="flex flex-wrap justify-between items-center gap-2">
+                    <div class="flex items-center gap-2 font-black text-amber-950">
+                      <span class="material-symbols-outlined text-amber-600 text-base">verified_user</span>
+                      <span>[5만 원 초과 스페셜 사은품] 제세공과금 22% 입금 및 국세청 신분증 서류</span>
+                    </div>
+                    <span class="text-[11px] font-black px-2.5 py-0.5 rounded-full ${taxStatus === 'verified' ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-amber-200 text-amber-950 border border-amber-400 animate-pulse'}">
+                      ${taxStatus === 'verified' ? '✓ 관리자 서류·입금 승인 완료' : '⏳ 카카오뱅크 입금 및 신분증 대조 필요'}
                     </span>
                   </div>
-                  <p><strong>배송지:</strong> ${req.shippingData?.address || '서울시 강남구 테헤란로 123'}</p>
-                  ${req.shippingData?.memo ? `<p class="text-gray-500"><strong>배송 메모:</strong> ${req.shippingData.memo}</p>` : ''}
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono text-[11px]">
+                    <div class="bg-white p-3 rounded-xl border border-amber-200">
+                      <span class="text-[10px] text-gray-500 font-bold block">제세공과금 (22%)</span>
+                      <span class="text-amber-700 font-black text-sm">₩${taxAmount.toLocaleString()}원</span>
+                      <span class="text-[9px] text-gray-400 block mt-0.5 font-sans">카카오뱅크 3333-05-0344911</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-amber-200">
+                      <span class="text-[10px] text-gray-500 font-bold block">유저 입력 입금자 성명</span>
+                      <span class="text-gray-900 font-black text-sm">${depositName || '미기재'}</span>
+                      <span class="text-[9px] text-gray-400 block mt-0.5 font-sans">실시간 통장 내역 대조</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-amber-200 flex items-center justify-between">
+                      <div>
+                        <span class="text-[10px] text-gray-500 font-bold block">국세청 신분증 사본</span>
+                        <span class="${hasIdCard ? 'text-blue-600 font-bold' : 'text-gray-400 font-bold'}">${hasIdCard ? '첨부 완료 (대조 가능)' : '미첨부'}</span>
+                      </div>
+                      ${hasIdCard ? `
+                        <button type="button" onclick="window.__previewAdminIdCard('${req.shippingId}')" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
+                          <span class="material-symbols-outlined text-xs">visibility</span>
+                          신분증 보기
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-amber-200/60">
+                    <p class="text-[11px] text-amber-900/90 leading-tight">
+                      ※ 카카오뱅크 통장 입금 및 신분증 사본의 성명이 일치하는지 확인 후 승인 버튼을 눌러주세요.
+                    </p>
+                    ${taxStatus !== 'verified' ? `
+                      <button type="button" onclick="window.__verifyShippingTax('${req.shippingId}')" class="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-md flex items-center gap-1.5 active:scale-95 cursor-pointer">
+                        <span class="material-symbols-outlined text-sm">check_circle</span>
+                        제세공과금 입금 및 신분증 확인 승인
+                      </button>
+                    ` : `
+                      <span class="text-xs text-emerald-700 font-extrabold flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">verified</span>
+                        승인 완료 (운송장 입력 및 출고 가능)
+                      </span>
+                    `}
+                  </div>
+                </div>
+                ` : ''}
+
+                <div class="bg-slate-50 p-4 rounded-2xl text-xs space-y-1.5">
+                  <div class="flex flex-wrap justify-between items-center pb-1.5 border-b border-slate-200/60">
+                    <p><strong>수령인:</strong> ${recipientName} (${recipientPhone})</p>
+                    <span class="text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded-full font-mono">
+                      배송비 ₩${(req.shippingFee || (isSpecial ? 0 : 3000)).toLocaleString()}원 (${isSpecial ? '사은품 무료배송' : req.shippingPayMethod === 'points' ? '포인트 결제' : req.shippingPayMethod === 'toss' ? '토스 결제' : req.shippingPayMethod === 'easy_pay' ? '간편결제' : req.shippingPayMethod === 'paypal' ? 'PayPal' : '결제 완료'})
+                    </span>
+                  </div>
+                  <p><strong>배송지:</strong> ${shippingAddress}</p>
+                  ${memo ? `<p class="text-gray-500"><strong>배송 메모:</strong> ${memo}</p>` : ''}
                 </div>
 
                 <!-- Carrier and Tracking -->
@@ -395,7 +472,7 @@ function renderShippingTab() {
 
                   <input type="text" id="track-${req.shippingId}" value="${req.trackingNumber || ''}" placeholder="운송장 번호 입력" class="flex-1 min-w-[200px] bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-mono outline-none focus:border-primary font-bold">
 
-                  <button onclick="window.__updateTracking('${req.shippingId}')" class="px-5 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-primary-container transition-colors shadow-xs active:scale-95">
+                  <button onclick="window.__updateTracking('${req.shippingId}')" class="px-5 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-primary-container transition-colors shadow-xs active:scale-95 cursor-pointer">
                     ${isShipped ? '운송장 수정 저장' : '송장 등록 및 출고 완료'}
                   </button>
                 </div>
@@ -418,7 +495,7 @@ function renderUsersTab() {
           <h3 class="font-black text-xl text-gray-900">회원 및 지갑 관리</h3>
           <p class="text-xs text-gray-500 mt-0.5">회원별 보유 포인트 및 골든 티켓 직접 지급/차감 조정</p>
         </div>
-        <button onclick="window.__resetAllTestData()" class="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs flex items-center gap-1 transition-colors">
+        <button onclick="window.__resetAllTestData()" class="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs flex items-center gap-1 transition-colors cursor-pointer">
           <span class="material-symbols-outlined text-sm">restart_alt</span>
           전체 테스트 데이터 초기화
         </button>
@@ -503,10 +580,15 @@ function renderUsersTab() {
             ${vault.length === 0 ? `
               <p class="text-xs text-gray-400 py-2">보관함이 비어 있습니다.</p>
             ` : vault.map(v => `
-              <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-xs">
-                <img src="${v.imageUrl}" class="w-8 h-8 rounded-lg object-cover" alt="">
-                <span class="font-bold text-gray-800 truncate max-w-[150px]">${v.title}</span>
-                <span class="text-[10px] text-gray-400 font-mono">₩${v.retailPrice?.toLocaleString()}원</span>
+              <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <img src="${v.imageUrl}" class="w-8 h-8 rounded-lg object-cover" alt="">
+                  <span class="font-bold text-gray-800 truncate max-w-[150px]">${v.title}</span>
+                  <span class="text-[10px] text-gray-400 font-mono">₩${v.retailPrice?.toLocaleString()}원</span>
+                </div>
+                <button onclick="window.__deleteAdminVaultItem('${v.id}', '${v.title.replace(/'/g, "\\'")}')" class="p-1 text-slate-300 hover:text-red-600 rounded transition-colors cursor-pointer" title="이 아이템 삭제">
+                  <span class="material-symbols-outlined text-sm">close</span>
+                </button>
               </div>
             `).join('')}
           </div>
@@ -1287,7 +1369,13 @@ export function render() {
   };
 
   // --- Force Draw & Auto-Refund End-to-End ---
-  window.__forceDrawRaffle = async (raffleId) => {
+  window.__forceDrawRaffle = async (raffleId, btnElem) => {
+    if (btnElem) {
+      if (btnElem.disabled) return;
+      btnElem.disabled = true;
+      btnElem.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">refresh</span> 추첨 및 환불 처리 중...';
+      btnElem.classList.add('opacity-70', 'cursor-not-allowed');
+    }
     try {
       const result = await forceDrawAndResolveRaffle(raffleId);
       // 1. Refresh background tab to show closed state
@@ -1298,6 +1386,11 @@ export function render() {
     } catch (err) {
       console.error('Force draw raffle error:', err);
       alert(err.message || '추첨 진행 중 오류가 발생했습니다.');
+      if (btnElem) {
+        btnElem.disabled = false;
+        btnElem.innerHTML = '<span class="material-symbols-outlined text-base">casino</span> 완료 그룹 즉시 추첨 & 미달 그룹 티켓 자동 환불 실행';
+        btnElem.classList.remove('opacity-70', 'cursor-not-allowed');
+      }
     }
   };
 
@@ -1496,6 +1589,57 @@ export function render() {
     }
   };
 
+  window.__verifyShippingTax = async (shippingId) => {
+    if (!confirm('카카오뱅크 제세공과금(22%) 입금 및 국세청 신분증 사본 대조가 완료되었습니까?\n\n승인 시 고객 보관함의 상태가 [제세공과금 승인 완료]로 전환되며 출고 준비가 진행됩니다.')) return;
+    try {
+      await updateShippingRequestStatus(shippingId, 'shipping_requested', null, null, 'verified');
+      alert('✓ 제세공과금 입금 및 신분증 서류 승인이 완료되었습니다!\n이제 운송장을 등록하여 상품을 출고하실 수 있습니다.');
+      window.__switchAdminTab('shipping');
+    } catch (err) {
+      console.error('[Admin] verifyShippingTax error:', err);
+      alert('❌ 승인 처리 실패: ' + err.message);
+    }
+  };
+
+  window.__previewAdminIdCard = (shippingId) => {
+    const allRequests = getAllShippingRequests();
+    const req = allRequests.find(r => r.shippingId === shippingId);
+    if (!req || !req.taxIdCardImage) {
+      alert('첨부된 신분증 이미지가 없습니다.');
+      return;
+    }
+
+    const modalHtml = `
+      <div class="fixed inset-0 z-[110] flex items-center justify-center p-4 modal-backdrop bg-black/75 backdrop-blur-sm" id="admin-idcard-modal" onclick="if(event.target===this)window.__closeAdminModal()">
+        <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95">
+          <div class="flex justify-between items-center border-b pb-3">
+            <div>
+              <h3 class="font-bold text-base text-gray-900">📄 국세청 신고용 신분증 사본 확인</h3>
+              <p class="text-xs text-gray-500 font-mono">수령인: ${req.shippingData?.name || req.recipientName || '고객'} (입금자명: ${req.taxDepositName || '확인 중'})</p>
+            </div>
+            <button onclick="window.__closeAdminModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer">
+              <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+
+          <div class="p-2 bg-slate-900 rounded-2xl flex items-center justify-center overflow-hidden max-h-[60vh]">
+            <img src="${req.taxIdCardImage}" class="max-w-full max-h-[58vh] object-contain rounded-xl" alt="신분증 사본">
+          </div>
+
+          <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-snug">
+            ⚠️ <strong>세무 및 개인정보 보호 안내:</strong> 본 신분증 사본은 소득세법 제164조에 따른 원천징수이행상황신고서 제출용입니다. 세무 신고 완료 후 안전하게 파기해주시기 바랍니다.
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <button onclick="window.__closeAdminModal()" class="px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 cursor-pointer">
+              확인 닫기
+            </button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('admin-modal-container').innerHTML = modalHtml;
+  };
+
   window.__deleteShipping = async (shippingId) => {
     if (!confirm('이 배송 요청을 목록에서 삭제하시겠습니까?')) return;
     try {
@@ -1587,6 +1731,18 @@ export function render() {
     } catch (err) {
       console.error('[Admin] resetAllTestData error:', err);
       alert('❌ 데이터 리셋 실패: ' + err.message);
+    }
+  };
+
+  window.__deleteAdminVaultItem = async (vaultId, itemTitle) => {
+    if (!confirm(`[${itemTitle || '해당 아이템'}]을(를) 보관함에서 삭제하시겠습니까?`)) return;
+    try {
+      await deleteVaultItem(vaultId);
+      alert(`✓ [${itemTitle || '아이템'}]이(가) 보관함에서 정상 삭제되었습니다.`);
+      window.__switchAdminTab('users');
+    } catch (err) {
+      console.error('[Admin] deleteAdminVaultItem error:', err);
+      alert('보관함 삭제 오류: ' + (err.message || err));
     }
   };
 

@@ -254,9 +254,9 @@ exports.updateShippingStatus = onCall({ region: "asia-northeast3" }, async (requ
     }
   }
 
-  const { shippingId, newStatus, carrier, trackingNumber } = request.data;
-  if (!shippingId || !newStatus) {
-    throw new HttpsError("invalid-argument", "배송 ID와 새 상태가 필요합니다.");
+  const { shippingId, newStatus, carrier, trackingNumber, taxStatus } = request.data;
+  if (!shippingId) {
+    throw new HttpsError("invalid-argument", "배송 ID가 필요합니다.");
   }
 
   const shippingRef = db.collection("shipping_infos").doc(shippingId);
@@ -266,13 +266,37 @@ exports.updateShippingStatus = onCall({ region: "asia-northeast3" }, async (requ
   }
 
   const updateData = {
-    status: newStatus,
     updatedAt: Date.now(),
   };
+  if (newStatus) updateData.status = newStatus;
   if (carrier) updateData.carrier = carrier;
   if (trackingNumber) updateData.trackingNumber = trackingNumber;
+  if (taxStatus) updateData.taxStatus = taxStatus;
 
   await shippingRef.update(updateData);
+
+  // Sync to user vault for seamless real-time UI reflection
+  const shipData = shippingDoc.data();
+  if (shipData.winnerUid) {
+    try {
+      const userRef = db.collection("users").doc(shipData.winnerUid);
+      const userDoc = await userRef.get();
+      if (userDoc.exists) {
+        const uData = userDoc.data();
+        const vault = uData.vault || [];
+        const vIdx = vault.findIndex((v) => String(v.id) === String(shipData.productId) || (v.shippingData && v.status === "shipping_requested"));
+        if (vIdx !== -1) {
+          if (newStatus) vault[vIdx].status = newStatus;
+          if (carrier) vault[vIdx].carrier = carrier;
+          if (trackingNumber) vault[vIdx].trackingNumber = trackingNumber;
+          if (taxStatus) vault[vIdx].taxStatus = taxStatus;
+          await userRef.update({ vault, updatedAt: Date.now() });
+        }
+      }
+    } catch (syncErr) {
+      console.warn("[updateShippingStatus] Vault sync error:", syncErr);
+    }
+  }
 
   return { success: true, ...updateData };
 });
@@ -1471,20 +1495,25 @@ exports.forceDrawRaffle = onCall({ region: "asia-northeast3" }, async (request) 
       const userDoc = await winnerUserRef.get();
       if (userDoc.exists) {
         const vault = userDoc.data().vault || [];
-        vault.unshift({
-          id: "vault_raffle_" + Date.now() + "_" + g,
-          tierId: "super_raffle",
-          tierName: `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`,
-          itemId: raffle.id,
-          title: raffle.title,
-          imageUrl: raffle.imageUrl || "",
-          retailPrice: raffle.retailPrice || 1000000,
-          grade: "LEGENDARY",
-          refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
-          status: "in_vault",
-          wonAt: Date.now()
-        });
-        await winnerUserRef.update({ vault, updatedAt: Date.now() });
+        const uniqueVaultId = `vault_raffle_${raffle.id}_group_${g + 1}`;
+        const alreadyAwarded = vault.some((v) => v.id === uniqueVaultId || (v.itemId === raffle.id && v.tierName === `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`));
+
+        if (!alreadyAwarded) {
+          vault.unshift({
+            id: uniqueVaultId,
+            tierId: "super_raffle",
+            tierName: `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`,
+            itemId: raffle.id,
+            title: raffle.title,
+            imageUrl: raffle.imageUrl || "",
+            retailPrice: raffle.retailPrice || 1000000,
+            grade: "LEGENDARY",
+            refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
+            status: "in_vault",
+            wonAt: Date.now()
+          });
+          await winnerUserRef.update({ vault, updatedAt: Date.now() });
+        }
       }
     }
   }
@@ -1601,7 +1630,18 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
       newPoints -= fee;
     }
 
+    const isSpecialGift = (Number(item.retailPrice) > 50000) || Boolean(item.isSpecialGift);
+    const taxAmount = isSpecialGift ? Math.round(Number(item.retailPrice) * 0.22) : 0;
+    const taxStatus = isSpecialGift ? "pending" : "none";
+    const taxDepositName = shippingData.depositName || shippingData.name || shippingData.recipientName || "";
+    const taxIdCardImage = shippingData.idCardImage || "";
+
     item.status = "shipping_requested";
+    item.isSpecialGift = isSpecialGift;
+    item.taxAmount = taxAmount;
+    item.taxStatus = taxStatus;
+    item.taxDepositName = taxDepositName;
+    item.taxIdCardImage = taxIdCardImage;
     item.shippingData = shippingData;
     vault[idx] = item;
 
@@ -1612,6 +1652,7 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
       shippingId,
       productId: item.id || vaultId,
       productTitle: item.title || item.name || "보관함 상품",
+      retailPrice: item.retailPrice || 0,
       imageUrl: item.imageUrl || "",
       winnerUid: uid,
       winnerName: shippingData.name || shippingData.recipientName || userData.displayName || "회원",
@@ -1622,6 +1663,11 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
       shippingMemo: shippingData.memo || "",
       shippingFee: fee,
       shippingPayMethod: shippingData.payMethod || "points",
+      isSpecialGift,
+      taxAmount,
+      taxStatus,
+      taxDepositName,
+      taxIdCardImage,
       status: "pending",
       submittedAt: Date.now()
     };
@@ -1798,6 +1844,39 @@ exports.deleteShippingAdmin = onCall({ region: "asia-northeast3" }, async (reque
   await db.collection("shipping_infos").doc(shippingId).delete();
   console.log(`[Admin] Successfully deleted shipping info ${shippingId} from Firestore`);
   return { success: true, deletedShippingId: shippingId };
+});
+
+// ============================================
+// 25. cleanDuplicateVaultItems (Callable) - Clean Duplicate Special Raffle Vault Items
+// ============================================
+exports.cleanDuplicateVaultItems = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  const uid = request.auth.uid;
+  const userRef = db.collection("users").doc(uid);
+  const userDoc = await userRef.get();
+  if (!userDoc.exists) throw new HttpsError("not-found", "유저 정보를 찾을 수 없습니다.");
+
+  const vault = userDoc.data().vault || [];
+  const seen = new Set();
+  const cleanedVault = [];
+  let removedCount = 0;
+
+  for (const item of vault) {
+    const key = `${item.itemId || item.title}_${item.tierName || ""}`;
+    if (item.tierId === "super_raffle" && seen.has(key)) {
+      removedCount++;
+      continue;
+    }
+    seen.add(key);
+    cleanedVault.push(item);
+  }
+
+  if (removedCount > 0) {
+    await userRef.update({ vault: cleanedVault, updatedAt: Date.now() });
+    console.log(`[Vault] Cleaned ${removedCount} duplicate items for UID ${uid}`);
+  }
+
+  return { success: true, removedCount, remainingCount: cleanedVault.length, vault: cleanedVault };
 });
 
 

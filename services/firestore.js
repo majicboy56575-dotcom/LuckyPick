@@ -18,6 +18,7 @@ import {
   getDocs,
   setDoc,
   deleteDoc,
+  updateDoc,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import {
   getFunctions,
@@ -245,6 +246,14 @@ async function saveUserDocData(data) {
     Object.assign(currentUserDocCache, data);
     window.dispatchEvent(new CustomEvent('userDataChanged', { detail: currentUserDocCache }));
   }
+  const authUser = getCurrentAuthUser();
+  if (db && authUser?.uid) {
+    try {
+      await updateDoc(doc(db, 'users', authUser.uid), { ...data, updatedAt: Date.now() });
+    } catch (e) {
+      console.warn('[Firestore] saveUserDocData direct update fallback:', e.message);
+    }
+  }
   return true;
 }
 
@@ -367,31 +376,33 @@ async function submitShippingInfoToFirestore(data) {
   return payload;
 }
 
-async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '') {
+async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '', taxStatus = '') {
   const updateData = {
-    status,
-    carrier: carrier || 'CJ대한통운',
-    trackingNumber: trackingNumber || '',
     updatedAt: Date.now()
   };
+  if (status) updateData.status = status;
+  if (carrier) updateData.carrier = carrier;
+  if (trackingNumber) updateData.trackingNumber = trackingNumber;
+  if (taxStatus) updateData.taxStatus = taxStatus;
 
   if (db) {
     try {
       await setDoc(doc(db, 'shipping_infos', shippingId), updateData, { merge: true });
     } catch (e) {
       console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
-      await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+      await updateShippingStatus(shippingId, status, carrier, trackingNumber, taxStatus);
     }
   } else {
-    await updateShippingStatus(shippingId, status, carrier, trackingNumber);
+    await updateShippingStatus(shippingId, status, carrier, trackingNumber, taxStatus);
   }
 
   // Update cache upon success
   const item = shippingCache.find(s => s.id === shippingId || s.shippingId === shippingId);
   if (item) {
-    item.status = status;
-    item.carrier = carrier || 'CJ대한통운';
-    item.trackingNumber = trackingNumber || '';
+    if (status) item.status = status;
+    if (carrier) item.carrier = carrier;
+    if (trackingNumber) item.trackingNumber = trackingNumber;
+    if (taxStatus) item.taxStatus = taxStatus;
     item.updatedAt = Date.now();
     window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   }
@@ -651,10 +662,10 @@ async function submitShippingInfo(data) {
   return result.data.shippingInfo;
 }
 
-async function updateShippingStatus(shippingId, newStatus, carrier = '', trackingNumber = '') {
+async function updateShippingStatus(shippingId, newStatus, carrier = '', trackingNumber = '', taxStatus = '') {
   if (!functions) throw new Error('Firebase Functions not initialized');
   const callable = httpsCallable(functions, 'updateShippingStatus');
-  const result = await callable({ shippingId, newStatus, carrier, trackingNumber });
+  const result = await callable({ shippingId, newStatus, carrier, trackingNumber, taxStatus });
   return result.data;
 }
 
@@ -900,6 +911,13 @@ async function deleteShippingServer(shippingId) {
   return result.data;
 }
 
+async function cleanDuplicateVaultItemsServer() {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'cleanDuplicateVaultItems');
+  const result = await callable({});
+  return result.data;
+}
+
 /**
  * Compute group/slot info for a product.
  * @param {object} product - The active product object.
@@ -1039,4 +1057,5 @@ export {
   deleteSuperRaffleServer,
   syncBoxCatalogServer,
   deleteShippingServer,
+  cleanDuplicateVaultItemsServer,
 };

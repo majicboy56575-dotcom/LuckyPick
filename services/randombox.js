@@ -119,10 +119,10 @@ export const DEFAULT_SUPER_RAFFLES = [
 ];
 
 export const LIVE_WINNING_FEED = [
-  { icon: 'verified', title: '100% 정품 실물 재화 보장', desc: '모든 럭키박스는 엄선된 정품 실물 상품만 제공됩니다' },
-  { icon: 'local_shipping', title: '안전 무료 배송 지원', desc: '획득한 상품은 마이페이지에서 안전하게 택배 배송 신청 가능합니다' },
-  { icon: 'undo', title: '100% 자동 환불 보장', desc: '골든 래플 목표 인원 미달 시 응모 티켓이 전액 자동 환불 반환됩니다' },
-  { icon: 'security', title: '구매안전서비스(에스크로) 가입', desc: '네이버파이낸셜 구매안전서비스 가입 안전 쇼핑몰' }
+  { icon: 'verified', title: '100% 정품 실물 재화 보장', desc: '모든 상품은 엄선된 제조사 정품 실물로만 구성되어 있습니다' },
+  { icon: 'local_shipping', title: '전국 안전 무료 배송', desc: '획득한 모든 실물 상품은 마이페이지에서 택배 무료 배송 신청 가능합니다' },
+  { icon: 'published_with_changes', title: '단순변심 반품 적립 지원', desc: '배송 전 단순변심 시 80% 스토어 적립금으로 즉시 반품 전환 가능합니다' },
+  { icon: 'security', title: '구매안전서비스(에스크로) 가입', desc: '네이버파이낸셜 구매안전서비스 정식 가입 안전 쇼핑몰' }
 ];
 
 // Trigger Initial Auto-Seeding to Firestore on startup (Box Catalog only)
@@ -574,6 +574,17 @@ export async function convertVaultItemToPoints(vaultId) {
   }
 }
 
+// Direct Delete Item from User Vault
+export async function deleteVaultItem(vaultId) {
+  const vault = getUserVault();
+  const targetIdx = vault.findIndex(v => String(v.id) === String(vaultId));
+  if (targetIdx === -1) return false;
+  vault.splice(targetIdx, 1);
+  await saveUserDocData({ vault });
+  window.dispatchEvent(new CustomEvent('vaultUpdated', { detail: { vault } }));
+  return true;
+}
+
 // Request Individual Shipping (Server-Backed Atomic Shipping Request)
 export async function requestShippingForVaultItem(vaultId, shippingData) {
   try {
@@ -598,22 +609,23 @@ export function getAllShippingRequests() {
   return [];
 }
 
-export async function updateShippingRequestStatus(shippingId, status, carrier = '', trackingNumber = '') {
+export async function updateShippingRequestStatus(shippingId, status, carrier = '', trackingNumber = '', taxStatus = '') {
   // Update central shipping_infos collection in Firestore
-  await updateShippingStatusInFirestore(shippingId, status, carrier, trackingNumber);
+  await updateShippingStatusInFirestore(shippingId, status, carrier, trackingNumber, taxStatus);
 
   // Update in user vault if applicable
   const vault = getUserVault();
   const vaultItem = vault.find(v => v.id === shippingId || (v.shippingData && v.status === 'shipping_requested'));
   if (vaultItem) {
-    vaultItem.status = status;
-    vaultItem.carrier = carrier;
-    vaultItem.trackingNumber = trackingNumber;
-    vaultItem.shippedAt = Date.now();
+    if (status) vaultItem.status = status;
+    if (carrier) vaultItem.carrier = carrier;
+    if (trackingNumber) vaultItem.trackingNumber = trackingNumber;
+    if (taxStatus) vaultItem.taxStatus = taxStatus;
+    if (status === 'shipped') vaultItem.shippedAt = Date.now();
     saveUserDocData({ vault });
   }
 
-  return { shippingId, status, carrier, trackingNumber };
+  return { shippingId, status, carrier, trackingNumber, taxStatus };
 }
 
 export async function deleteShippingRequest(shippingId) {
