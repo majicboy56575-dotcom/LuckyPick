@@ -435,6 +435,7 @@ window.__processDirectPayment = async (tierId, amount, method) => {
           `;
         }
       }
+    }, 50);
   }
 };
 
