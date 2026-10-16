@@ -107,7 +107,7 @@ function renderFooter(pageName) {
           <p><span class="font-semibold text-on-surface">상호(법인명):</span> 럭키픽 | <span class="font-semibold text-on-surface">대표자:</span> 이재영 | <span class="font-semibold text-on-surface">사업자등록번호:</span> 803-05-03449</p>
           <p><span class="font-semibold text-on-surface">통신판매업신고:</span> 제 2026-화성새솔-0099 호 | <span class="font-semibold text-on-surface">개인정보관리책임자:</span> 이재영</p>
           <p><span class="font-semibold text-on-surface">사업장 소재지:</span> 경기도 화성시 만세구 수노을1로 148, 101동 902호(새솔동, 송산신도시 대방노블랜드 더퍼스티지 1차) (우: 18237)</p>
-          <p><span class="font-semibold text-on-surface">고객센터:</span> 010-4710-5657 (운영시간: 평일 10:00~17:00 / 점심 12:00~13:00 / 주말·공휴일 휴무)</p>
+          <p><span class="font-semibold text-on-surface">고객센터:</span> 070-8019-3205 (운영시간: 평일 10:00~17:00 / 점심 12:00~13:00 / 주말·공휴일 휴무)</p>
           <p><span class="font-semibold text-on-surface">이메일:</span> leejeayoung0713@gmail.com | <span class="font-semibold text-on-surface">호스팅 제공자:</span> Google Firebase</p>
         </div>
 
@@ -466,7 +466,7 @@ const POLICY_CONTENT = {
 
         <h4 class="font-bold text-on-surface text-sm">4. 개인정보 보호책임자 및 고객센터</h4>
         <p>• 성명: 이재영 (대표자)<br>
-        • 고객센터: 010-4710-5657 (운영시간: 평일 10:00 ~ 17:00)<br>
+        • 고객센터: 070-8019-3205 (운영시간: 평일 10:00 ~ 17:00)<br>
         • 이메일: leejeayoung0713@gmail.com</p>
       </div>
     `
