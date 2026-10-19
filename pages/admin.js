@@ -453,7 +453,7 @@ function renderShippingTab() {
                   <div class="flex flex-wrap justify-between items-center pb-1.5 border-b border-slate-200/60">
                     <p><strong>수령인:</strong> ${recipientName} (${recipientPhone})</p>
                     <span class="text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded-full font-mono">
-                      배송비 ₩${(req.shippingFee || (isSpecial ? 0 : 3000)).toLocaleString()}원 (${isSpecial ? '사은품 무료배송' : req.shippingPayMethod === 'points' ? '포인트 결제' : req.shippingPayMethod === 'toss' ? '토스 결제' : req.shippingPayMethod === 'easy_pay' ? '간편결제' : req.shippingPayMethod === 'paypal' ? 'PayPal' : '결제 완료'})
+                      배송비 ₩${(req.shippingFee || 3000).toLocaleString()}원 (${req.shippingPayMethod === 'points' ? '포인트 결제' : req.shippingPayMethod === 'toss' ? '토스 결제' : req.shippingPayMethod === 'easy_pay' ? '간편결제' : req.shippingPayMethod === 'paypal' ? 'PayPal' : req.shippingPayMethod === 'bank_transfer' ? '계좌 입금' : '결제 완료'}${isSpecial ? ' · 사은품' : ''})
                     </span>
                   </div>
                   <p><strong>배송지:</strong> ${shippingAddress}</p>

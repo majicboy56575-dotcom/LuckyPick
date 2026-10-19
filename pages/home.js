@@ -492,7 +492,7 @@ export function render() {
               <span class="gold-gradient-text">100% 정품 실물 득템</span> + <span class="text-amber-300">구매 사은 래플</span>
             </h1>
             <p class="text-sm md:text-base text-slate-300 mb-8 leading-relaxed">
-              소비자가 기준 최저 보장 가치 100% 보장! 엄선된 디지털·생활 잡화 전 품목 무료 배송 & 구매 사은 골든 티켓으로 <strong>스페셜 사은품(아이폰 16 Pro 등)에 자유롭게 응모</strong>하세요. (인원 미달 시 티켓 100% 자동 반환)
+              소비자가 기준 최저 보장 가치 100% 보장! 엄선된 디지털·생활 잡화 전 품목 100% 정품 출고 & 구매 사은 골든 티켓으로 <strong>스페셜 사은품(아이폰 16 Pro 등)에 자유롭게 응모</strong>하세요. (인원 미달 시 티켓 100% 자동 반환)
             </p>
 
             <div class="flex flex-wrap items-center gap-4">

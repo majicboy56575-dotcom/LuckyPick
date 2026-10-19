@@ -163,7 +163,7 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
             <div class="min-w-0 flex-1">
               <span class="text-[9px] font-black px-1.5 py-0.5 rounded ${isSpecialGift ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'} border border-amber-200">${isSpecialGift ? '스페셜 사은품' : '100% 정품 보장'}</span>
               <h4 class="font-extrabold text-sm text-gray-900 truncate mt-0.5">${itemTitle}</h4>
-              <p class="text-[11px] text-gray-500 font-mono">소비자 정가: <strong>₩${itemPrice.toLocaleString()}원</strong> (${isSpecialGift ? '전국 무료 안심 배송' : '배송 신청 시 무료 수령'})</p>
+              <p class="text-[11px] text-gray-500 font-mono">소비자 정가: <strong>₩${itemPrice.toLocaleString()}원</strong> (기본 택배 배송비: ₩3,000원)</p>
             </div>
           </div>
 
@@ -283,17 +283,14 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
               </select>
             </div>
 
-            ${!isSpecialGift ? `
             <!-- Remote area checkbox -->
             <label class="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
               <input type="checkbox" id="s-ship-remote" onchange="window.__toggleRemoteAreaShipping()" class="rounded text-primary focus:ring-primary w-4 h-4">
               <span class="font-bold text-gray-700 text-xs">제주도 및 도서산간 지역 배송 (+₩3,000원 추가 운임)</span>
             </label>
-            ` : ''}
           </div>
 
-          ${!isSpecialGift ? `
-          <!-- Shipping Fee Payment Section for normal items -->
+          <!-- Shipping Fee Payment Section (Applies to all items) -->
           <div class="space-y-3 pt-2">
             <div class="flex items-center justify-between border-b pb-1.5">
               <div class="flex items-center gap-1.5 font-bold text-gray-900 text-xs">
@@ -346,27 +343,30 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
               </label>
             </div>
           </div>
-          ` : ''}
 
           <!-- Cost Summary Box -->
           <div class="p-4 bg-slate-900 text-white rounded-2xl space-y-2">
             <div class="flex justify-between items-center text-xs text-slate-300">
               <span>상품 수령액</span>
-              <span class="font-mono font-bold text-emerald-400">₩0원 (사은품 획득 무료)</span>
+              <span class="font-mono font-bold text-emerald-400">₩0원 (${isSpecialGift ? '스페셜 사은품 획득' : '당첨 상품 수령'})</span>
             </div>
             <div class="flex justify-between items-center text-xs text-slate-300">
               <span>택배 배송비 (CJ대한통운/우체국)</span>
-              <span class="font-mono ${isSpecialGift ? 'text-emerald-400 font-bold' : ''}">${isSpecialGift ? '₩0원 (전액 무료 배송)' : '₩3,000원'}</span>
+              <span class="font-mono text-white font-bold">₩3,000원</span>
             </div>
-            ${!isSpecialGift ? `
             <div id="s-ship-remote-row" class="justify-between items-center text-xs text-amber-300 hidden">
               <span>도서산간/제주 추가 운임</span>
               <span class="font-mono font-bold">+₩3,000원</span>
             </div>
+            ${isSpecialGift ? `
+            <div class="flex justify-between items-center text-xs text-amber-400 pt-1 border-t border-slate-800">
+              <span>사은품 제세공과금 (22%, 계좌 송금)</span>
+              <span class="font-mono font-bold text-amber-300">₩${taxAmount.toLocaleString()}원</span>
+            </div>
             ` : ''}
             <div class="pt-2 border-t border-slate-700 flex justify-between items-center">
-              <span class="font-extrabold text-sm text-white">${isSpecialGift ? '사은품 제세공과금' : '최종 결제 배송비'}</span>
-              <span id="s-ship-total-fee" class="font-black text-lg text-amber-300 font-mono">${isSpecialGift ? `₩${taxAmount.toLocaleString()}원 (계좌 송금)` : '₩3,000원'}</span>
+              <span class="font-extrabold text-sm text-white">최종 결제 배송비</span>
+              <span id="s-ship-total-fee" class="font-black text-lg text-amber-300 font-mono">₩3,000원</span>
             </div>
           </div>
         </div>
@@ -383,7 +383,7 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
           </button>
           <button type="button" id="s-ship-submit-btn" onclick="window.__submitSingleShipping('${vaultItemId}')" class="flex-1 py-3.5 ${isSpecialGift ? 'bg-amber-600 hover:bg-amber-500 text-slate-950 font-black' : 'bg-primary hover:bg-primary-container text-white font-black'} rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer">
             <span class="material-symbols-outlined text-sm">check_circle</span>
-            <span id="s-ship-btn-text">${isSpecialGift ? `₩${taxAmount.toLocaleString()}원 입금 및 사은품 접수 완료` : '₩3,000원 결제 및 배송 접수'}</span>
+            <span id="s-ship-btn-text">${isSpecialGift ? '배송비 ₩3,000원 결제 및 서류 접수' : '₩3,000원 결제 및 배송 접수'}</span>
           </button>
         </div>
       </div>
@@ -1193,9 +1193,9 @@ export function render() {
         address: `${addr} ${detail}`.trim(),
         memo,
         isRemote,
-        fee: isSpecialGift ? 0 : fee,
-        payMethod: isSpecialGift ? 'bank_transfer' : payMethod,
-        payMethodName: isSpecialGift ? '제세공과금 계좌 입금' : (methodNames[payMethod] || '포인트'),
+        fee,
+        payMethod,
+        payMethodName: methodNames[payMethod] || '포인트',
         isSpecialGift,
         depositName,
         idCardImage: idCardData,
@@ -1203,7 +1203,7 @@ export function render() {
       });
 
       if (isSpecialGift) {
-        alert(`🎉 [스페셜 사은품 배송 및 서류 접수 완료]\n\n제세공과금(₩${taxAmount.toLocaleString()}원) 입금 확인 및 신분증 서류 검토 후 즉시 안전하게 발송됩니다!\n\n• 입금자 성명: ${depositName}\n• 입금 계좌: 카카오뱅크 3333-05-0344911 (럭키픽 이재영)\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
+        alert(`🎉 [스페셜 사은품 배송비 ₩${fee.toLocaleString()}원 결제 & 서류 접수 완료]\n\n배송비 결제가 정상 처리되었습니다.\n제세공과금(₩${taxAmount.toLocaleString()}원) 입금 확인 및 신분증 서류 검토 후 즉시 안전하게 발송됩니다!\n\n• 배송비 결제: ₩${fee.toLocaleString()}원 (${methodNames[payMethod] || '포인트'})\n• 세무 입금자: ${depositName}\n• 제세공과금 입금계좌: 카카오뱅크 3333-05-0344911 (럭키픽 이재영)\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
       } else {
         alert(`🎉 [배송비 ₩${fee.toLocaleString()}원 ${methodNames[payMethod]} 결제 완료]\n실물 상품 배송 요청이 성공적으로 접수되었습니다!\n\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
       }

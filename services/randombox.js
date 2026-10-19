@@ -120,7 +120,7 @@ export const DEFAULT_SUPER_RAFFLES = [
 
 export const LIVE_WINNING_FEED = [
   { icon: 'verified', title: '100% 정품 실물 재화 보장', desc: '모든 상품은 엄선된 제조사 정품 실물로만 구성되어 있습니다' },
-  { icon: 'local_shipping', title: '전국 안전 무료 배송', desc: '획득한 모든 실물 상품은 마이페이지에서 택배 무료 배송 신청 가능합니다' },
+  { icon: 'local_shipping', title: '전국 안심 택배 배송', desc: '획득한 모든 실물 상품은 마이페이지에서 간편하게 택배 배송 신청 가능합니다' },
   { icon: 'published_with_changes', title: '단순변심 반품 적립 지원', desc: '배송 전 단순변심 시 80% 스토어 적립금으로 즉시 반품 전환 가능합니다' },
   { icon: 'security', title: '구매안전서비스(에스크로) 가입', desc: '네이버파이낸셜 구매안전서비스 정식 가입 안전 쇼핑몰' }
 ];
