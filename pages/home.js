@@ -139,10 +139,16 @@ function renderSuperRaffleCard(raffle, index) {
       <div class="absolute -right-12 -top-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div>
-        <!-- Large Showcase Product Hero -->
-        <div class="relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden bg-slate-950/90 border-2 ${isClosed ? 'border-slate-700' : 'border-amber-400/50'} shadow-xl mb-4 group">
-          <img src="${raffle.imageUrl || 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80'}" alt="${raffle.title}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/30 pointer-events-none"></div>
+        <!-- Large Showcase Product Hero: Full Visibility (No Clipping) with Ambient Backdrop -->
+        <div class="relative w-full h-72 sm:h-80 rounded-2xl overflow-hidden bg-slate-950 border-2 ${isClosed ? 'border-slate-700' : 'border-amber-400/50'} shadow-xl mb-4 group flex items-center justify-center p-3">
+          <!-- Ambient Blur Backdrop for Seamless Margin Fill -->
+          <div class="absolute inset-0 bg-cover bg-center filter blur-2xl opacity-25 scale-110 pointer-events-none transition-transform duration-700 group-hover:scale-120" style="background-image: url('${raffle.imageUrl || ''}');"></div>
+
+          <!-- Top subtle vignette for badge contrast -->
+          <div class="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/50 via-black/10 to-transparent pointer-events-none z-2"></div>
+
+          <!-- 100% Full Original Image without Any Clipping -->
+          <img src="${raffle.imageUrl || 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80'}" alt="${raffle.title}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-contain relative z-1 transition-transform duration-300 group-hover:scale-[1.03] drop-shadow-md">
 
           <!-- Top Floating Badges over Image -->
           <div class="absolute top-3 left-3 z-10">
@@ -170,16 +176,18 @@ function renderSuperRaffleCard(raffle, index) {
             </div>
           </div>
 
+          ${raffle.winnerBonus ? `
           <!-- Bottom Floating Bonus Badge over Image -->
-          <div class="absolute bottom-3 left-3 right-3 z-10 flex justify-between items-end">
-            <span class="text-[11px] text-emerald-300 font-bold bg-slate-950/85 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 shadow-sm flex items-center gap-1">
+          <div class="absolute bottom-3 left-3 right-3 z-10 flex justify-between items-end pointer-events-none">
+            <span class="text-[11px] text-emerald-300 font-bold bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 shadow-sm flex items-center gap-1">
               <span>🎁</span>
               <span>${raffle.winnerBonus}</span>
             </span>
           </div>
+          ` : ''}
 
           ${isClosed ? `
-            <div class="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center z-20">
               <span class="px-5 py-2 bg-slate-900/90 text-amber-300 border-2 border-amber-400 font-black text-sm tracking-widest rounded-2xl shadow-2xl">
                 🏁 추첨 마감 완료
               </span>

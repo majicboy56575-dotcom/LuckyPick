@@ -748,7 +748,7 @@ export function render() {
     window.__switchAdminTab('shipping');
   };
 
-  // Image Upload Handler: Automatic 1:1 Square Center-Crop, 600x600 Resizing & Smart Lightweight Compression
+  // Image Upload Handler: 100% Full Visibility (No Crop), Smart Aspect Ratio Preservation & Lightweight Compression
   window.__handleImageUpload = (e, targetInputId, previewImgId, btnId) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -760,39 +760,67 @@ export function render() {
     const btn = btnId ? document.getElementById(btnId) : null;
     const originalBtnHtml = btn ? btn.innerHTML : '';
     if (btn) {
-      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">sync</span> 규격(1:1) 및 용량 자동 최적화 중...`;
+      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">sync</span> 원본 전체(No Crop) 자동 보정 중...`;
     }
 
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        // 1. Standard E-Commerce Product Image Spec: 600x600 px (Crisp 1:1 Retina Display)
-        const TARGET_SIZE = 600;
+        // Determine Target Specs based on context (Raffle showcase vs Box items)
+        const isRaffle = String(targetInputId).includes('raffle');
+        // For special raffles: Wide showcase ratio (800x600, 4:3)
+        // For box items: Clean square ratio (600x600, 1:1)
+        const TARGET_W = isRaffle ? 800 : 600;
+        const TARGET_H = 600;
 
-        // 2. Smart 1:1 Center-Crop: Calculate center coordinate for any aspect ratio (landscape or portrait)
-        const minSide = Math.min(img.width, img.height);
-        const cropX = Math.round((img.width - minSide) / 2);
-        const cropY = Math.round((img.height - minSide) / 2);
+        // 1. Calculate aspect-preserving fit scale (Never crop! 100% of original image visible)
+        // Leave a subtle 4% margin so the product breathes nicely inside the card
+        const paddingFactor = 0.94;
+        const maxDrawW = TARGET_W * paddingFactor;
+        const maxDrawH = TARGET_H * paddingFactor;
+
+        const scale = Math.min(maxDrawW / img.width, maxDrawH / img.height);
+        const drawW = Math.round(img.width * scale);
+        const drawH = Math.round(img.height * scale);
+        const drawX = Math.round((TARGET_W - drawW) / 2);
+        const drawY = Math.round((TARGET_H - drawH) / 2);
 
         const canvas = document.createElement('canvas');
-        canvas.width = TARGET_SIZE;
-        canvas.height = TARGET_SIZE;
+        canvas.width = TARGET_W;
+        canvas.height = TARGET_H;
         const ctx = canvas.getContext('2d');
 
-        // High quality image downsampling & smoothing
+        // High quality downsampling & smoothing
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        // Clean white background fill to prevent black background on transparent PNGs
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, TARGET_SIZE, TARGET_SIZE);
+        // 2. Smart Background Sampling from original image edges (Seamless letterboxing)
+        let bgStyle = '#FFFFFF';
+        try {
+          const sampleCanvas = document.createElement('canvas');
+          sampleCanvas.width = img.width;
+          sampleCanvas.height = img.height;
+          const sampleCtx = sampleCanvas.getContext('2d');
+          sampleCtx.drawImage(img, 0, 0);
+          const p = sampleCtx.getImageData(0, 0, 1, 1).data;
+          // If corner pixel is not completely transparent, use it
+          if (p[3] > 50) {
+            bgStyle = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
+          }
+        } catch (_) {
+          bgStyle = '#FFFFFF';
+        }
 
-        // Draw cropped 1:1 square from center
-        ctx.drawImage(img, cropX, cropY, minSide, minSide, 0, 0, TARGET_SIZE, TARGET_SIZE);
+        // Clean background fill
+        ctx.fillStyle = bgStyle;
+        ctx.fillRect(0, 0, TARGET_W, TARGET_H);
 
-        // 3. Compress to high-efficiency Web JPEG (~30-60KB) to ensure super-fast mobile loading and Firestore doc safety
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        // 3. Draw full original image centered without ANY clipping
+        ctx.drawImage(img, 0, 0, img.width, img.height, drawX, drawY, drawW, drawH);
+
+        // 4. Compress to high-efficiency Web JPEG (~40-70KB) to ensure super-fast mobile loading and Firestore doc safety
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
         // Calculate size savings
         const originalKb = Math.round(file.size / 1024);
@@ -807,15 +835,16 @@ export function render() {
         }
         if (preview) {
           preview.src = compressedDataUrl;
+          preview.className = 'w-full h-full object-contain bg-white p-0.5';
         }
 
-        // 4. Update button text with success feedback
+        // 5. Update button text with success feedback
         if (btn) {
-          btn.innerHTML = `<span class="material-symbols-outlined text-sm text-emerald-400">check_circle</span> 600×600 규격 & ${optimizedKb}KB 최적화 완료!`;
+          btn.innerHTML = `<span class="material-symbols-outlined text-sm text-emerald-400">check_circle</span> 원본 100% 보존 (${TARGET_W}×${TARGET_H}) 완료!`;
           btn.classList.add('bg-emerald-950', 'text-emerald-300', 'border', 'border-emerald-500/40');
         }
 
-        // 5. Add or update real-time optimization info badge below the input
+        // 6. Add or update real-time optimization info badge below the input
         const container = input ? input.parentElement : null;
         if (container) {
           let badge = container.querySelector('.img-opt-badge');
@@ -826,7 +855,7 @@ export function render() {
           }
           badge.innerHTML = `
             <span class="flex items-center gap-1 font-bold text-emerald-900">
-              <span class="material-symbols-outlined text-xs text-emerald-600">aspect_ratio</span> 600×600 (1:1 정사각형)
+              <span class="material-symbols-outlined text-xs text-emerald-600">aspect_ratio</span> ${TARGET_W}×${TARGET_H} (잘림 없는 원본 100% 보존)
             </span>
             <span class="text-emerald-700">
               ${originalKb.toLocaleString()}KB ➔ <strong>${optimizedKb.toLocaleString()}KB</strong> <span class="bg-emerald-200/80 text-emerald-900 font-bold px-1 rounded text-[9px]">-${savedPercent}%</span>
@@ -1004,7 +1033,7 @@ export function render() {
               <label class="font-bold block text-gray-700">상품 이미지 (노트북 사진 업로드 / URL)</label>
               <div class="flex items-center gap-3">
                 <div class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary shadow-2xs" onclick="document.getElementById('modal-item-file').click()" title="클릭하여 내 노트북에서 사진 선택">
-                  <img id="modal-item-preview" src="https://images.unsplash.com/photo-1544816155-12df9643f363?w=400" class="w-full h-full object-cover" alt="">
+                  <img id="modal-item-preview" src="https://images.unsplash.com/photo-1544816155-12df9643f363?w=400" class="w-full h-full object-contain bg-white p-0.5" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
                   <button type="button" id="modal-add-item-upload-btn" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
@@ -1085,7 +1114,7 @@ export function render() {
               <label class="font-bold block text-gray-700">상품 이미지 (노트북 사진 업로드 / URL)</label>
               <div class="flex items-center gap-3">
                 <div class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary shadow-2xs" onclick="document.getElementById('modal-item-file').click()" title="클릭하여 내 노트북에서 사진 선택">
-                  <img id="modal-item-preview" src="${item.image}" class="w-full h-full object-cover" alt="">
+                  <img id="modal-item-preview" src="${item.image}" class="w-full h-full object-contain bg-white p-0.5" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
                   <button type="button" id="modal-item-upload-btn" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
@@ -1230,7 +1259,7 @@ export function render() {
               <label class="font-bold block text-gray-700">상품 이미지 (노트북 사진 업로드 / URL)</label>
               <div class="flex items-center gap-3">
                 <div class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary shadow-2xs" onclick="document.getElementById('raffle-file').click()" title="클릭하여 내 노트북에서 사진 선택">
-                  <img id="raffle-preview" src="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600" class="w-full h-full object-cover" alt="">
+                  <img id="raffle-preview" src="https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600" class="w-full h-full object-contain bg-white p-0.5" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
                   <button type="button" id="raffle-add-upload-btn" onclick="document.getElementById('raffle-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
@@ -1298,7 +1327,7 @@ export function render() {
               <label class="font-bold block text-gray-700">상품 이미지 (노트북 사진 업로드 / URL)</label>
               <div class="flex items-center gap-3">
                 <div class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary shadow-2xs" onclick="document.getElementById('raffle-file').click()" title="클릭하여 내 노트북에서 사진 선택">
-                  <img id="raffle-preview" src="${raffle.imageUrl}" class="w-full h-full object-cover" alt="">
+                  <img id="raffle-preview" src="${raffle.imageUrl}" class="w-full h-full object-contain bg-white p-0.5" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
                   <button type="button" id="raffle-edit-upload-btn" onclick="document.getElementById('raffle-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
