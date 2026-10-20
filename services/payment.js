@@ -1,4 +1,4 @@
-import { confirmTossPayment } from './firestore.js';
+import { confirmTossPayment, readyDanalPaymentServer, confirmDanalPaymentServer } from './firestore.js';
 
 // Toss Payments Client Key (주문서형·결제창형 결제위젯 라이브 클라이언트 키)
 const TOSS_CLIENT_KEY = 'live_gck_GjLJoQ1aVZX5RWeOzlz58w6KYe2R';
@@ -165,6 +165,178 @@ async function handleTossSuccess(paymentKey, orderId, amount, productId) {
   }
 }
 
+/**
+ * --- Danal Credit Card & EasyPay (KakaoPay, NaverPay, SamsungPay) Integration ---
+ */
+async function requestDanalCardPayment({ amount, itemName = '럭키박스', productId }) {
+  trackMetaEvent('InitiateCheckout', {
+    content_name: itemName,
+    content_ids: [productId],
+    value: Number(amount),
+    currency: 'KRW'
+  });
+
+  const baseUrl = window.location.origin + window.location.pathname;
+  const returnUrl = `${baseUrl}?danal=card_return&productId=${encodeURIComponent(productId)}&amount=${amount}`;
+  const cancelUrl = `${baseUrl}?danal=cancel`;
+
+  const readyRes = await readyDanalPaymentServer({
+    method: 'card',
+    amount: Number(amount),
+    itemName,
+    productId,
+    returnUrl,
+    cancelUrl
+  });
+
+  if (!readyRes || !readyRes.success) {
+    throw new Error(readyRes?.message || '다날 결제창 호출 준비에 실패했습니다.');
+  }
+
+  // Open Danal Payment Popup or create submission form
+  const { startUrl, startParams } = readyRes;
+  const popupWidth = 500;
+  const popupHeight = 680;
+  const left = Math.max(0, (window.screen.width - popupWidth) / 2);
+  const top = Math.max(0, (window.screen.height - popupHeight) / 2);
+
+  const popup = window.open(
+    'about:blank',
+    'DanalCardPopup',
+    `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+  );
+
+  if (!popup) {
+    alert('팝업 차단이 감지되었습니다. 팝업 차단을 해제 후 다시 시도해 주세요.');
+    return;
+  }
+
+  // Create form in popup and submit to startUrl
+  const formHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><title>다날 결제 진행 중</title></head>
+    <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f8fafc;">
+      <div style="text-align:center;">
+        <p style="font-size:14px;color:#475569;font-weight:bold;">다날 결제창을 안전하게 연결하고 있습니다...</p>
+      </div>
+      <form name="danal_form" action="${startUrl}" method="POST">
+        <input type="hidden" name="STARTPARAMS" value="${startParams}">
+      </form>
+      <script>
+        document.danal_form.submit();
+      </script>
+    </body>
+    </html>
+  `;
+
+  popup.document.open();
+  popup.document.write(formHtml);
+  popup.document.close();
+}
+
+/**
+ * --- Danal Phone Micro-payment Integration ---
+ */
+async function requestDanalPhonePayment({ amount, itemName = '럭키박스', productId }) {
+  trackMetaEvent('InitiateCheckout', {
+    content_name: itemName,
+    content_ids: [productId],
+    value: Number(amount),
+    currency: 'KRW'
+  });
+
+  const baseUrl = window.location.origin + window.location.pathname;
+  const returnUrl = `${baseUrl}?danal=phone_return&productId=${encodeURIComponent(productId)}&amount=${amount}`;
+  const cancelUrl = `${baseUrl}?danal=cancel`;
+
+  const readyRes = await readyDanalPaymentServer({
+    method: 'phone',
+    amount: Number(amount),
+    itemName,
+    productId,
+    returnUrl,
+    cancelUrl
+  });
+
+  if (!readyRes || !readyRes.success) {
+    throw new Error(readyRes?.message || '다날 휴대폰 결제창 호출 준비에 실패했습니다.');
+  }
+
+  const { startUrl, params } = readyRes;
+  const popupWidth = 480;
+  const popupHeight = 650;
+  const left = Math.max(0, (window.screen.width - popupWidth) / 2);
+  const top = Math.max(0, (window.screen.height - popupHeight) / 2);
+
+  const popup = window.open(
+    'about:blank',
+    'DanalPhonePopup',
+    `width=${popupWidth},height=${popupHeight},left=${left},top=${top},scrollbars=yes,resizable=yes`
+  );
+
+  if (!popup) {
+    alert('팝업 차단이 감지되었습니다. 팝업 차단을 해제 후 다시 시도해 주세요.');
+    return;
+  }
+
+  let inputs = '';
+  for (const [k, v] of Object.entries(params)) {
+    inputs += `<input type="hidden" name="${k}" value="${v}">\n`;
+  }
+
+  const formHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><title>다날 휴대폰 결제 진행 중</title></head>
+    <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f8fafc;">
+      <div style="text-align:center;">
+        <p style="font-size:14px;color:#475569;font-weight:bold;">다날 휴대폰 결제창을 연결하고 있습니다...</p>
+      </div>
+      <form name="danal_phone_form" action="${startUrl}" method="POST">
+        ${inputs}
+      </form>
+      <script>
+        document.danal_phone_form.submit();
+      </script>
+    </body>
+    </html>
+  `;
+
+  popup.document.open();
+  popup.document.write(formHtml);
+  popup.document.close();
+}
+
+/**
+ * Handle Danal Payment Confirm
+ */
+async function handleDanalSuccess(returnParams, amount, productId, orderId, method = 'card') {
+  try {
+    const result = await confirmDanalPaymentServer({
+      returnParams,
+      amount: parseInt(amount),
+      productId,
+      orderId,
+      method
+    });
+
+    if (result && result.success) {
+      trackMetaEvent('Purchase', {
+        content_name: productId,
+        content_ids: [productId],
+        value: parseInt(amount),
+        currency: 'KRW'
+      });
+    }
+
+    return result;
+  } catch (err) {
+    console.error('[Danal] Confirm error:', err);
+    throw err;
+  }
+}
+
 export {
   PAYMENT_METHODS,
   TOSS_CLIENT_KEY,
@@ -173,4 +345,8 @@ export {
   renderTossPaymentWidget,
   requestTossWidgetPayment,
   handleTossSuccess,
+  requestDanalCardPayment,
+  requestDanalPhonePayment,
+  handleDanalSuccess,
 };
+

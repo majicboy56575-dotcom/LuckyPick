@@ -718,6 +718,20 @@ async function confirmTossPayment(data) {
   return result.data;
 }
 
+async function readyDanalPaymentServer(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'readyDanalPayment');
+  const result = await callable(data);
+  return result.data;
+}
+
+async function confirmDanalPaymentServer(data) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'confirmDanalPayment');
+  const result = await callable(data);
+  return result.data;
+}
+
 async function openLuckyBoxServer(tierId, payMethod = 'points') {
   if (!functions) throw new Error('Firebase Functions not initialized');
   const callable = httpsCallable(functions, 'openLuckyBox');
@@ -1028,6 +1042,8 @@ export {
   capturePayPalOrder,
   cancelUserParticipation,
   confirmTossPayment,
+  readyDanalPaymentServer,
+  confirmDanalPaymentServer,
   getGroupSlots,
   maskName,
   maskEmail,

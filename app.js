@@ -5,7 +5,7 @@ import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLangua
 // NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
 import { getClosedProducts, getCurrentUser, getCurrentUserDocCache } from './services/firestore.js';
-import { handleTossSuccess } from '/services/payment.js';
+import { handleTossSuccess, handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 
@@ -346,6 +346,64 @@ function navigate() {
     })();
     return;
   }
+
+  // --- Danal Payment Redirect Handlers ---
+  const danalStatus = urlParams.get('danal');
+  const danalReturnParams = urlParams.get('RETURNPARAMS');
+  const danalAmount = urlParams.get('amount');
+  const danalProductId = urlParams.get('productId') || sessionStorage.getItem('danal_pending_product') || 'box_basic';
+
+  if (danalStatus === 'cancel') {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    alert('다날 결제가 취소되었습니다.');
+    window.location.hash = '#home';
+    return;
+  }
+
+  if (danalStatus === 'card_return' && danalReturnParams) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    sessionStorage.removeItem('danal_pending_product');
+    (async () => {
+      const user = await waitForAuth(5000);
+      if (!user) {
+        alert('로그인 정보를 확인하지 못했습니다. 다시 로그인 후 시도해주세요.');
+        window.location.hash = '#profile';
+        return;
+      }
+      try {
+        const result = await handleDanalSuccess(danalReturnParams, danalAmount, danalProductId, null, 'card');
+        if (result && result.success) {
+          alert('🎉 다날 카드 결제 완료! 럭키박스를 개봉합니다.');
+          executeUnboxingAnimation(danalProductId, 'danal');
+        } else {
+          alert(`다날 결제 실패: ${result.message || '승인 실패'}`);
+          window.location.hash = '#home';
+        }
+      } catch (err) {
+        console.error('[Danal] Confirm error:', err);
+        alert(`다날 결제 승인 실패: ${err.message || '오류가 발생했습니다.'}`);
+        window.location.hash = '#home';
+      }
+    })();
+    return;
+  }
+
+  if (danalStatus === 'phone_return') {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    sessionStorage.removeItem('danal_pending_product');
+    (async () => {
+      const user = await waitForAuth(5000);
+      if (!user) {
+        alert('로그인 정보를 확인하지 못했습니다. 다시 로그인 후 시도해주세요.');
+        window.location.hash = '#profile';
+        return;
+      }
+      alert('🎉 다날 휴대폰 소액결제 승인이 완료되었습니다! 럭키박스를 개봉합니다.');
+      executeUnboxingAnimation(danalProductId, 'danal_phone');
+    })();
+    return;
+  }
+
 
   const pageName = getPageFromHash();
   const route = routes[pageName];

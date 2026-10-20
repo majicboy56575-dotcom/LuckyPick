@@ -21,6 +21,13 @@ const ADMIN_EMAIL = "majicboy56575@gmail.com";
 const TOSS_SECRET_KEY =
   process.env.TOSS_SECRET_KEY || "live_gsk_DpexMgkW367LEY5O7wAMVGbR5ozO";
 
+// Danal Payments Module
+const {
+  readyDanalCardPayment,
+  confirmDanalCardPayment,
+  readyDanalPhonePayment
+} = require("./danal");
+
 // ============================================
 // Helper: Privacy Masking
 // ============================================
@@ -997,6 +1004,166 @@ exports.confirmTossPayment = onCall(
     };
   }
 );
+
+// ============================================
+// 10-A. readyDanalPayment (Callable)
+// Prepare Danal Credit Card or Phone payment
+// ============================================
+exports.readyDanalPayment = onCall(
+  { region: "asia-northeast3" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {
+      method = "card", // "card" | "phone"
+      amount,
+      itemName = "럭키박스",
+      productId,
+      returnUrl,
+      cancelUrl,
+    } = request.data;
+
+    const uid = request.auth.uid;
+    const userEmail = request.auth.token.email || "";
+    const orderId = `LP_DANAL_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    console.log(`[Danal Ready] Method: ${method}, user: ${uid}, amount: ${amount}, item: ${itemName}`);
+
+    if (method === "card") {
+      try {
+        const result = await readyDanalCardPayment({
+          amount: Number(amount),
+          itemName,
+          orderId,
+          userId: uid,
+          userEmail,
+          returnUrl,
+          cancelUrl,
+        });
+
+        console.log(`[Danal Ready] Card response code: ${result.RETURNCODE}, TID: ${result.TID}`);
+
+        if (result.RETURNCODE === "0000") {
+          return {
+            success: true,
+            method: "card",
+            orderId,
+            tid: result.TID,
+            startUrl: result.STARTURL,
+            startParams: result.STARTPARAMS,
+          };
+        } else {
+          return {
+            success: false,
+            returnCode: result.RETURNCODE,
+            message: result.RETURNMSG || "다날 결제 준비 중 오류가 발생했습니다.",
+          };
+        }
+      } catch (err) {
+        console.error("[Danal Ready] Error:", err);
+        throw new HttpsError("internal", `다날 결제 준비 실패: ${err.message}`);
+      }
+    } else if (method === "phone") {
+      const phoneReady = readyDanalPhonePayment({
+        amount: Number(amount),
+        itemName,
+        orderId,
+        returnUrl,
+        cancelUrl,
+      });
+
+      return {
+        success: true,
+        method: "phone",
+        orderId,
+        startUrl: phoneReady.startUrl,
+        params: phoneReady.params,
+      };
+    } else {
+      throw new HttpsError("invalid-argument", "지원하지 않는 결제 수단입니다.");
+    }
+  }
+);
+
+// ============================================
+// 10-B. confirmDanalPayment (Callable)
+// Confirms Danal Credit Card payment server-side
+// ============================================
+exports.confirmDanalPayment = onCall(
+  { region: "asia-northeast3" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const {
+      returnParams,
+      amount,
+      productId,
+      orderId,
+      method = "card",
+    } = request.data;
+
+    const uid = request.auth.uid;
+    const userEmail = request.auth.token.email || "";
+
+    console.log(`[Danal Confirm] User: ${uid}, amount: ${amount}, product: ${productId}`);
+
+    let confirmResult;
+    try {
+      confirmResult = await confirmDanalCardPayment({
+        returnParams,
+        amount: Number(amount),
+      });
+    } catch (err) {
+      console.error("[Danal Confirm] API Error:", err);
+      throw new HttpsError("internal", `다날 승인 실패: ${err.message}`);
+    }
+
+    if (confirmResult.RETURNCODE !== "0000") {
+      console.warn(`[Danal Confirm] Failed with code ${confirmResult.RETURNCODE}: ${confirmResult.RETURNMSG}`);
+      return {
+        success: false,
+        returnCode: confirmResult.RETURNCODE,
+        message: confirmResult.RETURNMSG || "결제 승인에 실패했습니다.",
+      };
+    }
+
+    const tid = confirmResult.TID || `DANAL_${Date.now()}`;
+
+    // Record Payment in payments collection
+    await db.collection("payments").doc(tid).set({
+      userId: uid,
+      userEmail,
+      productId,
+      amount: Number(amount),
+      orderId: orderId || tid,
+      paymentKey: tid,
+      method: method === "phone" ? "DANAL_PHONE" : "DANAL_CARD",
+      status: "DONE",
+      createdAt: FieldValue.serverTimestamp(),
+      danalResult: {
+        cardName: confirmResult.CARDNAME || "",
+        cardNumber: confirmResult.CARDCODE || "",
+        tid,
+      },
+    });
+
+    console.log(`[Danal Confirm] Payment recorded in Firestore: ${tid}`);
+
+    return {
+      success: true,
+      tid,
+      orderId,
+      amount: Number(amount),
+      isLuckyBox: productId && productId.startsWith("box_"),
+      boxId: productId,
+    };
+  }
+);
+
 
 // ============================================
 // 10. deleteProduct (Callable) - Admin Only
