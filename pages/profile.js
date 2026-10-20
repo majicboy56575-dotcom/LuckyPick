@@ -318,28 +318,28 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
                 </span>
               </label>
 
-              <!-- Option 2: Toss Payments / Card -->
+              <!-- Option 2: Danal Card / EasyPay -->
               <label class="flex items-center justify-between p-3 border-2 border-slate-200 hover:border-slate-300 rounded-2xl cursor-pointer transition-all bg-white">
                 <div class="flex items-center gap-3">
-                  <input type="radio" name="ship-pay-method" value="toss" ${!canPayWithPoints ? 'checked' : ''} class="w-4 h-4 text-primary focus:ring-primary">
+                  <input type="radio" name="ship-pay-method" value="danal_card" ${!canPayWithPoints ? 'checked' : ''} class="w-4 h-4 text-primary focus:ring-primary">
                   <div>
-                    <span class="font-bold text-gray-900">토스페이 / 신용·체크카드 간편결제</span>
-                    <p class="text-[11px] text-gray-500">모든 국내 카드사 / 토스 즉시 결제</p>
+                    <span class="font-bold text-gray-900">신용·체크카드 / 간편결제</span>
+                    <p class="text-[11px] text-gray-500">모든 카드사, 카카오페이, 네이버페이, 삼성페이</p>
                   </div>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 text-sm">credit_card</span>
               </label>
 
-              <!-- Option 3: Kakao/Naver Pay -->
+              <!-- Option 3: Danal Phone -->
               <label class="flex items-center justify-between p-3 border-2 border-slate-200 hover:border-slate-300 rounded-2xl cursor-pointer transition-all bg-white">
                 <div class="flex items-center gap-3">
-                  <input type="radio" name="ship-pay-method" value="easy_pay" class="w-4 h-4 text-primary focus:ring-primary">
+                  <input type="radio" name="ship-pay-method" value="danal_phone" class="w-4 h-4 text-primary focus:ring-primary">
                   <div>
-                    <span class="font-bold text-gray-900">카카오페이 / 네이버페이</span>
-                    <p class="text-[11px] text-gray-500">원클릭 간편결제</p>
+                    <span class="font-bold text-gray-900">휴대폰 소액결제</span>
+                    <p class="text-[11px] text-gray-500">SKT, KT, LGU+, 알뜰폰 통신요금 합산 청구</p>
                   </div>
                 </div>
-                <span class="material-symbols-outlined text-gray-400 text-sm">account_balance_wallet</span>
+                <span class="material-symbols-outlined text-gray-400 text-sm">smartphone</span>
               </label>
             </div>
           </div>
@@ -417,16 +417,32 @@ function renderPointsPaymentModal(points, amount) {
           </div>
 
           <div class="space-y-2.5">
-            <!-- 1. Toss / Card -->
-            <button onclick="window.__executeChargePayment(${points}, '토스페이 / 카드')" class="w-full p-4 bg-blue-50/60 hover:bg-blue-100/80 border border-blue-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
+            <!-- 1. Danal Card -->
+            <button onclick="window.__executeChargePayment(${points}, '신용·체크카드 / 간편결제')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-colors text-left group">
               <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm">토스</span>
+                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  <span class="material-symbols-outlined text-xl">credit_card</span>
+                </span>
                 <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-blue-600">토스페이 / 카드 간편결제</h4>
-                  <p class="text-[11px] text-gray-500">신용카드, 카카오페이, 네이버페이</p>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-red-600">신용·체크카드 / 간편결제</h4>
+                  <p class="text-[11px] text-gray-500">모든 카드사, 카카오페이, 네이버페이, 삼성페이</p>
                 </div>
               </div>
-              <span class="material-symbols-outlined text-gray-400 group-hover:text-blue-600">chevron_right</span>
+              <span class="material-symbols-outlined text-gray-400 group-hover:text-red-600">chevron_right</span>
+            </button>
+
+            <!-- 2. Danal Phone -->
+            <button onclick="window.__executeChargePayment(${points}, '휴대폰 소액결제')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
+              <div class="flex items-center gap-3">
+                <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  <span class="material-symbols-outlined text-xl">smartphone</span>
+                </span>
+                <div>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-emerald-700">휴대폰 소액결제</h4>
+                  <p class="text-[11px] text-gray-500">SKT, KT, LGU+, 알뜰폰 통신요금 합산 청구</p>
+                </div>
+              </div>
+              <span class="material-symbols-outlined text-gray-400 group-hover:text-emerald-700">chevron_right</span>
             </button>
           </div>
         </div>
@@ -1180,8 +1196,8 @@ export function render() {
     const fee = isRemote ? 6000 : 3000;
     const methodNames = {
       points: '보유 포인트 차감',
-      toss: '토스페이 / 카드 간편결제',
-      easy_pay: '카카오/네이버페이',
+      danal_card: '신용·체크카드 / 간편결제',
+      danal_phone: '휴대폰 소액결제',
       paypal: 'PayPal'
     };
 

@@ -5,7 +5,7 @@ import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLangua
 // NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
 import { getClosedProducts, getCurrentUser, getCurrentUserDocCache } from './services/firestore.js';
-import { handleTossSuccess, handleDanalSuccess } from '/services/payment.js';
+import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 
@@ -290,62 +290,32 @@ function renderDrawResultNotification() {
 }
 
 function navigate() {
-  // Check if URL has Toss payment redirect query params (?paymentKey=... or ?toss=...)
   const urlParams = new URLSearchParams(window.location.search);
-  const tossStatus = urlParams.get('toss');
-  const tossPaymentKey = urlParams.get('paymentKey');
-  const tossOrderId = urlParams.get('orderId');
-  const tossAmount = urlParams.get('amount');
-  const tossProductId = urlParams.get('productId') || sessionStorage.getItem('toss_pending_product');
 
-  if (tossStatus === 'fail') {
-    const errorCode = urlParams.get('code') || '';
-    const errorMessage = urlParams.get('message') || '결제가 취소되었습니다.';
-    window.history.replaceState({}, document.title, window.location.pathname);
-    sessionStorage.removeItem('toss_pending_product');
-    if (errorCode !== 'PAY_PROCESS_CANCELED') {
-      alert(`토스 결제 실패: ${errorMessage}`);
-    }
-    window.location.hash = '#home';
-    return;
-  }
-
-  if (tossPaymentKey && tossOrderId && tossAmount) {
-    window.history.replaceState({}, document.title, window.location.pathname);
-    const pendingBoxId = sessionStorage.getItem('pending_unboxing_box_id');
-    sessionStorage.removeItem('toss_pending_product');
-    sessionStorage.removeItem('pending_unboxing_box_id');
-
-    (async () => {
-      const user = await waitForAuth(5000);
-      if (!user) {
-        alert('로그인 정보를 확인하는 데 실패했습니다. 다시 로그인 후 시도해주세요.');
-        window.location.hash = '#profile';
-        return;
-      }
-      try {
-        const result = await handleTossSuccess(tossPaymentKey, tossOrderId, tossAmount, tossProductId || pendingBoxId || 'box_basic');
-        
-        if (pendingBoxId || result.isLuckyBox) {
-          // Lucky box unboxing flow
-          const targetBox = pendingBoxId || result.boxId || tossProductId || 'box_basic';
-          executeUnboxingAnimation(targetBox, 'toss');
-        } else {
-          // General golden raffle entry flow
-          const countText = result.currentParticipants && result.maxParticipants
-            ? `${result.currentParticipants}/${result.maxParticipants}`
-            : '';
-          alert(`🎉 토스 결제 성공!\n\n참여가 등록되었습니다! (현재 참여 인원: ${countText})\n\n[진행 중] 페이지로 이동합니다.`);
-          window.location.hash = '#home';
+  // --- Danal Payment Cross-Window Message Listener (for popup flow) ---
+  window.addEventListener('message', async (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data && event.data.type === 'DANAL_PAYMENT_SUCCESS') {
+      const { status, returnParams, amount, productId } = event.data;
+      if (status === 'card_return' && returnParams) {
+        try {
+          const result = await handleDanalSuccess(returnParams, amount, productId, null, 'card');
+          if (result && result.success) {
+            alert('🎉 다날 카드 결제 완료! 럭키박스를 개봉합니다.');
+            executeUnboxingAnimation(productId, 'danal');
+          } else {
+            alert(`다날 결제 실패: ${result?.message || '승인 실패'}`);
+          }
+        } catch (err) {
+          console.error('[Danal] Popup confirm error:', err);
+          alert(`다날 결제 승인 실패: ${err.message || '오류가 발생했습니다.'}`);
         }
-      } catch (err) {
-        console.error('[Toss] Confirm failed:', err);
-        alert(`토스 결제 승인 실패: ${err.message || '서버 오류가 발생했습니다.'}`);
-        window.location.hash = '#home';
+      } else if (status === 'phone_return') {
+        alert('🎉 다날 휴대폰 소액결제 승인이 완료되었습니다! 럭키박스를 개봉합니다.');
+        executeUnboxingAnimation(productId, 'danal_phone');
       }
-    })();
-    return;
-  }
+    }
+  });
 
   // --- Danal Payment Redirect Handlers ---
   const danalStatus = urlParams.get('danal');
@@ -355,6 +325,10 @@ function navigate() {
 
   if (danalStatus === 'cancel') {
     window.history.replaceState({}, document.title, window.location.pathname);
+    if (window.opener && !window.opener.closed) {
+      window.close();
+      return;
+    }
     alert('다날 결제가 취소되었습니다.');
     window.location.hash = '#home';
     return;
@@ -363,6 +337,24 @@ function navigate() {
   if (danalStatus === 'card_return' && danalReturnParams) {
     window.history.replaceState({}, document.title, window.location.pathname);
     sessionStorage.removeItem('danal_pending_product');
+
+    // If opened in popup window, notify parent opener and close popup
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({
+          type: 'DANAL_PAYMENT_SUCCESS',
+          status: 'card_return',
+          returnParams: danalReturnParams,
+          amount: danalAmount,
+          productId: danalProductId
+        }, window.location.origin);
+        window.close();
+        return;
+      } catch (e) {
+        console.warn('[Danal] postMessage to opener failed, continuing in current window:', e);
+      }
+    }
+
     (async () => {
       const user = await waitForAuth(5000);
       if (!user) {
@@ -391,6 +383,22 @@ function navigate() {
   if (danalStatus === 'phone_return') {
     window.history.replaceState({}, document.title, window.location.pathname);
     sessionStorage.removeItem('danal_pending_product');
+
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({
+          type: 'DANAL_PAYMENT_SUCCESS',
+          status: 'phone_return',
+          amount: danalAmount,
+          productId: danalProductId
+        }, window.location.origin);
+        window.close();
+        return;
+      } catch (e) {
+        console.warn('[Danal] postMessage to opener failed:', e);
+      }
+    }
+
     (async () => {
       const user = await waitForAuth(5000);
       if (!user) {

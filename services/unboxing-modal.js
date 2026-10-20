@@ -2,7 +2,7 @@
 // LuckyPick - Interactive Unboxing & Payment Integration
 // ============================================
 import { getRandomBoxTiers, openRandomBox, convertVaultItemToPoints, getUserPoints, setUserPoints, getAvailableGoldenTicketsCount } from './randombox.js';
-import { renderTossPaymentWidget, requestTossWidgetPayment, requestDanalCardPayment, requestDanalPhonePayment } from '/services/payment.js';
+import { requestDanalCardPayment, requestDanalPhonePayment } from '/services/payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
 
 export function showProbabilityModal(boxId) {
@@ -207,20 +207,6 @@ export function openDirectPaymentModal(tierId, amount) {
               </div>
               <span class="material-symbols-outlined text-gray-400 group-hover:text-emerald-700 transition-colors">chevron_right</span>
             </button>
-
-            <!-- 3. Toss Payments -->
-            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'toss')" class="w-full p-4 bg-blue-50/60 hover:bg-blue-100/80 border border-blue-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
-              <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm">
-                  <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
-                </span>
-                <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-blue-600">토스페이 결제</h4>
-                  <p class="text-[11px] text-gray-500">토스페이, 등록 계좌 간편결제</p>
-                </div>
-              </div>
-              <span class="material-symbols-outlined text-gray-400 group-hover:text-blue-600">chevron_right</span>
-            </button>
           </div>
         </div>
 
@@ -376,12 +362,32 @@ window.__processDirectPayment = async (tierId, amount, method) => {
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(b => b.id === tierId);
   const tierName = tier ? tier.name : '럭키박스';
-  
-  const authUser = getCurrentAuthUser();
-  const userId = authUser.uid;
-  const userEmail = authUser.email;
+
+  const modalContainer = document.querySelector('#direct-pay-modal .space-y-2\\.5');
+  const originalHtml = modalContainer ? modalContainer.innerHTML : '';
+
+  const showLoading = (label) => {
+    if (modalContainer) {
+      modalContainer.innerHTML = `
+        <div class="p-8 text-center space-y-4">
+          <div class="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto"></div>
+          <div>
+            <h4 class="font-extrabold text-base text-gray-900">${label}</h4>
+            <p class="text-xs text-gray-500 mt-1">다날 보안 결제창을 안전하게 호출하고 있습니다...</p>
+          </div>
+        </div>
+      `;
+    }
+  };
+
+  const restoreModal = () => {
+    if (modalContainer && originalHtml) {
+      modalContainer.innerHTML = originalHtml;
+    }
+  };
 
   if (method === 'danal_card') {
+    showLoading('신용·체크카드 / 간편결제 연결 중');
     try {
       await requestDanalCardPayment({
         amount: Number(amount),
@@ -390,12 +396,14 @@ window.__processDirectPayment = async (tierId, amount, method) => {
       });
     } catch (err) {
       console.error('[DanalCard] Error:', err);
+      restoreModal();
       alert(`다날 카드 결제 준비 실패: ${err.message || err}`);
     }
     return;
   }
 
   if (method === 'danal_phone') {
+    showLoading('휴대폰 소액결제 연결 중');
     try {
       await requestDanalPhonePayment({
         amount: Number(amount),
@@ -404,102 +412,10 @@ window.__processDirectPayment = async (tierId, amount, method) => {
       });
     } catch (err) {
       console.error('[DanalPhone] Error:', err);
+      restoreModal();
       alert(`다날 휴대폰 결제 준비 실패: ${err.message || err}`);
     }
     return;
-  }
-
-  if (method === 'toss') {
-    const modalContent = document.querySelector('#direct-pay-modal .space-y-2\\.5');
-    if (!modalContent) return;
-
-    modalContent.innerHTML = `
-      <div class="space-y-3">
-        <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-center justify-between">
-          <span class="font-bold text-blue-900 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-            토스페이 결제위젯
-          </span>
-          <span class="font-black text-blue-950 font-mono text-base">₩${Number(amount).toLocaleString()}원</span>
-        </div>
-
-        <!-- 토스 결제위젯 DOM 렌더링 컨테이너 -->
-        <div id="toss-widget-box" class="min-h-[220px] bg-slate-50/50 p-2 rounded-2xl border border-slate-100">
-          <div id="toss-payment-methods" class="w-full"></div>
-          <div id="toss-agreement" class="w-full mt-2"></div>
-          <div id="toss-widget-loading" class="p-6 text-center text-xs text-gray-500 animate-pulse flex items-center justify-center gap-2">
-            <span class="material-symbols-outlined animate-spin text-base text-blue-600">sync</span>
-            안전한 결제창을 불러오는 중입니다...
-          </div>
-        </div>
-
-        <!-- 최종 결제 버튼 -->
-        <button id="toss-pay-submit-btn" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-extrabold rounded-2xl text-sm shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
-          <span class="material-symbols-outlined text-lg">lock</span>
-          <span>₩${Number(amount).toLocaleString()}원 결제하기</span>
-        </button>
-
-        <button onclick="window.__openDirectPaymentModal('${tierId}', ${amount})" class="w-full py-2 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
-          <span class="material-symbols-outlined text-sm">arrow_back</span>
-          다른 결제 수단 선택
-        </button>
-      </div>
-    `;
-
-    setTimeout(async () => {
-      try {
-        await renderTossPaymentWidget({
-          methodsSelector: '#toss-payment-methods',
-          agreementSelector: '#toss-agreement',
-          amount: Number(amount),
-          userId: userId,
-          userEmail: userEmail,
-          productId: tierId,
-          productName: tierName
-        });
-
-        const loader = document.getElementById('toss-widget-loading');
-        if (loader) loader.remove();
-
-        const payBtn = document.getElementById('toss-pay-submit-btn');
-        if (payBtn) {
-          payBtn.onclick = async () => {
-            payBtn.disabled = true;
-            payBtn.innerHTML = `
-              <span class="material-symbols-outlined animate-spin text-base">sync</span>
-              <span>결제 진행 중...</span>
-            `;
-            try {
-              await requestTossWidgetPayment({
-                productId: tierId,
-                productName: tierName,
-                amount: Number(amount),
-                userId: userId,
-                userEmail: userEmail
-              });
-            } catch (payErr) {
-              console.error('[TossWidget] Request error:', payErr);
-              payBtn.disabled = false;
-              payBtn.innerHTML = `
-                <span class="material-symbols-outlined text-lg">lock</span>
-                <span>₩${Number(amount).toLocaleString()}원 결제하기</span>
-              `;
-              alert(`결제 요청 실패: ${payErr.message || payErr}`);
-            }
-          };
-        }
-      } catch (widgetErr) {
-        console.error('[TossWidget] Render error:', widgetErr);
-        const widgetBox = document.getElementById('toss-widget-box');
-        if (widgetBox) {
-          widgetBox.innerHTML = `
-            <div class="p-4 text-center text-xs text-red-600 bg-red-50 rounded-xl border border-red-200">
-              결제 위젯 로딩 중 오류가 발생했습니다.<br>(${widgetErr.message || widgetErr})
-            </div>
-          `;
-        }
-      }
-    }, 50);
   }
 };
 

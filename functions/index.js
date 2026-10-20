@@ -1010,7 +1010,7 @@ exports.confirmTossPayment = onCall(
 // Prepare Danal Credit Card or Phone payment
 // ============================================
 exports.readyDanalPayment = onCall(
-  { region: "asia-northeast3" },
+  { region: "asia-northeast3", invoker: "public" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -1092,7 +1092,7 @@ exports.readyDanalPayment = onCall(
 // Confirms Danal Credit Card payment server-side
 // ============================================
 exports.confirmDanalPayment = onCall(
-  { region: "asia-northeast3" },
+  { region: "asia-northeast3", invoker: "public" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
