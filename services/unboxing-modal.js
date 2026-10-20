@@ -174,32 +174,32 @@ export function openDirectPaymentModal(tierId, amount) {
           </div>
 
           <div class="space-y-2.5">
-            <!-- 1. Danal Credit Card / KakaoPay / NaverPay -->
-            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_card')" class="w-full p-4 bg-gradient-to-r from-red-50/80 to-amber-50/80 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
+            <!-- 1. Credit Card / KakaoPay / EasyPay -->
+            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_card')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
               <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                  다날
+                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold shadow-sm">
+                  <span class="material-symbols-outlined text-xl">credit_card</span>
                 </span>
                 <div>
                   <div class="flex items-center gap-1.5">
-                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-red-600 transition-colors">다날 카드 / 간편결제</h4>
-                    <span class="text-[10px] font-black bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded font-mono">카카오페이</span>
+                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-red-600 transition-colors">신용·체크카드 / 간편결제</h4>
+                    <span class="text-[10px] font-black bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded font-mono shadow-2xs">카카오페이</span>
                   </div>
-                  <p class="text-[11px] text-gray-500">신용·체크카드, 카카오페이, 네이버페이, 삼성페이</p>
+                  <p class="text-[11px] text-gray-500">모든 카드사, 카카오페이, 네이버페이, 삼성페이</p>
                 </div>
               </div>
               <span class="material-symbols-outlined text-gray-400 group-hover:text-red-600 transition-colors">chevron_right</span>
             </button>
 
-            <!-- 2. Danal Phone Micro-payment -->
+            <!-- 2. Phone Micro-payment -->
             <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_phone')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
               <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                  <span class="material-symbols-outlined text-lg">smartphone</span>
+                <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">
+                  <span class="material-symbols-outlined text-xl">smartphone</span>
                 </span>
                 <div>
                   <div class="flex items-center gap-1.5">
-                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-emerald-700 transition-colors">다날 휴대폰 소액결제</h4>
+                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-emerald-700 transition-colors">휴대폰 소액결제</h4>
                     <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">통신 3사</span>
                   </div>
                   <p class="text-[11px] text-gray-500">SKT, KT, LGU+, 알뜰폰 통신요금 합산 청구</p>
@@ -208,14 +208,14 @@ export function openDirectPaymentModal(tierId, amount) {
               <span class="material-symbols-outlined text-gray-400 group-hover:text-emerald-700 transition-colors">chevron_right</span>
             </button>
 
-            <!-- 3. Toss Payments / Card -->
+            <!-- 3. Toss Payments -->
             <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'toss')" class="w-full p-4 bg-blue-50/60 hover:bg-blue-100/80 border border-blue-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
               <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
-                  토스
+                <span class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm">
+                  <span class="material-symbols-outlined text-xl">account_balance_wallet</span>
                 </span>
                 <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-blue-600">토스페이 결제위젯</h4>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-blue-600">토스페이 결제</h4>
                   <p class="text-[11px] text-gray-500">토스페이, 등록 계좌 간편결제</p>
                 </div>
               </div>
