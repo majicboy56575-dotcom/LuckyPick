@@ -4,15 +4,15 @@
 import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js';
 // NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
-import { getClosedProducts, getCurrentUser, getCurrentUserDocCache, chargeUserPointsServer } from './services/firestore.js';
+import { getClosedProducts, getCurrentUser, getCurrentUserDocCache, chargeUserPointsServer, requestVaultShippingServer } from './services/firestore.js';
 import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 
-import * as homePage from './pages/home.js?v=20261016_V33';
-import * as historyPage from './pages/history.js?v=20261016_V33';
-import * as profilePage from './pages/profile.js?v=20261016_V33';
-import * as adminPage from './pages/admin.js?v=20261016_V33';
+import * as homePage from './pages/home.js?v=20261021_V42';
+import * as historyPage from './pages/history.js?v=20261021_V42';
+import * as profilePage from './pages/profile.js?v=20261021_V42';
+import * as adminPage from './pages/admin.js?v=20261021_V42';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;
@@ -303,6 +303,27 @@ function navigate() {
       } catch (e) {
         console.error('Point charge credit error:', e);
         alert(`포인트 반영 오류: ${e.message || e}`);
+      }
+      window.location.hash = '#profile';
+      window.location.reload();
+      return;
+    }
+
+    if (prodId && prodId.startsWith('shipping_')) {
+      const vaultId = prodId.replace('shipping_', '');
+      const savedStr = sessionStorage.getItem('danal_pending_shipping_' + vaultId);
+      if (savedStr) {
+        try {
+          const shippingData = JSON.parse(savedStr);
+          await requestVaultShippingServer(vaultId, shippingData);
+          sessionStorage.removeItem('danal_pending_shipping_' + vaultId);
+          alert(`🎉 [${payMethod} 배송비 결제 완료]\n배송 접수가 성공적으로 완료되었습니다!\n\n• 수령인: ${shippingData.name} (${shippingData.phone})\n• 배송지: ${shippingData.address}\n• 결제 배송비: ₩${Number(amt || shippingData.fee).toLocaleString()}원`);
+        } catch (e) {
+          console.error('Shipping submission error after Danal payment:', e);
+          alert(`배송 접수 처리 오류: ${e.message || e}`);
+        }
+      } else {
+        alert(`🎉 [${payMethod} 배송비 ₩${Number(amt).toLocaleString()}원 결제 완료]\n배송 신청이 정상 접수되었습니다.`);
       }
       window.location.hash = '#profile';
       window.location.reload();

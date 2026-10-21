@@ -1198,26 +1198,78 @@ export function render() {
     const methodNames = {
       points: '보유 포인트 차감',
       danal_card: '신용·체크카드 / 간편결제',
-      danal_phone: '휴대폰 소액결제',
-      paypal: 'PayPal'
+      danal_phone: '휴대폰 소액결제'
     };
 
+    const shippingPayload = {
+      itemTitle,
+      name,
+      phone,
+      address: `${addr} ${detail}`.trim(),
+      memo,
+      isRemote,
+      fee,
+      payMethod,
+      payMethodName: methodNames[payMethod] || '포인트',
+      isSpecialGift,
+      depositName,
+      idCardImage: idCardData,
+      taxAmount
+    };
+
+    // 1. Danal Card or Phone Payment Integration
+    if (payMethod === 'danal_card' || payMethod === 'danal_phone') {
+      const submitBtn = document.getElementById('s-ship-submit-btn');
+      const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `
+          <span class="material-symbols-outlined text-sm animate-spin">sync</span>
+          <span>다날 결제창 호출 중...</span>
+        `;
+      }
+
+      // Save shipping form data for callback processing
+      sessionStorage.setItem('danal_pending_shipping_' + vaultId, JSON.stringify(shippingPayload));
+
+      const itemName = isSpecialGift ? '스페셜 사은품 택배 배송비' : `[${itemTitle}] 택배 배송비`;
+      const productId = `shipping_${vaultId}`;
+
+      try {
+        if (payMethod === 'danal_card') {
+          await requestDanalCardPayment({
+            amount: fee,
+            itemName,
+            productId
+          });
+        } else {
+          await requestDanalPhonePayment({
+            amount: fee,
+            itemName,
+            productId
+          });
+        }
+      } catch (danalErr) {
+        console.error('[Danal Shipping] Payment error:', danalErr);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnHtml;
+        }
+        sessionStorage.removeItem('danal_pending_shipping_' + vaultId);
+        alert(`다날 배송비 결제창 호출 실패: ${danalErr.message || danalErr}`);
+      }
+      return;
+    }
+
+    // 2. Points Deduction Flow
+    const currentPts = getUserPoints();
+    if (currentPts < fee) {
+      alert(`⚠️ [포인트 부족]\n\n배송비 결제를 위한 보유 포인트가 부족합니다.\n• 결제 배송비: ₩${fee.toLocaleString()}P\n• 현재 잔액: ₩${currentPts.toLocaleString()}P\n\n하단의 '신용·체크카드' 또는 '휴대폰 소액결제'를 선택하여 결제해주세요.`);
+      return;
+    }
+
     try {
-      await requestVaultShippingServer(vaultId, {
-        itemTitle,
-        name,
-        phone,
-        address: `${addr} ${detail}`.trim(),
-        memo,
-        isRemote,
-        fee,
-        payMethod,
-        payMethodName: methodNames[payMethod] || '포인트',
-        isSpecialGift,
-        depositName,
-        idCardImage: idCardData,
-        taxAmount
-      });
+      await requestVaultShippingServer(vaultId, shippingPayload);
 
       if (isSpecialGift) {
         alert(`🎉 [스페셜 사은품 배송비 ₩${fee.toLocaleString()}원 결제 & 서류 접수 완료]\n\n배송비 결제가 정상 처리되었습니다.\n제세공과금(₩${taxAmount.toLocaleString()}원) 입금 확인 및 신분증 서류 검토 후 즉시 안전하게 발송됩니다!\n\n• 배송비 결제: ₩${fee.toLocaleString()}원 (${methodNames[payMethod] || '포인트'})\n• 세무 입금자: ${depositName}\n• 제세공과금 입금계좌: 카카오뱅크 3333-05-0344911 (럭키픽 이재영)\n• 수령인: ${name} (${phone})\n• 배송지: ${addr} ${detail}`);
