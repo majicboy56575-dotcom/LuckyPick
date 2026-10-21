@@ -4,7 +4,7 @@
 import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLanguageDropdown } from './i18n.js';
 // NOTE: auth.js must be imported WITHOUT a version query everywhere, so every file shares one module instance (one login state)
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
-import { getClosedProducts, getCurrentUser, getCurrentUserDocCache } from './services/firestore.js';
+import { getClosedProducts, getCurrentUser, getCurrentUserDocCache, chargeUserPointsServer } from './services/firestore.js';
 import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
@@ -292,6 +292,27 @@ function renderDrawResultNotification() {
 function navigate() {
   const urlParams = new URLSearchParams(window.location.search);
 
+  // Helper to handle payment success for either LuckyBox unboxing or Points Recharge
+  const handlePaymentSuccessAction = async (prodId, amt, payMethod) => {
+    if (prodId && prodId.startsWith('points_')) {
+      const parts = prodId.split('_');
+      const chargePts = parseInt(parts[1], 10) || Number(amt);
+      try {
+        const res = await chargeUserPointsServer(chargePts, payMethod);
+        alert(`🎉 [${payMethod} 결제 완료]\n₩${chargePts.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${(res?.newPoints || chargePts).toLocaleString()}P`);
+      } catch (e) {
+        console.error('Point charge credit error:', e);
+        alert(`포인트 반영 오류: ${e.message || e}`);
+      }
+      window.location.hash = '#profile';
+      window.location.reload();
+      return;
+    }
+    // Default: LuckyBox Unboxing
+    alert(`🎉 [${payMethod} 결제 완료] 럭키박스를 개봉합니다.`);
+    executeUnboxingAnimation(prodId, payMethod === '다날 휴대폰 소액결제' ? 'danal_phone' : 'danal');
+  };
+
   // --- Danal Payment Cross-Window Message Listener (for popup flow) ---
   window.addEventListener('message', async (event) => {
     if (event.origin !== window.location.origin) return;
@@ -301,8 +322,7 @@ function navigate() {
         try {
           const result = await handleDanalSuccess(returnParams, amount, productId, null, 'card');
           if (result && result.success) {
-            alert('🎉 다날 카드 결제 완료! 럭키박스를 개봉합니다.');
-            executeUnboxingAnimation(productId, 'danal');
+            await handlePaymentSuccessAction(productId, amount, '다날 신용카드');
           } else {
             alert(`다날 결제 실패: ${result?.message || '승인 실패'}`);
           }
@@ -311,8 +331,7 @@ function navigate() {
           alert(`다날 결제 승인 실패: ${err.message || '오류가 발생했습니다.'}`);
         }
       } else if (status === 'phone_return') {
-        alert('🎉 다날 휴대폰 소액결제 승인이 완료되었습니다! 럭키박스를 개봉합니다.');
-        executeUnboxingAnimation(productId, 'danal_phone');
+        await handlePaymentSuccessAction(productId, amount, '다날 휴대폰 소액결제');
       }
     }
   });
@@ -365,8 +384,7 @@ function navigate() {
       try {
         const result = await handleDanalSuccess(danalReturnParams, danalAmount, danalProductId, null, 'card');
         if (result && result.success) {
-          alert('🎉 다날 카드 결제 완료! 럭키박스를 개봉합니다.');
-          executeUnboxingAnimation(danalProductId, 'danal');
+          await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 신용카드');
         } else {
           alert(`다날 결제 실패: ${result.message || '승인 실패'}`);
           window.location.hash = '#home';
@@ -406,8 +424,7 @@ function navigate() {
         window.location.hash = '#profile';
         return;
       }
-      alert('🎉 다날 휴대폰 소액결제 승인이 완료되었습니다! 럭키박스를 개봉합니다.');
-      executeUnboxingAnimation(danalProductId, 'danal_phone');
+      await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 휴대폰 소액결제');
     })();
     return;
   }

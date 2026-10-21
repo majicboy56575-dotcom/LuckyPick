@@ -17,6 +17,7 @@ import {
   deleteVaultItem
 } from '../services/randombox.js';
 import '../services/unboxing-modal.js';
+import { requestDanalCardPayment, requestDanalPhonePayment } from '../services/payment.js';
 
 let activeProfileTab = 'vault'; // 'vault' | 'tickets' | 'charge'
 let isSignUpMode = false;
@@ -418,7 +419,7 @@ function renderPointsPaymentModal(points, amount) {
 
           <div class="space-y-2.5">
             <!-- 1. Danal Card -->
-            <button onclick="window.__executeChargePayment(${points}, '신용·체크카드 / 간편결제')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-colors text-left group">
+            <button onclick="window.__executeChargePayment(${points}, ${amount}, 'danal_card')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-colors text-left group">
               <div class="flex items-center gap-3">
                 <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
                   <span class="material-symbols-outlined text-xl">credit_card</span>
@@ -432,7 +433,7 @@ function renderPointsPaymentModal(points, amount) {
             </button>
 
             <!-- 2. Danal Phone -->
-            <button onclick="window.__executeChargePayment(${points}, '휴대폰 소액결제')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
+            <button onclick="window.__executeChargePayment(${points}, ${amount}, 'danal_phone')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
               <div class="flex items-center gap-3">
                 <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
                   <span class="material-symbols-outlined text-xl">smartphone</span>
@@ -1248,14 +1249,30 @@ export function render() {
     if (modal) modal.remove();
   };
 
-  window.__executeChargePayment = async (points, method) => {
+  window.__executeChargePayment = async (points, amount, method) => {
     try {
-      const res = await chargeUserPointsServer(points, method);
-      alert(`🎉 [${method} 결제 완료]\n₩${points.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${res.newPoints.toLocaleString()}P`);
       window.__closeChargePayModal();
-      window.location.reload();
+      const itemName = `포인트 ${points.toLocaleString()}P 충전`;
+      const productId = `points_${points}_${amount}`;
+
+      console.log(`[Charge Payment] Requesting Danal: method=${method}, amount=${amount}, points=${points}, productId=${productId}`);
+
+      if (method === 'danal_card') {
+        await requestDanalCardPayment({
+          amount: Number(amount),
+          itemName,
+          productId
+        });
+      } else if (method === 'danal_phone') {
+        await requestDanalPhonePayment({
+          amount: Number(amount),
+          itemName,
+          productId
+        });
+      }
     } catch (err) {
-      alert(`충전 오류: ${err.message || err}`);
+      console.error('[Charge Payment] Error:', err);
+      alert(`다날 결제창 호출 실패: ${err.message || err}`);
     }
   };
 
