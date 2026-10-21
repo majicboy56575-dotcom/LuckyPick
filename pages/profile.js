@@ -309,7 +309,6 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
                   <div>
                     <div class="flex items-center gap-1.5">
                       <span class="font-bold text-gray-900">보유 포인트 차감 결제</span>
-                      <span class="text-[10px] font-extrabold bg-primary text-white px-2 py-0.2 rounded-full">추천</span>
                     </div>
                     <p class="text-[11px] text-gray-500">내 보유 잔액: <strong class="font-mono ${canPayWithPoints ? 'text-primary' : 'text-red-500'}">₩${currentPts.toLocaleString()} P</strong></p>
                   </div>

@@ -8,9 +8,11 @@ import {
   getUserPoints, 
   setUserPoints, 
   getAvailableGoldenTicketsCount,
+  getUserVault,
   openLuckyBoxServer,
   convertVaultItemToPointsServer
 } from './randombox.js';
+import { saveUserDocData } from './firestore.js';
 import { requestDanalCardPayment, requestDanalPhonePayment } from './payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
 
@@ -269,6 +271,15 @@ export async function executeUnboxingAnimation(boxId, payMethod = 'points') {
     const earnedGoldenTickets = tier.goldenTickets || 2;
     const totalGoldenTickets = serverResult.newTickets;
 
+    // Immediately synchronize client cache and local vault (most recent won item at top)
+    const currentVault = getUserVault();
+    const updatedVault = [wonItem, ...currentVault.filter(v => v.id !== wonItem.id)];
+    await saveUserDocData({
+      vault: updatedVault,
+      points: serverResult.newPoints,
+      goldenTickets: serverResult.newTickets
+    });
+
     // Stage 2: Reveal Results after 1.6s
     setTimeout(() => {
       const stageContent = document.getElementById('unboxing-stage-content');
@@ -444,15 +455,28 @@ window.__closeStageModal = () => {
   const modal = document.getElementById('unboxing-stage-modal');
   if (modal) modal.remove();
   window.dispatchEvent(new CustomEvent('vaultUpdated'));
+  window.dispatchEvent(new CustomEvent('userDataChanged'));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
 };
 
 window.__quickConvertPoints = async (vaultId) => {
   if (!requireLogin()) return;
   try {
     const res = await convertVaultItemToPointsServer(vaultId);
-    alert(`🎉 [${res.item.title || res.item.name}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
+    alert(`🎉 [${res.item?.title || res.item?.name || '상품'}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
+
+    // Immediately synchronize local client cache
+    const currentVault = getUserVault().filter(v => v.id !== vaultId);
+    await saveUserDocData({
+      vault: currentVault,
+      points: res.newPoints
+    });
+
     window.__closeStageModal();
     window.location.hash = '#profile';
+    if (typeof window.__switchProfileTab === 'function') {
+      window.__switchProfileTab('vault');
+    }
   } catch (err) {
     alert(err.message || '포인트 전환 실패');
   }
@@ -461,4 +485,7 @@ window.__quickConvertPoints = async (vaultId) => {
 window.__openVaultItemShipping = (vaultId) => {
   window.__closeStageModal();
   window.location.hash = `#profile`;
+  if (typeof window.__switchProfileTab === 'function') {
+    window.__switchProfileTab('vault');
+  }
 };

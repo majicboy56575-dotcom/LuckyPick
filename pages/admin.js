@@ -1490,8 +1490,8 @@ export function render() {
               <span class="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
                 추첨 및 마감 실행 결과
               </span>
-              <h3 class="font-extrabold text-lg text-white mt-1">[${raffle.title}]</h3>
-              <p class="text-xs text-amber-300">소비자 정가 ₩${raffle.retailPrice.toLocaleString()}원 상당</p>
+              <h3 class="font-extrabold text-lg text-white mt-1">[${raffle?.title || '스페셜 상품'}]</h3>
+              <p class="text-xs text-amber-300">소비자 정가 ₩${(raffle?.retailPrice || 0).toLocaleString()}원 상당</p>
             </div>
             <button onclick="window.__closeAdminModal()" class="text-slate-400 hover:text-white">
               <span class="material-symbols-outlined">close</span>

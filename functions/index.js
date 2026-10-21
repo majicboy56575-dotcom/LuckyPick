@@ -1468,7 +1468,7 @@ exports.openLuckyBox = onCall({ region: "asia-northeast3" }, async (request) => 
 
     const newPoints = payMethod === "points" ? (currentPoints - tier.price) : currentPoints;
     const newTickets = (Number(userData.goldenTickets) || 0) + (Number(tier.goldenTickets) || 2);
-    const updatedVault = [...(userData.vault || []), wonItem];
+    const updatedVault = [wonItem, ...(userData.vault || [])];
 
     transaction.set(userRef, {
       points: newPoints,
@@ -1778,7 +1778,12 @@ exports.forceDrawRaffle = onCall({ region: "asia-northeast3" }, async (request) 
     fullGroupsCount,
     remainderCount,
     winners,
-    raffle: { id: raffleId, title: raffle.title }
+    raffle: { 
+      id: raffleId, 
+      title: raffle.title,
+      retailPrice: Number(raffle.retailPrice) || 0,
+      image: raffle.image || ''
+    }
   };
 });
 

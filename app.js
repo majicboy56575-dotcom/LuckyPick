@@ -707,6 +707,7 @@ window.addEventListener('authStateChanged', debouncedNavigate);
 window.addEventListener('userDataChanged', debouncedNavigate);
 window.addEventListener('superRafflesChanged', debouncedNavigate);
 window.addEventListener('boxCatalogChanged', debouncedNavigate);
+window.addEventListener('vaultUpdated', debouncedNavigate);
 
 // Immediately initialize router
 if (document.readyState === 'loading') {
