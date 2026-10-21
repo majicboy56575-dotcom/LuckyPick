@@ -24,6 +24,7 @@ import {
   deleteVaultItem,
   getRaffleGroupData
 } from '../services/randombox.js';
+import { getMembers, grantUserBalanceServer } from '../services/firestore.js';
 
 let activeAdminTab = 'boxes'; // 'boxes' | 'raffles' | 'shipping' | 'users' | 'analytics'
 let selectedBoxId = 'box_basic';
@@ -484,114 +485,162 @@ function renderShippingTab() {
 }
 
 function renderUsersTab() {
-  const currentPts = getUserPoints();
-  const currentTickets = getAvailableGoldenTicketsCount();
-  const vault = getUserVault();
+  const members = getMembers();
+  const totalPoints = members.reduce((sum, m) => sum + (Number(m.points) || 0), 0);
+  const totalTickets = members.reduce((sum, m) => sum + (Number(m.goldenTickets) || 0), 0);
+  const totalVaultItems = members.reduce((sum, m) => sum + (Number(m.vaultCount) || 0), 0);
 
   return `
     <div class="space-y-6">
-      <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs flex justify-between items-center">
+      <!-- Title & Summary Header -->
+      <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h3 class="font-black text-xl text-gray-900">회원 및 지갑 관리</h3>
-          <p class="text-xs text-gray-500 mt-0.5">회원별 보유 포인트 및 골든 티켓 직접 지급/차감 조정</p>
+          <div class="flex items-center gap-2">
+            <h3 class="font-black text-xl text-gray-900">회원 및 지갑 관리</h3>
+            <span class="text-xs font-black bg-primary text-white px-2.5 py-0.5 rounded-full">${members.length}명 등록</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-0.5">전체 가입 회원 명부 실시간 조회 및 회원별 포인트/골든티켓 직접 지급·차감 관리</p>
         </div>
-        <button onclick="window.__resetAllTestData()" class="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs flex items-center gap-1 transition-colors cursor-pointer">
-          <span class="material-symbols-outlined text-sm">restart_alt</span>
-          전체 테스트 데이터 초기화
-        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="window.__switchAdminTab('users')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1 transition-colors cursor-pointer" title="회원 목록 새로고침">
+            <span class="material-symbols-outlined text-sm">refresh</span>
+            새로고침
+          </button>
+          <button onclick="window.__resetAllTestData()" class="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs flex items-center gap-1 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-sm">restart_alt</span>
+            내 테스트 데이터 초기화
+          </button>
+        </div>
       </div>
 
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-6">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <h4 class="font-bold text-base text-gray-900">현재 테스트 계정 지갑</h4>
-              <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">ACTIVE</span>
-            </div>
-            <p class="text-xs text-gray-500 font-mono mt-0.5">my_account@luckypick.com (UID: my_user_id)</p>
-          </div>
-          <div class="flex gap-6 text-right">
-            <div>
-              <span class="text-[10px] text-gray-400 font-bold block">포인트 잔액</span>
-              <span class="font-black text-2xl text-primary font-mono">₩${currentPts.toLocaleString()} P</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-gray-400 font-bold block">골든 티켓</span>
-              <span class="font-black text-2xl text-amber-600 font-mono">${currentTickets}장</span>
-            </div>
-          </div>
+      <!-- 4 KPI Summary Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <span class="text-[10px] font-bold text-gray-400 uppercase block">총 가입 회원</span>
+          <span class="font-black text-2xl text-slate-900 font-mono mt-1 block">${members.length.toLocaleString()}명</span>
+          <span class="text-[11px] text-emerald-600 font-bold flex items-center gap-0.5 mt-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+            정상 활동 계정 100%
+          </span>
         </div>
 
-        <!-- Quick Grant Buttons -->
-        <div class="space-y-2 pt-2 border-t border-slate-100">
-          <span class="text-[11px] font-bold text-gray-500 block">빠른 원클릭 지급</span>
-          <div class="flex flex-wrap gap-2">
-            <button onclick="window.__adminGrantPoints(10000)" class="px-3.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors">
-              + 10,000P 지급
-            </button>
-            <button onclick="window.__adminGrantPoints(100000)" class="px-3.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors">
-              + 100,000P 지급
-            </button>
-            <button onclick="window.__adminGrantPoints(1000000)" class="px-3.5 py-2 bg-primary text-white font-bold rounded-xl text-xs shadow-xs hover:bg-primary-container transition-all">
-              + 1,000,000P 지급
-            </button>
-            <button onclick="window.__adminGrantTickets(20)" class="px-3.5 py-2 bg-amber-50 text-amber-800 hover:bg-amber-100 font-bold rounded-xl text-xs transition-colors">
-              + 골든티켓 20장 지급
-            </button>
-            <button onclick="window.__adminGrantTickets(500)" class="px-3.5 py-2 bg-amber-100 text-amber-900 font-bold rounded-xl text-xs hover:bg-amber-200 transition-colors">
-              + 골든티켓 500장 지급
-            </button>
-            <button onclick="window.__adminGrantTickets(1000)" class="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs hover:from-amber-400 transition-all">
-              + 골든티켓 1,000장 지급 (테스트용)
-            </button>
-          </div>
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <span class="text-[10px] font-bold text-gray-400 uppercase block">총 유통 포인트</span>
+          <span class="font-black text-2xl text-primary font-mono mt-1 block">₩${totalPoints.toLocaleString()} P</span>
+          <span class="text-[11px] text-gray-400 mt-1 block">회원 보유 잔액 합계</span>
         </div>
 
-        <!-- Direct Amount Inputs -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-          <!-- Points Direct Adjust -->
-          <div class="p-4 bg-slate-50 rounded-2xl space-y-2 border border-slate-200">
-            <label class="font-bold text-xs text-gray-700 block">포인트 직접 조정 (원)</label>
-            <div class="flex gap-2">
-              <input type="number" id="custom-points-input" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder="금액 입력">
-              <button onclick="window.__adminDirectPoints(1)" class="px-3.5 py-2 bg-primary text-white font-bold rounded-xl text-xs shadow-xs">지급 (+)</button>
-              <button onclick="window.__adminDirectPoints(-1)" class="px-3.5 py-2 bg-red-600 text-white font-bold rounded-xl text-xs shadow-xs">차감 (-)</button>
-            </div>
-          </div>
-
-          <!-- Golden Tickets Direct Adjust -->
-          <div class="p-4 bg-slate-50 rounded-2xl space-y-2 border border-slate-200">
-            <label class="font-bold text-xs text-gray-700 block">골든 티켓 직접 조정 (장수)</label>
-            <div class="flex gap-2">
-              <input type="number" id="custom-tickets-input" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder="수량 입력">
-              <button onclick="window.__adminDirectTickets(1)" class="px-3.5 py-2 bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-xs">지급 (+)</button>
-              <button onclick="window.__adminDirectTickets(-1)" class="px-3.5 py-2 bg-red-600 text-white font-bold rounded-xl text-xs shadow-xs">차감 (-)</button>
-            </div>
-          </div>
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <span class="text-[10px] font-bold text-gray-400 uppercase block">총 발행 골든티켓</span>
+          <span class="font-black text-2xl text-amber-600 font-mono mt-1 block">${totalTickets.toLocaleString()}장</span>
+          <span class="text-[11px] text-amber-500 font-bold mt-1 block">래플 응모 가능 티켓</span>
         </div>
 
-        <!-- User Vault Mini Overview -->
-        <div class="pt-4 border-t border-slate-100">
-          <div class="flex justify-between items-center mb-3">
-            <h5 class="font-bold text-xs text-gray-700">현재 보관함 보유 아이템 (${vault.length}건)</h5>
-            <span class="text-[11px] text-gray-400">쇼핑몰 '내 보관함' 탭 연동</span>
-          </div>
-          <div class="flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-            ${vault.length === 0 ? `
-              <p class="text-xs text-gray-400 py-2">보관함이 비어 있습니다.</p>
-            ` : vault.map(v => `
-              <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2 text-xs">
-                <div class="flex items-center gap-2 min-w-0">
-                  <img src="${v.imageUrl}" class="w-8 h-8 rounded-lg object-cover" alt="">
-                  <span class="font-bold text-gray-800 truncate max-w-[150px]">${v.title}</span>
-                  <span class="text-[10px] text-gray-400 font-mono">₩${v.retailPrice?.toLocaleString()}원</span>
-                </div>
-                <button onclick="window.__deleteAdminVaultItem('${v.id}', '${v.title.replace(/'/g, "\\'")}')" class="p-1 text-slate-300 hover:text-red-600 rounded transition-colors cursor-pointer" title="이 아이템 삭제">
-                  <span class="material-symbols-outlined text-sm">close</span>
-                </button>
-              </div>
-            `).join('')}
-          </div>
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+          <span class="text-[10px] font-bold text-gray-400 uppercase block">총 보관함 상품</span>
+          <span class="font-black text-2xl text-indigo-600 font-mono mt-1 block">${totalVaultItems.toLocaleString()}건</span>
+          <span class="text-[11px] text-gray-400 mt-1 block">미배송/보관 실물 상품</span>
+        </div>
+      </div>
+
+      <!-- Search & Filter Bar -->
+      <div class="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div class="relative flex-1 min-w-[240px]">
+          <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-lg">search</span>
+          <input 
+            type="text" 
+            id="admin-member-search" 
+            oninput="window.__filterAdminMembers(this.value)" 
+            placeholder="회원 이름, 이메일, UID로 실시간 검색..." 
+            class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+          >
+        </div>
+        <span class="text-xs text-gray-400 font-bold" id="admin-member-count-label">
+          검색 결과: ${members.length}명
+        </span>
+      </div>
+
+      <!-- Full Member Table -->
+      <div class="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                <th class="py-3.5 px-5">회원 정보</th>
+                <th class="py-3.5 px-4">가입일시</th>
+                <th class="py-3.5 px-4 text-center">권한</th>
+                <th class="py-3.5 px-4 text-right">보유 포인트</th>
+                <th class="py-3.5 px-4 text-right">골든 티켓</th>
+                <th class="py-3.5 px-4 text-center">보관함 상품</th>
+                <th class="py-3.5 px-5 text-center">관리 액션</th>
+              </tr>
+            </thead>
+            <tbody id="admin-members-tbody" class="divide-y divide-slate-100 text-xs">
+              ${members.map((m) => `
+                <tr class="hover:bg-slate-50/70 transition-colors member-row" data-search="${(m.name + ' ' + m.email + ' ' + m.uid).toLowerCase()}">
+                  <!-- User Info -->
+                  <td class="py-4 px-5">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr ${m.role === 'admin' ? 'from-amber-400 to-amber-600 text-slate-950 font-black' : 'from-slate-700 to-slate-900 text-white font-bold'} flex items-center justify-center text-sm shadow-xs flex-shrink-0">
+                        ${m.initials}
+                      </div>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-extrabold text-sm text-gray-900 truncate">${m.name}</span>
+                          ${m.role === 'admin' ? '<span class="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-mono">ADMIN</span>' : ''}
+                        </div>
+                        <p class="text-xs text-gray-500 font-mono truncate">${m.email}</p>
+                        <p class="text-[10px] text-gray-400 font-mono">UID: ${m.uid}</p>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- Join Date -->
+                  <td class="py-4 px-4 font-mono text-gray-600 text-xs whitespace-nowrap">
+                    ${m.joinDate}
+                  </td>
+
+                  <!-- Role / Status -->
+                  <td class="py-4 px-4 text-center whitespace-nowrap">
+                    <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full ${m.role === 'admin' ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+                      ${m.role === 'admin' ? '운영 관리자' : '일반 회원'}
+                    </span>
+                  </td>
+
+                  <!-- Points -->
+                  <td class="py-4 px-4 text-right font-mono font-black text-sm text-primary whitespace-nowrap">
+                    ₩${m.points.toLocaleString()} P
+                  </td>
+
+                  <!-- Tickets -->
+                  <td class="py-4 px-4 text-right font-mono font-black text-sm text-amber-600 whitespace-nowrap">
+                    ${m.goldenTickets.toLocaleString()}장
+                  </td>
+
+                  <!-- Vault Count -->
+                  <td class="py-4 px-4 text-center whitespace-nowrap">
+                    <span class="font-mono font-bold text-xs ${m.vaultCount > 0 ? 'text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100' : 'text-gray-400'}">
+                      ${m.vaultCount}건
+                    </span>
+                  </td>
+
+                  <!-- Action Buttons -->
+                  <td class="py-4 px-5 text-center whitespace-nowrap">
+                    <div class="flex items-center justify-center gap-1.5">
+                      <button onclick="window.__openUserWalletModal('${m.uid}')" class="px-3 py-1.5 bg-primary hover:bg-primary-container text-white font-bold rounded-xl text-xs transition-all shadow-2xs flex items-center gap-1 cursor-pointer">
+                        <span class="material-symbols-outlined text-sm">account_balance_wallet</span>
+                        재화 관리
+                      </button>
+                      <button onclick="window.__openUserVaultModal('${m.uid}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer" title="회원 보관함 상품 조회">
+                        <span class="material-symbols-outlined text-sm">inventory_2</span>
+                        보관함
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>`;
@@ -1723,67 +1772,281 @@ export function render() {
     window.__switchAdminTab('shipping');
   };
 
-  // --- 4. User Wallet & Points Management ---
-  window.__adminGrantPoints = async (pts) => {
-    const cur = getUserPoints();
-    try {
-      await setUserPoints(cur + pts);
-      alert(`포인트 ₩${pts.toLocaleString()}P 가 서버 DB에 정상 지급되었습니다.`);
-      window.__switchAdminTab('users');
-    } catch (err) {
-      console.error('[Admin] grantPoints error:', err);
-      alert('❌ 포인트 지급 실패: ' + err.message);
-    }
+  // --- 4. User Directory & Wallet Management ---
+  window.__filterAdminMembers = (query) => {
+    const q = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#admin-members-tbody .member-row');
+    let visibleCount = 0;
+    rows.forEach(row => {
+      const searchData = row.getAttribute('data-search') || '';
+      if (!q || searchData.includes(q)) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+    const label = document.getElementById('admin-member-count-label');
+    if (label) label.textContent = `검색 결과: ${visibleCount}명`;
   };
 
-  window.__adminGrantTickets = async (tCount) => {
-    const cur = getAvailableGoldenTicketsCount();
-    try {
-      await setAvailableGoldenTicketsCount(cur + tCount);
-      alert(`골든 티켓 ${tCount}장이 서버 DB에 정상 지급되었습니다.`);
-      window.__switchAdminTab('users');
-    } catch (err) {
-      console.error('[Admin] grantTickets error:', err);
-      alert('❌ 골든티켓 지급 실패: ' + err.message);
-    }
-  };
-
-  window.__adminDirectPoints = async (multiplier) => {
-    const input = document.getElementById('custom-points-input');
-    const val = parseInt(input?.value || '0', 10);
-    if (isNaN(val) || val <= 0) {
-      alert('조정할 포인트 금액을 입력해주세요.');
+  window.__openUserWalletModal = (uid) => {
+    const members = getMembers();
+    const member = members.find(m => m.uid === uid || m.id === uid) || members[0];
+    if (!member) {
+      alert('회원 정보를 찾을 수 없습니다.');
       return;
     }
-    const cur = getUserPoints();
-    const target = Math.max(0, cur + val * multiplier);
+
+    const modalHtml = `
+      <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/70 backdrop-blur-sm" id="user-wallet-modal" onclick="if(event.target===this)window.__closeAdminModal()">
+        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+          <!-- Header -->
+          <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider bg-primary text-white px-2.5 py-0.5 rounded-full">
+                회원 지갑 관리
+              </span>
+              <h3 class="font-extrabold text-lg text-white mt-1">${member.name} 님 지갑 관리</h3>
+              <p class="text-xs text-slate-400 font-mono">${member.email} (UID: ${member.uid})</p>
+            </div>
+            <button onclick="window.__closeAdminModal()" class="text-slate-400 hover:text-white cursor-pointer">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+            <!-- Current Balance Cards -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl text-center">
+                <span class="text-[10px] text-blue-700 font-bold block uppercase">현재 보유 포인트</span>
+                <span class="font-black text-2xl text-primary font-mono mt-1 block">₩${member.points.toLocaleString()} P</span>
+              </div>
+              <div class="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl text-center">
+                <span class="text-[10px] text-amber-800 font-bold block uppercase">현재 보유 골든티켓</span>
+                <span class="font-black text-2xl text-amber-600 font-mono mt-1 block">${member.goldenTickets.toLocaleString()}장</span>
+              </div>
+            </div>
+
+            <!-- Quick Points Grant -->
+            <div class="space-y-2">
+              <span class="text-xs font-black text-gray-700 block">⚡ 포인트 빠른 원클릭 지급</span>
+              <div class="grid grid-cols-3 gap-2">
+                <button onclick="window.__adminAdjustUserBalance('${member.uid}', '${member.email}', 'points_add', 10000)" class="py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors cursor-pointer text-center">
+                  +10,000 P
+                </button>
+                <button onclick="window.__adminAdjustUserBalance('${member.uid}', '${member.email}', 'points_add', 100000)" class="py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition-colors cursor-pointer text-center">
+                  +100,000 P
+                </button>
+                <button onclick="window.__adminAdjustUserBalance('${member.uid}', '${member.email}', 'points_add', 1000000)" class="py-2.5 bg-primary text-white hover:bg-primary-container font-black rounded-xl text-xs transition-colors cursor-pointer text-center shadow-xs">
+                  +1,000,000 P
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Tickets Grant -->
+            <div class="space-y-2">
+              <span class="text-xs font-black text-gray-700 block">🎟️ 골든티켓 빠른 원클릭 지급</span>
+              <div class="grid grid-cols-3 gap-2">
+                <button onclick="window.__adminAdjustUserBalance('${member.uid}', '${member.email}', 'tickets_add', 20)" class="py-2.5 bg-amber-50 text-amber-800 hover:bg-amber-100 font-bold rounded-xl text-xs transition-colors cursor-pointer text-center">
+                  +20 장
+                </button>
+                <button onclick="window.__adminAdjustUserBalance('${member.uid}', '${member.email}', 'tickets_add', 500)" class="py-2.5 bg-amber-100 text-amber-900 hover:bg-amber-200 font-bold rounded-xl text-xs transition-colors cursor-pointer text-center">
+                  +500 장
+                </button>
+                <button onclick="window.__adminAdjustUserBalance('${member.uid}', '${member.email}', 'tickets_add', 1000)" class="py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl text-xs transition-colors cursor-pointer text-center shadow-xs">
+                  +1,000 장
+                </button>
+              </div>
+            </div>
+
+            <!-- Direct Custom Adjust -->
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <span class="text-xs font-black text-gray-700 block">✏️ 직접 수량 입력 지급/차감</span>
+              
+              <!-- Points Custom -->
+              <div>
+                <label class="text-[11px] font-bold text-gray-500 block mb-1">포인트 직접 조정 (원)</label>
+                <div class="flex gap-2">
+                  <input type="number" id="m-custom-points-input" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder="금액 입력 (예: 50000)">
+                  <button onclick="window.__adminDirectAdjustUser('${member.uid}', '${member.email}', 'points', 1)" class="px-3.5 py-2 bg-primary text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer">
+                    지급 (+)
+                  </button>
+                  <button onclick="window.__adminDirectAdjustUser('${member.uid}', '${member.email}', 'points', -1)" class="px-3.5 py-2 bg-red-600 text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer">
+                    차감 (-)
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tickets Custom -->
+              <div>
+                <label class="text-[11px] font-bold text-gray-500 block mb-1">골든티켓 직접 조정 (장수)</label>
+                <div class="flex gap-2">
+                  <input type="number" id="m-custom-tickets-input" class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder="수량 입력 (예: 10)">
+                  <button onclick="window.__adminDirectAdjustUser('${member.uid}', '${member.email}', 'tickets', 1)" class="px-3.5 py-2 bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-xs cursor-pointer">
+                    지급 (+)
+                  </button>
+                  <button onclick="window.__adminDirectAdjustUser('${member.uid}', '${member.email}', 'tickets', -1)" class="px-3.5 py-2 bg-red-600 text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer">
+                    차감 (-)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <button onclick="window.__closeAdminModal()" class="px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition-colors cursor-pointer">
+              닫기
+            </button>
+          </div>
+        </div>
+      </div>`;
+
+    const container = document.getElementById('admin-modal-container');
+    if (container) container.innerHTML = modalHtml;
+  };
+
+  window.__adminAdjustUserBalance = async (uid, email, type, amount) => {
+    const members = getMembers();
+    const member = members.find(m => m.uid === uid || m.id === uid);
+    if (!member) {
+      alert('회원 정보를 찾을 수 없습니다.');
+      return;
+    }
+
     try {
-      await setUserPoints(target);
-      alert(`포인트가 ₩${target.toLocaleString()}P 로 서버 DB에 정상 조정되었습니다.`);
+      if (type === 'points_add') {
+        const newPts = (member.points || 0) + amount;
+        await grantUserBalanceServer(uid, email, newPts, null);
+        alert(`✓ [${member.name}] 님에게 포인트 +₩${amount.toLocaleString()}P 가 정상 지급되었습니다.\n현재 잔액: ₩${newPts.toLocaleString()}P`);
+      } else if (type === 'tickets_add') {
+        const newTickets = (member.goldenTickets || 0) + amount;
+        await grantUserBalanceServer(uid, email, null, newTickets);
+        alert(`✓ [${member.name}] 님에게 골든티켓 +${amount.toLocaleString()}장이 정상 지급되었습니다.\n현재 보유: ${newTickets.toLocaleString()}장`);
+      }
+      window.__closeAdminModal();
       window.__switchAdminTab('users');
     } catch (err) {
-      console.error('[Admin] directPoints error:', err);
-      alert('❌ 포인트 조정 실패: ' + err.message);
+      console.error('[Admin] adjust balance error:', err);
+      alert('❌ 재화 지급 실패: ' + err.message);
     }
   };
 
-  window.__adminDirectTickets = async (multiplier) => {
-    const input = document.getElementById('custom-tickets-input');
-    const val = parseInt(input?.value || '0', 10);
-    if (isNaN(val) || val <= 0) {
-      alert('조정할 티켓 장수를 입력해주세요.');
+  window.__adminDirectAdjustUser = async (uid, email, type, multiplier) => {
+    const members = getMembers();
+    const member = members.find(m => m.uid === uid || m.id === uid);
+    if (!member) {
+      alert('회원 정보를 찾을 수 없습니다.');
       return;
     }
-    const cur = getAvailableGoldenTicketsCount();
-    const target = Math.max(0, cur + val * multiplier);
-    try {
-      await setAvailableGoldenTicketsCount(target);
-      alert(`골든 티켓이 ${target}장으로 서버 DB에 정상 조정되었습니다.`);
-      window.__switchAdminTab('users');
-    } catch (err) {
-      console.error('[Admin] directTickets error:', err);
-      alert('❌ 골든티켓 조정 실패: ' + err.message);
+
+    if (type === 'points') {
+      const input = document.getElementById('m-custom-points-input');
+      const val = parseInt(input?.value || '0', 10);
+      if (isNaN(val) || val <= 0) {
+        alert('조정할 포인트 금액을 올바르게 입력해주세요.');
+        return;
+      }
+      const newPts = Math.max(0, (member.points || 0) + val * multiplier);
+      try {
+        await grantUserBalanceServer(uid, email, newPts, null);
+        alert(`✓ [${member.name}] 님의 포인트가 ₩${newPts.toLocaleString()}P 로 정상 조정되었습니다.`);
+        window.__closeAdminModal();
+        window.__switchAdminTab('users');
+      } catch (err) {
+        alert('❌ 포인트 조정 실패: ' + err.message);
+      }
+    } else if (type === 'tickets') {
+      const input = document.getElementById('m-custom-tickets-input');
+      const val = parseInt(input?.value || '0', 10);
+      if (isNaN(val) || val <= 0) {
+        alert('조정할 골든티켓 장수를 올바르게 입력해주세요.');
+        return;
+      }
+      const newTickets = Math.max(0, (member.goldenTickets || 0) + val * multiplier);
+      try {
+        await grantUserBalanceServer(uid, email, null, newTickets);
+        alert(`✓ [${member.name}] 님의 골든티켓이 ${newTickets.toLocaleString()}장으로 정상 조정되었습니다.`);
+        window.__closeAdminModal();
+        window.__switchAdminTab('users');
+      } catch (err) {
+        alert('❌ 골든티켓 조정 실패: ' + err.message);
+      }
     }
+  };
+
+  window.__openUserVaultModal = (uid) => {
+    const members = getMembers();
+    const member = members.find(m => m.uid === uid || m.id === uid) || members[0];
+    if (!member) {
+      alert('회원 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    const vault = member.vault || [];
+
+    const modalHtml = `
+      <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/70 backdrop-blur-sm" id="user-vault-modal" onclick="if(event.target===this)window.__closeAdminModal()">
+        <div class="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+          <!-- Header -->
+          <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2.5 py-0.5 rounded-full">
+                회원 실물 보관함
+              </span>
+              <h3 class="font-extrabold text-lg text-white mt-1">${member.name} 님의 보관함 (${vault.length}건)</h3>
+              <p class="text-xs text-slate-400 font-mono">${member.email}</p>
+            </div>
+            <button onclick="window.__closeAdminModal()" class="text-slate-400 hover:text-white cursor-pointer">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 space-y-3 overflow-y-auto custom-scrollbar flex-1">
+            ${vault.length === 0 ? `
+              <div class="p-12 text-center text-gray-400">
+                <span class="material-symbols-outlined text-4xl block mb-2 text-gray-300">inventory_2</span>
+                <p class="text-xs font-bold">보관함에 보관된 상품이 없습니다.</p>
+              </div>
+            ` : vault.map(v => {
+              const statusBadge = {
+                in_vault: '<span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">보관 중</span>',
+                shipping_requested: '<span class="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">배송 요청</span>',
+                shipped: '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">배송 완료</span>',
+                converted_to_points: '<span class="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md">포인트 반품</span>'
+              }[v.status] || '<span class="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">보관 중</span>';
+
+              return `
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <img src="${v.imageUrl || v.image || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=200'}" onerror="this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=200';" class="w-12 h-12 rounded-xl object-cover border border-slate-200 flex-shrink-0" alt="">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="font-extrabold text-sm text-gray-900 truncate">${v.title || v.name || '당첨 상품'}</span>
+                        ${statusBadge}
+                      </div>
+                      <p class="text-xs text-gray-500 font-mono">소비자가: ₩${(v.retailPrice || 0).toLocaleString()}원</p>
+                      <p class="text-[10px] text-gray-400 font-mono">획득일: ${v.wonAt ? new Date(v.wonAt).toLocaleString('ko-KR') : '-'}</p>
+                    </div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+
+          <!-- Footer -->
+          <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <button onclick="window.__closeAdminModal()" class="px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition-colors cursor-pointer">
+              확인
+            </button>
+          </div>
+        </div>
+      </div>`;
+
+    const container = document.getElementById('admin-modal-container');
+    if (container) container.innerHTML = modalHtml;
   };
 
   window.__resetAllTestData = async () => {
@@ -1846,4 +2109,10 @@ export function cleanup() {
   delete window.__adminDirectPoints;
   delete window.__adminDirectTickets;
   delete window.__resetAllTestData;
+  delete window.__filterAdminMembers;
+  delete window.__openUserWalletModal;
+  delete window.__openUserVaultModal;
+  delete window.__adminAdjustUserBalance;
+  delete window.__adminDirectAdjustUser;
+  delete window.__deleteAdminVaultItem;
 }

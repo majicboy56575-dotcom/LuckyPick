@@ -498,17 +498,61 @@ function getAllShippingInfos() {
 }
 
 function getMembers() {
-  return usersCache.map((u) => ({
-    uid: u.uid,
-    name: u.displayName || u.name || '사용자',
-    email: u.email || '미등록 이메일',
-    initials: (u.displayName || u.name || 'U').charAt(0).toUpperCase(),
-    joinDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-',
-    tickets: u.tickets || (u.participatedRaffles ? u.participatedRaffles.length : 0),
-    status: u.status || 'verified',
-    role: u.role || 'user',
-    colors: u.role === 'admin' ? 'from-tertiary to-tertiary-container' : 'from-primary to-primary-container',
-  }));
+  let list = usersCache;
+  if (!list || list.length === 0) {
+    const authUser = getCurrentAuthUser();
+    const curDoc = getCurrentUserDocCache();
+    if (authUser || curDoc) {
+      list = [{
+        id: authUser?.uid || curDoc?.id || 'admin_user',
+        uid: authUser?.uid || curDoc?.id || 'admin_user',
+        displayName: authUser?.displayName || curDoc?.name || '관리자',
+        name: authUser?.displayName || curDoc?.name || '관리자',
+        email: authUser?.email || curDoc?.email || 'admin@luckypick.com',
+        points: Number(curDoc?.points) || 0,
+        goldenTickets: Number(curDoc?.goldenTickets) || 0,
+        vault: Array.isArray(curDoc?.vault) ? curDoc.vault : [],
+        role: 'admin',
+        createdAt: curDoc?.createdAt || Date.now(),
+        updatedAt: curDoc?.updatedAt || Date.now()
+      }];
+    }
+  }
+
+  return (list || []).map((u) => {
+    const uid = u.id || u.uid || 'user_unknown';
+    const email = u.email || '미등록 이메일';
+    const name = u.displayName || u.name || (email.includes('@') ? email.split('@')[0] : '이용자');
+    const isAdmin = u.role === 'admin' || email === 'majicboy56575@gmail.com' || email === 'admin@luckypick.com';
+    const points = Number(u.points) || 0;
+    const goldenTickets = Number(u.goldenTickets !== undefined ? u.goldenTickets : (u.tickets || 0)) || 0;
+    const vault = Array.isArray(u.vault) ? u.vault : [];
+
+    let joinDate = '-';
+    if (u.createdAt) {
+      joinDate = new Date(u.createdAt).toLocaleDateString('ko-KR');
+    } else if (u.updatedAt) {
+      joinDate = new Date(u.updatedAt).toLocaleDateString('ko-KR');
+    }
+
+    return {
+      id: uid,
+      uid,
+      name,
+      email,
+      initials: (name || 'U').charAt(0).toUpperCase(),
+      joinDate,
+      createdAt: u.createdAt || u.updatedAt || 0,
+      points,
+      goldenTickets,
+      tickets: goldenTickets,
+      vault,
+      vaultCount: vault.length,
+      status: u.status || 'ACTIVE',
+      role: isAdmin ? 'admin' : 'user',
+      colors: isAdmin ? 'from-amber-500 to-amber-600' : 'from-primary to-primary-container',
+    };
+  }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 function getCurrentUser() {
