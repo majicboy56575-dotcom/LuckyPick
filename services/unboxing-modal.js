@@ -1,8 +1,17 @@
 // ============================================
 // LuckyPick - Interactive Unboxing & Payment Integration
 // ============================================
-import { getRandomBoxTiers, openRandomBox, convertVaultItemToPoints, getUserPoints, setUserPoints, getAvailableGoldenTicketsCount } from './randombox.js';
-import { requestDanalCardPayment, requestDanalPhonePayment } from '/services/payment.js';
+import { 
+  getRandomBoxTiers, 
+  openRandomBox, 
+  convertVaultItemToPoints, 
+  getUserPoints, 
+  setUserPoints, 
+  getAvailableGoldenTicketsCount,
+  openLuckyBoxServer,
+  convertVaultItemToPointsServer
+} from './randombox.js';
+import { requestDanalCardPayment, requestDanalPhonePayment } from './payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
 
 export function showProbabilityModal(boxId) {

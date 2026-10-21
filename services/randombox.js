@@ -648,14 +648,15 @@ export function createDemoShippingRequest() {
       address: '경기도 화성시 만세구 수노을1로 148, 101동 902호',
       memo: '부재 시 문 앞에 놓아주세요.'
     },
-    shippingFee: 3000,
-    shippingPayMethod: 'points',
-    status: 'pending',
-    requestedAt: Date.now(),
     carrier: 'CJ대한통운',
     trackingNumber: ''
   };
   submitShippingInfoToFirestore(demo);
   return demo;
 }
+
+export {
+  openLuckyBoxServer,
+  convertVaultItemToPointsServer
+};
 
