@@ -69,13 +69,35 @@ export function openProductPurchaseModal(itemId, tierId) {
         </div>
 
         <div class="p-6 space-y-5">
+          <!-- 3 Products Selector (내가 지정한 상품 선택) -->
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-bold text-gray-700">구매할 지정 상품 선택 (3종 중 택1)</span>
+              <span class="text-[10px] text-primary font-bold">100% 확정 정가 구매</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              ${(tier.items || []).map(it => {
+                const isSelected = it.id === item.id;
+                return `
+                  <button type="button" onclick="window.__switchModalProduct('${it.id}', '${tier.id}')" class="p-2 rounded-2xl border text-left flex flex-col items-center gap-1.5 transition-all ${isSelected ? 'bg-primary/5 border-primary ring-2 ring-primary/20 text-gray-900 font-extrabold shadow-xs' : 'bg-white border-slate-200 text-gray-500 hover:bg-slate-50'}">
+                    <div class="w-12 h-12 rounded-xl bg-slate-50 p-1 flex items-center justify-center overflow-hidden border border-slate-100">
+                      <img src="${it.image || 'assets/products/phonestand_metal.jpg'}" alt="${it.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-[10px] text-center line-clamp-1 w-full text-center leading-tight">${it.name}</span>
+                    <span class="text-[9px] font-mono font-bold ${isSelected ? 'text-primary' : 'text-gray-400'}">₩${(it.retailPrice || tier.price).toLocaleString()}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
           <!-- Product Preview Card -->
           <div class="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
             <div class="w-20 h-20 rounded-xl bg-white border border-slate-200 p-1 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-xs">
               <img src="${item.image || 'assets/products/phonestand_metal.jpg'}" alt="${item.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
             </div>
             <div class="flex-grow min-w-0">
-              <span class="text-[10px] font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded">${tier.name}</span>
+              <span class="text-[10px] font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded">${tier.name} 지정 상품</span>
               <h4 class="font-extrabold text-sm text-gray-900 mt-1 line-clamp-2 leading-snug">${item.name}</h4>
               <div class="flex items-baseline gap-1 mt-1">
                 <span class="text-xs text-gray-400 font-bold">정가:</span>
@@ -432,6 +454,10 @@ window.__openVaultItemShipping = (vaultId) => {
   if (typeof window.__switchProfileTab === 'function') {
     window.__switchProfileTab('vault');
   }
+};
+
+window.__switchModalProduct = (itemId, tierId) => {
+  openProductPurchaseModal(itemId, tierId);
 };
 
 // Legacy compatibility export for app.js and router

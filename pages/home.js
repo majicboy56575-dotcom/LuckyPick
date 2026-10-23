@@ -1,5 +1,5 @@
 // ============================================
-// LuckyPick - Home Page (Fixed-Price Product Store & Multi-Group Golden Raffle Showcase)
+// LuckyPick - Home Page (Fixed-Price Product Commerce & Multi-Group Golden Raffle Showcase)
 // ============================================
 import { t } from '../i18n.js';
 import { 
@@ -18,7 +18,6 @@ import { openProductPurchaseModal } from '../services/unboxing-modal.js';
 import { isLoggedIn, requireLogin } from '../services/auth.js';
 
 let countdownIntervals = [];
-let activeStoreFilter = 'all'; // 'all' | 'box_basic' | 'box_premium' | 'box_vip'
 
 function clearTimers() {
   countdownIntervals.forEach((id) => clearInterval(id));
@@ -51,63 +50,82 @@ function renderLiveTicker() {
     </div>`;
 }
 
-function renderStoreProductCard(item, tier) {
+function renderProductTierCard(box) {
   const loggedIn = isLoggedIn();
-  const price = Number(item.retailPrice || tier.price || 5000);
-  const tickets = Number(tier.goldenTickets) || (price >= 20000 ? 11 : price >= 10000 ? 5 : 2);
-
   return `
     <div class="relative bg-white rounded-3xl border border-slate-200/80 shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5 flex flex-col overflow-hidden group">
       <!-- Top Badges -->
-      <div class="absolute top-3.5 left-3.5 z-10 flex gap-1.5">
-        <span class="bg-slate-900/90 backdrop-blur-md text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full shadow-sm">
-          ${item.badge || tier.badge || '인기'}
-        </span>
-        <span class="bg-primary text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full shadow-sm">
-          ${tier.name}
+      <div class="absolute top-4 left-4 z-10 flex gap-2">
+        <span class="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[11px] px-3 py-1 rounded-full shadow-sm">
+          ${box.badge}
         </span>
       </div>
 
-      <div class="absolute top-3.5 right-3.5 z-10">
-        <span class="bg-amber-400 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded-full border border-amber-300 flex items-center gap-1 shadow-sm">
-          <span class="material-symbols-outlined text-[13px]">confirmation_number</span>
-          사은 티켓 +${tickets}장
+      <div class="absolute top-4 right-4 z-10">
+        <span class="bg-slate-900/80 backdrop-blur-md text-amber-300 font-extrabold text-[11px] px-3 py-1 rounded-full border border-amber-400/30 flex items-center gap-1 shadow-sm">
+          <span class="material-symbols-outlined text-[14px]">confirmation_number</span>
+          골든티켓 +${box.goldenTickets}장 증정
         </span>
       </div>
 
-      <!-- Product Image: Full Visibility object-contain -->
-      <div class="relative h-60 w-full overflow-hidden bg-slate-50 flex items-center justify-center p-4 border-b border-slate-100">
-        <img src="${item.image || 'assets/products/phonestand_metal.jpg'}" alt="${item.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105">
+      <!-- Box Image & Glow Header -->
+      <div class="relative h-56 w-full overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200/60 flex items-center justify-center">
+        <div class="absolute inset-0 bg-gradient-to-r ${box.color} opacity-10 group-hover:opacity-20 transition-opacity"></div>
+        <img src="${box.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" alt="${box.name}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-36 h-36 object-cover rounded-2xl shadow-xl border-2 border-white group-hover:scale-105 transition-transform duration-300 float-anim">
       </div>
 
       <!-- Content Details -->
       <div class="p-6 flex-grow flex flex-col justify-between">
         <div>
-          <div class="mb-3">
-            <h3 class="font-extrabold text-base text-gray-900 line-clamp-2 leading-snug group-hover:text-primary transition-colors">${item.name}</h3>
-            <p class="text-xs text-gray-500 mt-1 line-clamp-2">${item.description || tier.tagline}</p>
-          </div>
-
-          <!-- Product Specs / Guarantee Tag -->
-          <div class="mb-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-emerald-600 text-lg">verified</span>
-              <div>
-                <p class="font-bold text-gray-900">100% 정품 실물 배송</p>
-                <p class="text-[10px] text-gray-500">결제 즉시 내 보관함 보관</p>
-              </div>
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <h3 class="font-black text-xl text-gray-900">${box.name}</h3>
+              <p class="text-xs text-gray-500 mt-0.5">${box.tagline}</p>
             </div>
             <div class="text-right">
-              <span class="text-[10px] text-gray-400 font-bold block uppercase">정가</span>
-              <span class="font-black text-lg text-gray-900 font-mono">₩${price.toLocaleString()}</span>
+              <span class="text-[10px] text-gray-400 font-bold uppercase block tracking-wider">FIXED PRICE</span>
+              <span class="font-black text-2xl text-primary font-mono">₩${box.price.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <!-- 100% Genuine Direct Delivery Guarantee Badge -->
+          <div class="my-4 p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-emerald-600 text-xl">verified</span>
+              <div>
+                <p class="font-bold text-emerald-950">100% 정품 실물 지정 배송</p>
+                <p class="text-[10px] text-emerald-700">원하는 품목 100% 지정 확정 구매 (가챠 추첨 X)</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full">정가 직구매</span>
+          </div>
+
+          <!-- 3 Selectable Fixed-Price Items in this Tier -->
+          <div class="space-y-2 mb-5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">지정 구매 가능 품목 (3종)</span>
+              <span class="text-[10px] text-primary font-bold">클릭 시 바로 구매</span>
+            </div>
+            <div class="space-y-1.5">
+              ${(box.items || []).map(it => `
+                <div onclick="window.__openProductPurchase('${it.id}', '${box.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 flex items-center justify-between cursor-pointer transition-colors group/item">
+                  <div class="flex items-center gap-2.5 overflow-hidden">
+                    <img src="${it.image || 'assets/products/phonestand_metal.jpg'}" alt="${it.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-8 h-8 rounded-lg object-contain bg-white border border-slate-200 p-0.5 flex-shrink-0">
+                    <span class="text-xs font-bold text-gray-800 group-hover/item:text-primary transition-colors truncate">${it.name}</span>
+                  </div>
+                  <div class="text-right flex-shrink-0 ml-2">
+                    <span class="text-[11px] font-black text-gray-900 font-mono">₩${(it.retailPrice || box.price).toLocaleString()}</span>
+                  </div>
+                </div>
+              `).join('')}
             </div>
           </div>
         </div>
 
-        <!-- Buy Action Button -->
-        <button onclick="window.__openProductPurchase('${item.id}', '${tier.id}')" class="w-full py-3.5 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-primary hover:to-indigo-600 text-white font-extrabold rounded-2xl shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
-          <span class="material-symbols-outlined text-base">shopping_cart</span>
-          <span>정가 바로 구매하기 (₩${price.toLocaleString()}원)</span>
+        <!-- Action Button -->
+        <button onclick="window.__openTierProductSelect('${box.id}')" class="w-full py-4 bg-gradient-to-r ${box.color} text-white font-extrabold rounded-2xl shadow-lg hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:shadow-primary/20">
+          <span class="material-symbols-outlined text-xl">${loggedIn ? 'shopping_bag' : 'lock'}</span>
+          <span>${loggedIn ? '내가 지정한 상품 구매하기' : '로그인하고 상품 구매하기'}</span>
         </button>
       </div>
     </div>`;
@@ -140,32 +158,19 @@ function renderSuperRaffleCard(raffle, index) {
                 추첨 마감 (CLOSED)
               </span>
             ` : `
-              <span class="bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
-                ${raffle.badge}
+              <span class="bg-amber-500 text-slate-950 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse"></span>
+                실시간 응모 진행 중
               </span>
             `}
           </div>
 
           <div class="absolute top-3 right-3 z-10">
-            <div class="flex items-center gap-1.5 text-xs text-amber-300 font-mono bg-slate-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-amber-400/30 shadow-md">
-              ${isClosed ? `
-                <span class="material-symbols-outlined text-[14px]">emoji_events</span>
-                <span>추첨 완료 (${raffle.winners?.length || 0}명)</span>
-              ` : `
-                <span class="material-symbols-outlined text-[14px]">timer</span>
-                <span id="super-timer-${index}">${formatTime(remaining)}</span>
-              `}
-            </div>
-          </div>
-
-          ${raffle.winnerBonus ? `
-          <div class="absolute bottom-3 left-3 right-3 z-10 flex justify-between items-end pointer-events-none">
-            <span class="text-[11px] text-emerald-300 font-bold bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 shadow-sm flex items-center gap-1">
-              <span>🎁</span>
-              <span>${raffle.winnerBonus}</span>
+            <span class="bg-slate-900/90 backdrop-blur-md text-white font-mono text-[11px] px-3 py-1 rounded-full border border-white/20 flex items-center gap-1 shadow-md">
+              <span class="material-symbols-outlined text-amber-300 text-[14px]">timer</span>
+              <span id="super-timer-${index}">${formatTime(remaining)}</span>
             </span>
           </div>
-          ` : ''}
 
           ${isClosed ? `
             <div class="absolute inset-0 bg-black/60 backdrop-blur-2xs flex items-center justify-center z-20">
@@ -340,33 +345,35 @@ function renderTransparencyModal(raffleId) {
 function renderApplyTicketModal(raffleId, raffleTitle, userTickets) {
   return `
     <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="apply-ticket-modal" onclick="if(event.target===this)window.__closeApplyTicketModal()">
-      <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
-        <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
-          <span class="material-symbols-outlined text-3xl">military_tech</span>
+      <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold text-gray-900">골든 티켓 응모하기</h3>
+          <button onclick="window.__closeApplyTicketModal()" class="text-gray-400 hover:text-gray-600">
+            <span class="material-symbols-outlined">close</span>
+          </button>
         </div>
 
-        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-1">스페셜 상품 골든 티켓 응모</h3>
-        <p class="text-xs text-gray-500 mb-4 truncate font-semibold">[${raffleTitle}]</p>
-
-        <div class="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl text-xs text-left mb-5 space-y-2">
-          <div class="flex justify-between items-center">
-            <span class="text-gray-600">내 보유 골든 티켓</span>
-            <span class="font-black text-amber-700 font-mono text-base">${userTickets}장</span>
-          </div>
-          <p class="text-[11px] text-amber-900/80">원하는 수량만큼 골든 티켓을 자유롭게 분배하여 응모할 수 있습니다.</p>
-          <p class="text-[10px] text-amber-900/60 leading-tight">※ 5만 원 초과 경품 당첨 시 소득세법에 따라 제세공과금(22%)이 부과됩니다.</p>
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-4">
+          <span class="text-xs text-gray-500 font-medium">대상 스페셜 래플</span>
+          <p class="font-bold text-gray-900 mt-0.5">${raffleTitle}</p>
         </div>
 
         ${userTickets > 0 ? `
-          <div class="space-y-3 mb-6">
-            <label class="text-xs font-bold text-gray-700 block text-left">응모할 티켓 수량 입력</label>
+          <div class="mb-5">
+            <div class="flex justify-between text-xs text-gray-500 mb-2">
+              <span>내 보유 골든 티켓</span>
+              <span class="font-bold text-amber-600 font-mono">${userTickets}장</span>
+            </div>
+
+            <label class="block text-xs font-semibold text-gray-700 mb-1">응모할 티켓 수량 입력</label>
             <div class="flex items-center gap-2">
-              <input type="number" id="apply-ticket-input" min="1" max="${userTickets}" value="1" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center font-mono font-black text-lg text-primary focus:border-primary outline-none">
-              <button onclick="document.getElementById('apply-ticket-input').value = '${userTickets}'" class="px-3.5 py-3 bg-slate-900 text-white font-bold rounded-xl text-xs whitespace-nowrap">
-                전액 (${userTickets}장)
+              <input type="number" id="apply-ticket-input" min="1" max="${userTickets}" value="1" class="flex-grow p-3 bg-slate-100 border border-slate-300 rounded-xl font-bold font-mono text-center text-lg focus:outline-primary">
+              <button onclick="document.getElementById('apply-ticket-input').value = '${userTickets}'" class="px-3.5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold whitespace-nowrap">
+                최대(${userTickets}장)
               </button>
             </div>
-            <div class="flex gap-1.5 justify-center pt-1">
+
+            <div class="flex gap-1.5 mt-2">
               <button onclick="document.getElementById('apply-ticket-input').value = '1'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+1장</button>
               ${userTickets >= 3 ? `<button onclick="document.getElementById('apply-ticket-input').value = '3'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+3장</button>` : ''}
               ${userTickets >= 5 ? `<button onclick="document.getElementById('apply-ticket-input').value = '5'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+5장</button>` : ''}
@@ -386,8 +393,8 @@ function renderApplyTicketModal(raffleId, raffleTitle, userTickets) {
             보유 중인 골든 티켓이 없습니다.<br>
             정가 상품을 구매하시면 골든 티켓이 무료 사은품으로 적립됩니다!
           </div>
-          <button onclick="window.__closeApplyTicketModal(); window.location.hash='#store_lineup'" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md">
-            정가 상품 둘러보고 골든티켓 받기
+          <button onclick="window.__closeApplyTicketModal(); window.location.hash='#box_lineup'" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md">
+            지정 상품 둘러보고 골든티켓 받기
           </button>
         `}
       </div>
@@ -401,14 +408,9 @@ export function render() {
   const loggedIn = isLoggedIn();
   const userPts = loggedIn ? getUserPoints() : 0;
   const userTickets = loggedIn ? getAvailableGoldenTicketsCount() : 0;
-  const tiers = getRandomBoxTiers();
+  const boxes = getRandomBoxTiers();
   const allRaffles = getSuperRaffles();
   const raffles = allRaffles.filter(r => r.status === 'active');
-
-  // Filter products based on activeStoreFilter
-  const displayTiers = activeStoreFilter === 'all' 
-    ? tiers 
-    : tiers.filter(t => t.id === activeStoreFilter);
 
   const html = `
     <!-- Top Live Marquee -->
@@ -425,21 +427,21 @@ export function render() {
           <div class="relative z-10 max-w-2xl">
             <div class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-full text-amber-300 font-extrabold text-xs mb-4 shadow-sm">
               <span class="material-symbols-outlined text-sm">verified_user</span>
-              100% 정품 실물 정가 쇼핑몰 · 구매 고객 사은 래플
+              100% 정품 실물 상품 라인업 · 구매 사은 골든티켓 증정
             </div>
 
             <h1 class="font-black text-3xl md:text-5xl leading-tight mb-4 tracking-tight">
               실속 있는 정가 쇼핑!<br>
-              <span class="gold-gradient-text">100% 실물 상품 정가 구매</span> + <span class="text-amber-300">구매 사은 래플</span>
+              <span class="gold-gradient-text">지정한 실물 상품 정가 구매</span> + <span class="text-amber-300">구매 사은 래플</span>
             </h1>
             <p class="text-sm md:text-base text-slate-300 mb-8 leading-relaxed">
-              5,000원 / 10,000원 / 20,000원 엄선된 실물 정가 상품을 자유롭게 구매하시고, 구매 금액에 따라 무료 증정되는 사은 골든티켓으로 <strong>스페셜 사은품(아이폰 16 Pro, 명품백 등)에 자유롭게 응모</strong>하세요!
+              소비자가 기준 최저 보장 가치 100% 보장! 5,000원 / 10,000원 / 20,000원 엄선된 실물 정가 상품을 자유롭게 지정 구매하시고, 구매 금액에 따라 무료 증정되는 사은 골든티켓으로 <strong>스페셜 사은품(아이폰 16 Pro 등)에 자유롭게 응모</strong>하세요!
             </p>
 
             <div class="flex flex-wrap items-center gap-4">
-              <a href="#store_lineup" class="px-8 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-2">
-                <span class="material-symbols-outlined">shopping_bag</span>
-                정가 상품 둘러보기
+              <a href="#box_lineup" class="px-8 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-2">
+                <span class="material-symbols-outlined">package_2</span>
+                지정 상품 라인업 둘러보기
               </a>
               ${loggedIn ? `
               <div class="flex items-center gap-3 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-xs">
@@ -490,42 +492,18 @@ export function render() {
         `}
       </section>
 
-      <!-- Main Fixed-Price Store Products Showcase -->
-      <section id="store_lineup" class="mb-16">
-        <div class="flex flex-col sm:flex-row justify-between sm:items-end mb-6 gap-4">
+      <!-- Main Showcase: 3 Fixed-Price Tiers (Selectable 3 Items each) -->
+      <section id="box_lineup" class="mb-16">
+        <div class="flex justify-between items-end mb-6">
           <div>
             <span class="text-xs font-black text-primary uppercase tracking-widest">100% AUTHENTIC FIXED-PRICE COMMERCE</span>
-            <h2 class="text-2xl md:text-3xl font-black text-gray-900 mt-1">정가 상품 스토어 (구매 사은 골든티켓 증정)</h2>
+            <h2 class="text-2xl md:text-3xl font-black text-gray-900 mt-1">등급별 정가 상품 라인업</h2>
           </div>
-          <span class="text-xs text-gray-500">100% 정품 실물 배송 가능 · 구매 시 골든티켓 무료 사은 증정</span>
+          <span class="text-xs text-gray-500 hidden sm:block">전 품목 실물 배송 가능 · 구매 시 사은 골든티켓 무료 증정</span>
         </div>
 
-        <!-- Filter Tabs -->
-        <div id="store-filter-tabs" class="flex flex-wrap gap-2 mb-8 border-b border-slate-200 pb-4">
-          <button onclick="window.__filterStoreProducts('all')" data-filter="all" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'all' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
-            <span>전체 상품</span>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full ${activeStoreFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}">9개</span>
-          </button>
-          
-          <button onclick="window.__filterStoreProducts('box_basic')" data-filter="box_basic" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'box_basic' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
-            <span>5,000원 상품관</span>
-            <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+2장</span>
-          </button>
-
-          <button onclick="window.__filterStoreProducts('box_premium')" data-filter="box_premium" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'box_premium' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
-            <span>10,000원 상품관</span>
-            <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+5장</span>
-          </button>
-
-          <button onclick="window.__filterStoreProducts('box_vip')" data-filter="box_vip" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'box_vip' ? 'bg-amber-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
-            <span>20,000원 상품관</span>
-            <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+11장</span>
-          </button>
-        </div>
-
-        <!-- Products Grid (3 items per tier) -->
-        <div id="store-products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          ${displayTiers.flatMap(tier => (tier.items || []).map(item => renderStoreProductCard(item, tier))).join('')}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          ${boxes.map(box => renderProductTierCard(box)).join('')}
         </div>
       </section>
 
@@ -552,35 +530,17 @@ export function render() {
     });
   }, 100);
 
-  // Store Filter Handler (Smooth local DOM update without resetting timers/scroll)
-  window.__filterStoreProducts = (filter) => {
-    activeStoreFilter = filter;
-    const allTiers = getRandomBoxTiers();
-    const currentDisplayTiers = activeStoreFilter === 'all' 
-      ? allTiers 
-      : allTiers.filter(t => t.id === activeStoreFilter);
-
-    const grid = document.getElementById('store-products-grid');
-    if (grid) {
-      grid.innerHTML = currentDisplayTiers.flatMap(tier => (tier.items || []).map(item => renderStoreProductCard(item, tier))).join('');
-    }
-
-    // Update active tab styles
-    const buttons = document.querySelectorAll('.store-filter-btn');
-    buttons.forEach(btn => {
-      const f = btn.getAttribute('data-filter');
-      const isSelected = f === activeStoreFilter;
-      btn.className = `store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${
-        isSelected 
-          ? (f === 'box_basic' ? 'bg-blue-600 text-white shadow-md' : f === 'box_premium' ? 'bg-purple-600 text-white shadow-md' : f === 'box_vip' ? 'bg-amber-600 text-white shadow-md' : 'bg-slate-900 text-white shadow-md')
-          : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'
-      }`;
-    });
-  };
-
   // Fixed-Price Product Direct Purchase Modal Trigger
   window.__openProductPurchase = (itemId, tierId) => {
     openProductPurchaseModal(itemId, tierId);
+  };
+
+  // Open Tier Product Selector (defaults to first item of the tier, allows 3-way toggle inside modal)
+  window.__openTierProductSelect = (tierId) => {
+    const tiers = getRandomBoxTiers();
+    const tier = tiers.find(t => t.id === tierId) || tiers[0];
+    const firstItem = tier?.items?.[0];
+    openProductPurchaseModal(firstItem?.id, tier.id);
   };
 
   // Handlers
@@ -654,6 +614,6 @@ export function cleanup() {
   delete window.__openTransparencyModal;
   delete window.__closeTransparencyModal;
   delete window.__cancelTicket;
-  delete window.__filterStoreProducts;
   delete window.__openProductPurchase;
+  delete window.__openTierProductSelect;
 }
