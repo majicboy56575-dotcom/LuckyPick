@@ -321,35 +321,43 @@ function getBoxCatalogCache() {
 }
 
 async function saveBoxCatalogToFirestore(tiers) {
-  const payload = {
-    tiers,
-    version: '3.0',
-    updatedAt: Date.now()
-  };
-
-  // 1. Direct Firestore setDoc (primary & instant)
-  if (db) {
-    try {
-      await setDoc(doc(db, 'box_catalogs', 'default'), payload, { merge: true });
-    } catch (e) {
-      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
-      await saveBoxCatalogServer(tiers);
-    }
-  } else {
-    await saveBoxCatalogServer(tiers);
-  }
-
-  // 2. Update real-time cache upon success
+  // 1. Update real-time cache and localStorage FIRST so local state is ALWAYS instant and reliable
   boxCatalogCache = tiers;
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(Date.now()));
     localStorage.setItem('lp_box_catalog_version', '3.0_V18');
   } catch (e) {
-    console.warn('[Firestore] localStorage quota exceeded or error:', e);
+    console.warn('[Firestore] localStorage error:', e);
   }
   window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
   window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+  const payload = {
+    tiers,
+    version: '3.0',
+    updatedAt: Date.now()
+  };
+
+  // 2. Direct Firestore setDoc & Cloud Function Sync
+  if (db) {
+    try {
+      await setDoc(doc(db, 'box_catalogs', 'default'), payload, { merge: true });
+    } catch (e) {
+      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
+      try {
+        await saveBoxCatalogServer(tiers);
+      } catch (fnErr) {
+        console.warn('[Firestore] Cloud function fallback also failed, but local state preserved:', fnErr.message);
+      }
+    }
+  } else {
+    try {
+      await saveBoxCatalogServer(tiers);
+    } catch (fnErr2) {
+      console.warn('[Firestore] Cloud function save failed, local state preserved:', fnErr2.message);
+    }
+  }
   return true;
 }
 

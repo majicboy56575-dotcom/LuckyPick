@@ -171,6 +171,23 @@ export async function saveRandomBoxTiers(tiers) {
   return await saveBoxCatalogToFirestore(tiers);
 }
 
+export async function deleteBoxTierItem(boxId, itemId) {
+  const tiers = getRandomBoxTiers();
+  const tier = tiers.find(t => t.id === boxId);
+  if (!tier) return false;
+
+  tier.items = (tier.items || []).filter(it => it.id !== itemId);
+
+  // Also remove from in-memory DEFAULT_BOX_TIERS if present
+  const defaultTier = DEFAULT_BOX_TIERS.find(t => t.id === boxId);
+  if (defaultTier && Array.isArray(defaultTier.items)) {
+    defaultTier.items = defaultTier.items.filter(it => it.id !== itemId);
+  }
+
+  await saveRandomBoxTiers(tiers);
+  return true;
+}
+
 // Get Super Raffles (100% Pure Firestore Cloud DB - Zero Hardcoded Fallbacks)
 export function getSuperRaffles() {
   const serverRaffles = getSuperRafflesCache();
