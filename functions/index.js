@@ -1367,66 +1367,88 @@ function secureRandomFloat() {
   return buf.readUInt32BE(0) / 0xffffffff;
 }
 
-// Fallback Box Tiers for server draw
+// Fallback Fixed-Price Store Products (3 items per tier: 5,000 / 10,000 / 20,000)
 const SERVER_DEFAULT_BOXES = [
   {
     id: "box_basic",
-    name: "베이직 럭키박스",
+    name: "5,000원 상품관",
     price: 5000,
     goldenTickets: 2,
+    badge: "5,000원 BEST",
     items: [
-      { id: "b_item_1", name: "대용량 LED 디지털 잔량표시 보조배터리 10,000mAh", retailPrice: 9900, wholesalePrice: 4800, prob: 0.010, image: "assets/products/powerbank_10000mah.jpg", grade: "RARE" },
-      { id: "b_item_2", name: "차량용 듀얼 초고속 충전 시가잭 45W", retailPrice: 7900, wholesalePrice: 3500, prob: 0.020, image: "assets/products/carcharger_45w.jpg", grade: "RARE" },
-      { id: "b_item_3", name: "304 스테인리스 이중 진공 보온보냉 텀블러 500ml", retailPrice: 6500, wholesalePrice: 2800, prob: 0.080, image: "assets/products/tumbler_500ml.jpg", grade: "NORMAL" },
-      { id: "b_item_4", name: "휴대용 접이식 각도조절 메탈 스마트폰 거치대", retailPrice: 4900, wholesalePrice: 1800, prob: 0.300, image: "assets/products/phonestand_metal.jpg", grade: "NORMAL" },
-      { id: "b_item_5", name: "3in1 패브릭 메탈 초고속 충전 케이블 1.5M", retailPrice: 3900, wholesalePrice: 1400, prob: 0.590, image: "assets/products/cable_3in1_braided.jpg", grade: "NORMAL" },
+      { id: "b_item_1", name: "휴대용 접이식 각도조절 메탈 스마트폰 거치대", retailPrice: 5000, wholesalePrice: 1800, prob: 0.334, image: "assets/products/phonestand_metal.jpg", grade: "NORMAL", description: "고강도 알루미늄 합금, 자유로운 각도 조절 및 안정적인 미끄럼 방지 실리콘" },
+      { id: "b_item_2", name: "3in1 패브릭 메탈 초고속 충전 케이블 1.5M", retailPrice: 5000, wholesalePrice: 1400, prob: 0.333, image: "assets/products/cable_3in1_braided.jpg", grade: "NORMAL", description: "C타입, 8핀, 5핀 동시 고속 충전, 단선 방지 고내구성 나일론 브레이디드" },
+      { id: "b_item_3", name: "304 스테인리스 이중 진공 보온보냉 텀블러 500ml", retailPrice: 5000, wholesalePrice: 2800, prob: 0.333, image: "assets/products/tumbler_500ml.jpg", grade: "NORMAL", description: "식품용 최고급 304 스테인리스, 24시간 보온/보냉 완벽 유지 진공 텀블러" },
     ]
   },
   {
     id: "box_premium",
-    name: "프리미엄 럭키박스",
+    name: "10,000원 상품관",
     price: 10000,
     goldenTickets: 5,
+    badge: "10,000원 HIT",
     items: [
-      { id: "p_item_1", name: "블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰", retailPrice: 19900, wholesalePrice: 8900, prob: 0.010, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
-      { id: "p_item_2", name: "캠핑/테이블 휴대용 무선 무드등 서큘레이터", retailPrice: 15900, wholesalePrice: 6800, prob: 0.020, image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "p_item_3", name: "GaN 45W 초고속 듀얼 충전기", retailPrice: 12900, wholesalePrice: 5200, prob: 0.080, image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "p_item_4", name: "맥세이프 15W 3in1 무선 고속 충전패드", retailPrice: 9900, wholesalePrice: 3900, prob: 0.300, image: "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80", grade: "NORMAL" },
-      { id: "p_item_5", name: "고속 충전 대용량 슬림 보조배터리 10,000mAh", retailPrice: 7500, wholesalePrice: 2900, prob: 0.590, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
+      { id: "p_item_1", name: "대용량 LED 디지털 잔량표시 보조배터리 10,000mAh", retailPrice: 10000, wholesalePrice: 4800, prob: 0.334, image: "assets/products/powerbank_10000mah.jpg", grade: "RARE", description: "1% 단위 정밀 LED 배터리 잔량 표시, 듀얼 초고속 동시 충전" },
+      { id: "p_item_2", name: "맥세이프 15W 3in1 무선 고속 충전패드", retailPrice: 10000, wholesalePrice: 3900, prob: 0.333, image: "https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80", grade: "RARE", description: "스마트폰, 무선이어폰, 스마트워치를 케이블 하나로 동시 고속 무선 충전" },
+      { id: "p_item_3", name: "GaN 45W 초고속 듀얼 충전기", retailPrice: 10000, wholesalePrice: 5200, prob: 0.333, image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80", grade: "RARE", description: "차세대 질화갈륨(GaN) 기술 적용, 초소형 초경량 45W 초고속 듀얼 포트" },
     ]
   },
   {
     id: "box_vip",
-    name: "VIP 하이엔드 럭키박스",
+    name: "20,000원 상품관",
     price: 20000,
     goldenTickets: 11,
+    badge: "20,000원 VIP",
     items: [
-      { id: "v_item_1", name: "무선 고출력 딥티슈 전동 마사지건 (헤드 4종)", retailPrice: 39900, wholesalePrice: 16500, prob: 0.010, image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80", grade: "LEGENDARY" },
-      { id: "v_item_2", name: "3D 온열 지압 무선 목 어깨 안마기", retailPrice: 29900, wholesalePrice: 12000, prob: 0.030, image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80", grade: "EPIC" },
-      { id: "v_item_3", name: "스마트 터치 무드등 블루투스 스피커 & 무선충전기", retailPrice: 24900, wholesalePrice: 9800, prob: 0.050, image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "v_item_4", name: "고출력 무선 터보 에어건 먼지제거기 100,000RPM", retailPrice: 19900, wholesalePrice: 7800, prob: 0.150, image: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80", grade: "RARE" },
-      { id: "v_item_5", name: "초고속 프리미엄 PD 65W 20,000mAh 보조배터리", retailPrice: 15000, wholesalePrice: 5900, prob: 0.760, image: "assets/products/powerbank_10000mah.jpg", grade: "NORMAL" },
+      { id: "v_item_1", name: "블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰", retailPrice: 20000, wholesalePrice: 8900, prob: 0.334, image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80", grade: "EPIC", description: "최신 Bluetooth 5.3 탑재, ENC 통화 노이즈 캔슬링 및 Hi-Fi 고음질 사운드" },
+      { id: "v_item_2", name: "캠핑/테이블 휴대용 무선 무드등 서큘레이터", retailPrice: 20000, wholesalePrice: 6800, prob: 0.333, image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80", grade: "RARE", description: "무선 대용량 배터리 내장, 3단계 풍속 조절 및 감성 웜톤 LED 무드등" },
+      { id: "v_item_3", name: "초고속 프리미엄 PD 65W 20,000mAh 보조배터리", retailPrice: 20000, wholesalePrice: 5900, prob: 0.333, image: "assets/products/powerbank_10000mah.jpg", grade: "RARE", description: "노트북까지 충전 가능한 65W 초고출력 PD 고속 충전 및 메탈릭 슬림 바디" },
     ]
   }
 ];
 
 // ============================================
-// 14. openLuckyBox (Callable) - Server-Side Atomic Draw
+// 14. purchaseProduct (Callable) - Fixed Price Product Purchase (Zero Probability)
 // ============================================
-exports.openLuckyBox = onCall({ region: "asia-northeast3" }, async (request) => {
+exports.purchaseProduct = onCall({ region: "asia-northeast3" }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
   }
   const uid = request.auth.uid;
-  const { tierId, payMethod } = request.data;
-  if (!tierId) {
-    throw new HttpsError("invalid-argument", "박스 종류가 필요합니다.");
+  const { tierId, itemId, payMethod = "points" } = request.data;
+  if (!itemId && !tierId) {
+    throw new HttpsError("invalid-argument", "구매할 상품 정보가 필요합니다.");
   }
 
-  // 1. Fetch tier config from Firestore catalog or fallback
+  // 1. Fetch catalog
   const catDoc = await db.collection("box_catalogs").doc("default").get();
-  const tiers = (catDoc.exists && Array.isArray(catDoc.data().tiers) && catDoc.data().version === "3.0") ? catDoc.data().tiers : SERVER_DEFAULT_BOXES;
-  const tier = tiers.find((t) => t.id === tierId) || SERVER_DEFAULT_BOXES[0];
+  const tiers = (catDoc.exists && Array.isArray(catDoc.data().tiers)) ? catDoc.data().tiers : SERVER_DEFAULT_BOXES;
+
+  let targetTier = tiers.find((t) => t.id === tierId);
+  let selectedItem = null;
+  if (targetTier) {
+    selectedItem = (targetTier.items || []).find((it) => it.id === itemId);
+  } else {
+    for (const t of tiers) {
+      const it = (t.items || []).find((item) => item.id === itemId);
+      if (it) {
+        targetTier = t;
+        selectedItem = it;
+        break;
+      }
+    }
+  }
+
+  if (!targetTier) targetTier = tiers[0] || SERVER_DEFAULT_BOXES[0];
+  if (!selectedItem) selectedItem = (targetTier.items && targetTier.items[0]) || {
+    id: itemId || "item_default",
+    name: "정가 구매 상품",
+    retailPrice: targetTier.price || 5000,
+    image: "assets/products/phonestand_metal.jpg"
+  };
+
+  const itemPrice = Number(selectedItem.retailPrice || targetTier.price || 5000);
+  const earnedTickets = Number(targetTier.goldenTickets) || (itemPrice >= 20000 ? 11 : itemPrice >= 10000 ? 5 : 2);
 
   const userRef = db.collection("users").doc(uid);
 
@@ -1435,40 +1457,31 @@ exports.openLuckyBox = onCall({ region: "asia-northeast3" }, async (request) => 
     const userData = userDoc.exists ? userDoc.data() : { points: 0, goldenTickets: 0, vault: [] };
 
     const currentPoints = Number(userData.points) || 0;
-    if (payMethod === "points" && currentPoints < tier.price) {
-      throw new HttpsError("failed-precondition", `포인트가 부족합니다. (보유: ${currentPoints}P / 필요: ${tier.price}P)`);
+    if (payMethod === "points" && currentPoints < itemPrice) {
+      throw new HttpsError("failed-precondition", `포인트가 부족합니다. (보유: ${currentPoints.toLocaleString()}P / 필요: ${itemPrice.toLocaleString()}P)`);
     }
 
-    // 2. Cryptographic random draw on server
-    const rand = secureRandomFloat();
-    let cumulative = 0;
-    let selectedItem = tier.items[tier.items.length - 1];
-    for (const item of tier.items) {
-      cumulative += Number(item.prob) || 0;
-      if (rand <= cumulative) {
-        selectedItem = item;
-        break;
-      }
-    }
-
-    const wonItem = {
+    const purchasedItem = {
       id: "vault_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
-      tierId: tier.id,
-      tierName: tier.name,
+      tierId: targetTier.id,
+      tierName: targetTier.name,
+      itemId: selectedItem.id,
       title: selectedItem.name,
       name: selectedItem.name,
       imageUrl: selectedItem.image,
-      retailPrice: selectedItem.retailPrice,
-      wholesalePrice: selectedItem.wholesalePrice,
+      retailPrice: itemPrice,
+      wholesalePrice: selectedItem.wholesalePrice || Math.round(itemPrice * 0.4),
       grade: selectedItem.grade || "NORMAL",
-      refundPoints: Math.round(Number(selectedItem.retailPrice || 5000) * 0.8),
+      refundPoints: Math.round(itemPrice * 0.8),
       status: "in_vault",
-      wonAt: Date.now()
+      wonAt: Date.now(),
+      purchasedAt: Date.now(),
+      orderType: "fixed_price"
     };
 
-    const newPoints = payMethod === "points" ? (currentPoints - tier.price) : currentPoints;
-    const newTickets = (Number(userData.goldenTickets) || 0) + (Number(tier.goldenTickets) || 2);
-    const updatedVault = [wonItem, ...(userData.vault || [])];
+    const newPoints = payMethod === "points" ? (currentPoints - itemPrice) : currentPoints;
+    const newTickets = (Number(userData.goldenTickets) || 0) + earnedTickets;
+    const updatedVault = [purchasedItem, ...(userData.vault || [])];
 
     transaction.set(userRef, {
       points: newPoints,
@@ -1478,15 +1491,20 @@ exports.openLuckyBox = onCall({ region: "asia-northeast3" }, async (request) => 
     }, { merge: true });
 
     return {
-      wonItem,
+      wonItem: purchasedItem,
+      purchasedItem,
       newPoints,
       newTickets,
-      tierName: tier.name
+      earnedTickets,
+      tierName: targetTier.name
     };
   });
 
   return { success: true, ...result };
 });
+
+// Backward-compatible alias for existing callers
+exports.openLuckyBox = exports.purchaseProduct;
 
 // ============================================
 // 15. convertVaultItemToPoints (Callable) - Server 80% Refund

@@ -1,9 +1,10 @@
 // ============================================
-// LuckyPick - Home Page (100% Random Box + Multi-Group Golden Raffle Showcase)
+// LuckyPick - Home Page (Fixed-Price Product Store & Multi-Group Golden Raffle Showcase)
 // ============================================
 import { t } from '../i18n.js';
 import { 
   getRandomBoxTiers, 
+  getAllStoreProducts,
   getSuperRaffles, 
   LIVE_WINNING_FEED, 
   getUserPoints, 
@@ -13,10 +14,11 @@ import {
   cancelGoldenTicketApplication,
   checkAndResolveRaffleExpirations
 } from '../services/randombox.js';
-import '../services/unboxing-modal.js';
+import { openProductPurchaseModal } from '../services/unboxing-modal.js';
 import { isLoggedIn, requireLogin } from '../services/auth.js';
 
 let countdownIntervals = [];
+let activeStoreFilter = 'all'; // 'all' | 'box_basic' | 'box_premium' | 'box_vip'
 
 function clearTimers() {
   countdownIntervals.forEach((id) => clearInterval(id));
@@ -49,77 +51,63 @@ function renderLiveTicker() {
     </div>`;
 }
 
-function renderRandomBoxCard(box) {
+function renderStoreProductCard(item, tier) {
+  const loggedIn = isLoggedIn();
+  const price = Number(item.retailPrice || tier.price || 5000);
+  const tickets = Number(tier.goldenTickets) || (price >= 20000 ? 11 : price >= 10000 ? 5 : 2);
+
   return `
     <div class="relative bg-white rounded-3xl border border-slate-200/80 shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5 flex flex-col overflow-hidden group">
       <!-- Top Badges -->
-      <div class="absolute top-4 left-4 z-10 flex gap-2">
-        <span class="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold text-[11px] px-3 py-1 rounded-full shadow-sm">
-          ${box.badge}
+      <div class="absolute top-3.5 left-3.5 z-10 flex gap-1.5">
+        <span class="bg-slate-900/90 backdrop-blur-md text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full shadow-sm">
+          ${item.badge || tier.badge || '인기'}
+        </span>
+        <span class="bg-primary text-white font-extrabold text-[10px] px-2.5 py-1 rounded-full shadow-sm">
+          ${tier.name}
         </span>
       </div>
 
-      <div class="absolute top-4 right-4 z-10">
-        <span class="bg-slate-900/80 backdrop-blur-md text-amber-300 font-extrabold text-[11px] px-3 py-1 rounded-full border border-amber-400/30 flex items-center gap-1 shadow-sm">
-          <span class="material-symbols-outlined text-[14px]">confirmation_number</span>
-          골든티켓 +${box.goldenTickets}장 적립
+      <div class="absolute top-3.5 right-3.5 z-10">
+        <span class="bg-amber-400 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded-full border border-amber-300 flex items-center gap-1 shadow-sm">
+          <span class="material-symbols-outlined text-[13px]">confirmation_number</span>
+          사은 티켓 +${tickets}장
         </span>
       </div>
 
-      <!-- Box Image & Glow Header -->
-      <div class="relative h-56 w-full overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200/60 flex items-center justify-center">
-        <div class="absolute inset-0 bg-gradient-to-r ${box.color} opacity-10 group-hover:opacity-20 transition-opacity"></div>
-        <img src="${box.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" alt="${box.name}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-36 h-36 object-cover rounded-2xl shadow-xl border-2 border-white group-hover:scale-105 transition-transform duration-300 float-anim">
+      <!-- Product Image: Full Visibility object-contain -->
+      <div class="relative h-60 w-full overflow-hidden bg-slate-50 flex items-center justify-center p-4 border-b border-slate-100">
+        <img src="${item.image || 'assets/products/phonestand_metal.jpg'}" alt="${item.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105">
       </div>
 
       <!-- Content Details -->
       <div class="p-6 flex-grow flex flex-col justify-between">
         <div>
-          <div class="flex justify-between items-start mb-2">
-            <div>
-              <h3 class="font-black text-xl text-gray-900">${box.name}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">${box.tagline}</p>
-            </div>
-            <div class="text-right">
-              <span class="text-[10px] text-gray-400 font-bold uppercase block tracking-wider">BOX PRICE</span>
-              <span class="font-black text-2xl text-primary font-mono">₩${box.price.toLocaleString()}</span>
-            </div>
+          <div class="mb-3">
+            <h3 class="font-extrabold text-base text-gray-900 line-clamp-2 leading-snug group-hover:text-primary transition-colors">${item.name}</h3>
+            <p class="text-xs text-gray-500 mt-1 line-clamp-2">${item.description || tier.tagline}</p>
           </div>
 
-          <!-- 100% Guarantee Badge -->
-          <div class="my-4 p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between text-xs">
+          <!-- Product Specs / Guarantee Tag -->
+          <div class="mb-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between text-xs">
             <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-emerald-600 text-xl">verified</span>
+              <span class="material-symbols-outlined text-emerald-600 text-lg">verified</span>
               <div>
-                <p class="font-bold text-emerald-950">100% 실물 지급 보장 (꽝 없음)</p>
-                <p class="text-[10px] text-emerald-700">최소 ₩${box.minGuaranteedValue.toLocaleString()}원 이상 품목 100% 당첨</p>
+                <p class="font-bold text-gray-900">100% 정품 실물 배송</p>
+                <p class="text-[10px] text-gray-500">결제 즉시 내 보관함 보관</p>
               </div>
             </div>
-            <button onclick="window.__showProbModal('${box.id}')" class="text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 whitespace-nowrap">
-              확률표 보기 ↗
-            </button>
-          </div>
-
-          <!-- Item Pool Preview -->
-          <div class="space-y-1.5 mb-5">
-            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">주요 등장 실물 품목 라인업</span>
-            <div class="flex flex-wrap gap-1.5">
-              ${box.items.slice(0, 3).map(it => `
-                <span class="text-[11px] bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200/60 font-medium">
-                  ${it.name.split(' ')[0]} ${it.name.split(' ')[1] || ''}
-                </span>
-              `).join('')}
-              <span class="text-[11px] bg-amber-50 text-amber-700 px-2 py-1 rounded-lg border border-amber-200 font-bold">
-                외 ${box.items.length - 3}종
-              </span>
+            <div class="text-right">
+              <span class="text-[10px] text-gray-400 font-bold block uppercase">정가</span>
+              <span class="font-black text-lg text-gray-900 font-mono">₩${price.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        <!-- Action Button -->
-        <button onclick="window.__startUnboxing('${box.id}')" class="w-full py-4 bg-gradient-to-r ${box.color} text-white font-extrabold rounded-2xl shadow-lg hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 group-hover:shadow-primary/20">
-          <span class="material-symbols-outlined text-xl">${isLoggedIn() ? 'redeem' : 'lock'}</span>
-          ${isLoggedIn() ? '럭키박스 즉시 개봉하기' : '로그인하고 개봉하기'}
+        <!-- Buy Action Button -->
+        <button onclick="window.__openProductPurchase('${item.id}', '${tier.id}')" class="w-full py-3.5 bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-primary hover:to-indigo-600 text-white font-extrabold rounded-2xl shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
+          <span class="material-symbols-outlined text-base">shopping_cart</span>
+          <span>정가 바로 구매하기 (₩${price.toLocaleString()}원)</span>
         </button>
       </div>
     </div>`;
@@ -129,9 +117,7 @@ function renderSuperRaffleCard(raffle, index) {
   const isClosed = raffle.status === 'closed';
   const remaining = Math.max(0, raffle.endTime - Date.now());
   const loggedIn = isLoggedIn();
-  const userTickets = loggedIn ? getAvailableGoldenTicketsCount() : 0;
   const groupData = getRaffleGroupData(raffle, 'my_user_id');
-  // Never show "my ticket" markers to logged-out visitors
   if (!loggedIn) groupData.groups.forEach(g => { g.hasMyTicket = false; g.myTicketCount = 0; });
 
   return `
@@ -139,18 +125,14 @@ function renderSuperRaffleCard(raffle, index) {
       <div class="absolute -right-12 -top-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div>
-        <!-- Large Showcase Product Hero: Full Visibility (No Clipping) with Ambient Backdrop -->
+        <!-- Showcase Product Hero: Full Visibility (No Clipping) with Ambient Backdrop -->
         <div class="relative w-full h-72 sm:h-80 rounded-2xl overflow-hidden bg-slate-950 border-2 ${isClosed ? 'border-slate-700' : 'border-amber-400/50'} shadow-xl mb-4 group flex items-center justify-center p-3">
-          <!-- Ambient Blur Backdrop for Seamless Margin Fill -->
           <div class="absolute inset-0 bg-cover bg-center filter blur-2xl opacity-25 scale-110 pointer-events-none transition-transform duration-700 group-hover:scale-120" style="background-image: url('${raffle.imageUrl || ''}');"></div>
-
-          <!-- Top subtle vignette for badge contrast -->
           <div class="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/50 via-black/10 to-transparent pointer-events-none z-2"></div>
 
-          <!-- 100% Full Original Image without Any Clipping -->
           <img src="${raffle.imageUrl || 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80'}" alt="${raffle.title}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-contain relative z-1 transition-transform duration-300 group-hover:scale-[1.03] drop-shadow-md">
 
-          <!-- Top Floating Badges over Image -->
+          <!-- Top Floating Badges -->
           <div class="absolute top-3 left-3 z-10">
             ${isClosed ? `
               <span class="bg-slate-900/90 backdrop-blur-md text-amber-300 border border-amber-400/40 font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow-md flex items-center gap-1.5">
@@ -177,7 +159,6 @@ function renderSuperRaffleCard(raffle, index) {
           </div>
 
           ${raffle.winnerBonus ? `
-          <!-- Bottom Floating Bonus Badge over Image -->
           <div class="absolute bottom-3 left-3 right-3 z-10 flex justify-between items-end pointer-events-none">
             <span class="text-[11px] text-emerald-300 font-bold bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-emerald-500/40 shadow-sm flex items-center gap-1">
               <span>🎁</span>
@@ -200,158 +181,105 @@ function renderSuperRaffleCard(raffle, index) {
           <h4 class="font-black text-xl sm:text-2xl text-white tracking-tight leading-snug">${raffle.title}</h4>
           <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-1">
             <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">RETAIL VALUE</span>
-            <span class="text-base sm:text-lg font-black text-amber-300 font-mono">₩${raffle.retailPrice.toLocaleString()}원 상당</span>
+            <span class="text-base sm:text-lg font-black text-amber-300 font-mono">₩${Number(raffle.retailPrice || 0).toLocaleString()}원 상당</span>
             <span class="text-[10px] text-slate-400 font-normal">(※ 5만 원 초과 경품으로 제세공과금 22% 당첨자 부담)</span>
           </div>
         </div>
 
-        ${isClosed ? `
-          <!-- Closed Draw Results Box -->
-          <div class="space-y-3 mb-6 bg-gradient-to-b from-amber-950/30 to-slate-900/80 p-4 rounded-2xl border border-amber-500/30">
-            <div class="flex justify-between items-center pb-2 border-b border-white/10">
-              <div class="flex items-center gap-1.5 font-bold text-amber-300 text-xs">
-                <span class="material-symbols-outlined text-base">military_tech</span>
-                <span>추첨 결과 및 당첨자 선발 내역</span>
+        <!-- Multi-Group Progress Bar -->
+        <div class="space-y-3 mb-6 bg-white/5 p-4 rounded-2xl border border-white/10">
+          <div class="flex justify-between items-center text-xs">
+            <div class="flex items-center gap-1.5 font-bold text-amber-300">
+              <span class="material-symbols-outlined text-base">format_list_numbered</span>
+              <span>현재 참여 큐 현황</span>
+            </div>
+            <span class="text-slate-300 font-mono">총 참여: <strong>${groupData.totalActiveEntries}장</strong></span>
+          </div>
+
+          <!-- Group Status Tags -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            ${groupData.groups.slice(0, 3).map(g => `
+              <div class="p-2.5 rounded-xl border ${g.isComplete ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-white/5 border-white/10 text-slate-300'}">
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="font-bold">그룹 ${g.groupNumber}</span>
+                  <span class="font-mono">${g.count}/${g.unitSize}</span>
+                </div>
+                <div class="w-full bg-black/40 h-1.5 rounded-full overflow-hidden">
+                  <div class="h-full ${g.isComplete ? 'bg-emerald-400' : 'bg-amber-400'}" style="width: ${Math.min(100, (g.count / g.unitSize) * 100)}%"></div>
+                </div>
               </div>
-              <span class="text-[10px] font-mono text-emerald-400 font-bold">100% 당첨 완료 ✓</span>
-            </div>
-
-            <div class="space-y-2">
-              ${(raffle.winners || []).map(w => `
-                <div class="p-2.5 bg-amber-400/10 border border-amber-400/30 rounded-xl flex items-center justify-between text-xs">
-                  <div class="flex items-center gap-2">
-                    <span class="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded">그룹 ${w.groupNumber}</span>
-                    <div>
-                      <span class="font-bold text-white text-xs">${w.winner ? w.winner.userName : '당첨자'} 님</span>
-                      <span class="text-[10px] text-slate-400 font-mono block">${w.winner ? w.winner.userEmail : ''}</span>
-                    </div>
-                  </div>
-                  <div class="text-right">
-                    <span class="font-mono font-bold text-amber-300 text-xs">${w.winner ? w.winner.ticketNumber : ''}</span>
-                    <span class="block text-[9px] text-emerald-400 font-bold">🎉 1등 실물 당첨</span>
-                  </div>
-                </div>
-              `).join('')}
-
-              ${raffle.refundCount > 0 ? `
-                <div class="p-2.5 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between text-xs text-slate-300">
-                  <div class="flex items-center gap-2">
-                    <span class="bg-slate-700 text-slate-300 font-bold text-[9px] px-2 py-0.5 rounded">미달 그룹</span>
-                    <p class="text-[11px] text-slate-300">미달 인원(${raffle.refundCount}명) 티켓 전액 자동 환불 완료</p>
-                  </div>
-                  <span class="text-amber-400 font-bold font-mono text-[10px]">100% 환불</span>
-                </div>
-              ` : ''}
-            </div>
+            `).join('')}
           </div>
-        ` : `
-          <!-- Compact Multi-Group Slots Status Bar -->
-          <div class="space-y-2 mb-4 bg-white/5 p-3 rounded-2xl border border-white/10">
-            <div class="flex justify-between items-center text-xs">
-              <button onclick="window.__openTransparencyModal('${raffle.id}')" class="text-[11px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 underline underline-offset-2">
-                <span class="material-symbols-outlined text-sm">groups</span>
-                참여자 투명 공개 (${groupData.totalParticipants}명) ↗
-              </button>
-              <span class="text-[10px] text-slate-300 font-mono">
-                ${groupData.completedGroupsCount > 0 ? `<span class="text-emerald-400 font-bold">✓ ${groupData.completedGroupsCount}개 그룹 달성</span>` : `그룹당 목표: ${groupData.unitSize}명`}
-              </span>
-            </div>
-
-            <!-- Compact Group Grid Display -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              ${groupData.groups.map(g => `
-                <div class="p-2 rounded-xl border ${g.hasMyTicket ? 'border-amber-400 bg-amber-400/10' : g.isComplete ? 'border-emerald-500/40 bg-emerald-950/30' : 'border-white/10 bg-white/5'} text-center text-xs relative">
-                  ${g.hasMyTicket ? `<span class="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 text-[7.5px] font-black px-1.5 py-0.2 rounded-full whitespace-nowrap shadow-xs">🎯 내 티켓 ${g.myTicketCount}장</span>` : ''}
-                  <div class="flex justify-between items-center text-[9px] font-bold text-slate-400 mb-0.5">
-                    <span>그룹 ${g.groupNumber}</span>
-                    <span class="${g.isComplete ? 'text-emerald-400 font-bold' : 'text-slate-300'} font-mono">${g.count}/${g.unitSize}</span>
-                  </div>
-                  <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                    <div class="h-full ${g.isComplete ? 'bg-emerald-400' : 'bg-gradient-to-r from-amber-500 to-yellow-400'} rounded-full" style="width: ${g.fillPercentage}%"></div>
-                  </div>
-                  <span class="text-[8.5px] mt-0.5 block font-mono ${g.isComplete ? 'text-emerald-400 font-bold' : 'text-slate-400'}">
-                    ${g.isComplete ? '추첨 확정 ✓' : '모집 중'}
-                  </span>
-                </div>
-              `).join('')}
-            </div>
-
-            <p class="text-[9.5px] text-slate-400 leading-snug">
-              ※ 목표 달성 시 즉시 추첨 · 미달 그룹은 골든 티켓 100% 자동 환불 반환
-            </p>
-          </div>
-        `}
+        </div>
       </div>
 
       <!-- Action Button -->
-      ${isClosed ? `
-        <button onclick="window.__openTransparencyModal('${raffle.id}')" class="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 font-black rounded-2xl text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-          <span class="material-symbols-outlined text-base">military_tech</span>
-          당첨자 전체 명단 & 환불 상세 내역 보기 (마감)
+      <div class="space-y-2 pt-2 border-t border-white/10">
+        <button onclick="window.__openTransparencyModal('${raffle.id}')" class="w-full py-2.5 bg-white/10 hover:bg-white/15 text-slate-300 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 border border-white/10">
+          <span class="material-symbols-outlined text-sm">visibility</span>
+          <span>전체 참여자 명부 및 공정 추첨 큐 확인 ↗</span>
         </button>
-      ` : loggedIn ? `
-        <button onclick="window.__openApplyTicketModal('${raffle.id}', '${raffle.title.replace(/'/g, "\\'")}', ${userTickets})" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-          <span class="material-symbols-outlined text-base">confirmation_number</span>
-          이 상품에 골든 티켓 응모하기 (${userTickets}장 보유)
-        </button>
-      ` : `
-        <button onclick="window.__requireLoginForRaffle()" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-          <span class="material-symbols-outlined text-base">lock</span>
-          로그인하고 골든 티켓 응모하기
-        </button>
-      `}
+
+        ${isClosed ? `
+          <button disabled class="w-full py-4 bg-slate-800 text-slate-400 font-black rounded-2xl cursor-not-allowed text-xs">
+            추첨이 공식 마감되었습니다
+          </button>
+        ` : loggedIn ? `
+          <button onclick="window.__openApplyTicketModal('${raffle.id}', '${raffle.title}', ${getAvailableGoldenTicketsCount()})" class="w-full py-4 bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-xl">confirmation_number</span>
+            <span>내 사은 골든티켓으로 응모하기</span>
+          </button>
+        ` : `
+          <button onclick="window.__requireLoginForRaffle()" class="w-full py-4 bg-slate-800 hover:bg-slate-700 text-amber-300 font-black rounded-2xl border border-amber-400/30 transition-all flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-xl">lock</span>
+            <span>로그인하고 사은 골든티켓 응모하기</span>
+          </button>
+        `}
+      </div>
     </div>`;
 }
 
 function renderTransparencyModal(raffleId) {
-  const raffles = getSuperRaffles();
-  const raffle = raffles.find(r => r.id === raffleId);
+  const allRaffles = getSuperRaffles();
+  const raffle = allRaffles.find(r => r.id === raffleId);
   if (!raffle) return '';
 
+  const groupData = getRaffleGroupData(raffle, 'my_user_id');
   const isClosed = raffle.status === 'closed';
   const loggedIn = isLoggedIn();
-  const groupData = getRaffleGroupData(raffle, 'my_user_id');
-  if (!loggedIn) groupData.groups.forEach(g => { g.hasMyTicket = false; g.myTicketCount = 0; });
-
-  // Map winners by group number
-  const winnerMap = {};
-  if (raffle.winners) {
-    raffle.winners.forEach(w => {
-      winnerMap[w.groupNumber] = w.winner;
-    });
-  }
 
   return `
-    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop animate-in fade-in" id="transparency-modal" onclick="if(event.target===this)window.__closeTransparencyModal()">
-      <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 max-h-[85vh] flex flex-col">
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="transparency-modal" onclick="if(event.target===this)window.__closeTransparencyModal()">
+      <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
         <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
-            <span class="text-[10px] font-black uppercase tracking-wider ${isClosed ? 'bg-emerald-500 text-slate-950' : 'bg-amber-400 text-slate-950'} px-2.5 py-0.5 rounded-full">
-              ${isClosed ? '✓ 추첨 마감 및 결과 확인' : '투명한 참여 현황 및 내 순번 위치'}
-            </span>
-            <h3 class="font-extrabold text-lg text-white mt-1">[${raffle.title}]</h3>
-            <p class="text-xs text-slate-400">총 ${groupData.totalParticipants}개 티켓 응모 완료 (그룹당 ${groupData.unitSize}명 모집)</p>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-black bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full uppercase">공정 추첨 시스템</span>
+              <span class="text-xs text-slate-400 font-mono">단위: ${raffle.unitSize || 200}명당 1등 1명</span>
+            </div>
+            <h3 class="text-xl font-bold mt-1 text-white">${raffle.title}</h3>
+            <p class="text-xs text-slate-300">소비자가: ₩${Number(raffle.retailPrice || 0).toLocaleString()}원 상당</p>
           </div>
-          <button onclick="window.__closeTransparencyModal()" class="text-slate-400 hover:text-white">
-            <span class="material-symbols-outlined">close</span>
+          <button onclick="window.__closeTransparencyModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
+            <span class="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
-        <div class="p-6 overflow-y-auto space-y-6 custom-scrollbar flex-1">
+        <div class="p-6 overflow-y-auto space-y-4 custom-scrollbar">
           ${groupData.groups.map(g => {
-            const groupWinner = winnerMap[g.groupNumber];
+            const groupWinner = (raffle.winners || []).find(w => w.groupNumber === g.groupNumber);
             return `
-            <div class="border ${g.isComplete ? 'border-emerald-200' : 'border-slate-200'} rounded-2xl overflow-hidden shadow-2xs">
-              <div class="p-4 ${g.isComplete ? 'bg-emerald-50/60 border-b border-emerald-200' : 'bg-slate-50 border-b border-slate-200'} flex flex-wrap justify-between items-center gap-2">
+            <div class="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                  <span class="font-black text-sm text-gray-900">그룹 ${g.groupNumber} (슬롯 #${g.startSlot} ~ #${g.endSlot})</span>
+                  <span class="font-black text-sm text-gray-900">그룹 #${g.groupNumber}</span>
                   ${g.isComplete ? `
                     <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <span class="material-symbols-outlined text-[12px]">emoji_events</span>
                       ${isClosed ? '1등 당첨자 선발 완료' : '목표 달성 (추첨 확정)'}
                     </span>
                   ` : `
-                    <span class="text-[10px] font-bold ${isClosed ? 'bg-amber-100 text-amber-900' : 'bg-amber-100 text-amber-900'} px-2 py-0.5 rounded-full">
+                    <span class="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
                       ${isClosed ? `미달 마감 (골든티켓 100% 환불 반환)` : `⏳ 모집 중 (${g.count}/${g.unitSize})`}
                     </span>
                   `}
@@ -456,10 +384,10 @@ function renderApplyTicketModal(raffleId, raffleTitle, userTickets) {
         ` : `
           <div class="p-4 bg-slate-100 rounded-2xl text-xs text-gray-500 mb-5">
             보유 중인 골든 티켓이 없습니다.<br>
-            럭키박스를 개봉하면 골든 티켓이 무료로 적립됩니다!
+            정가 상품을 구매하시면 골든 티켓이 무료 사은품으로 적립됩니다!
           </div>
-          <button onclick="window.__closeApplyTicketModal(); window.location.hash='#box_lineup'" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md">
-            럭키박스 열고 골든티켓 받기
+          <button onclick="window.__closeApplyTicketModal(); window.location.hash='#store_lineup'" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md">
+            정가 상품 둘러보고 골든티켓 받기
           </button>
         `}
       </div>
@@ -473,18 +401,23 @@ export function render() {
   const loggedIn = isLoggedIn();
   const userPts = loggedIn ? getUserPoints() : 0;
   const userTickets = loggedIn ? getAvailableGoldenTicketsCount() : 0;
-  const boxes = getRandomBoxTiers();
+  const tiers = getRandomBoxTiers();
   const allRaffles = getSuperRaffles();
   const raffles = allRaffles.filter(r => r.status === 'active');
 
+  // Filter products based on activeStoreFilter
+  const displayTiers = activeStoreFilter === 'all' 
+    ? tiers 
+    : tiers.filter(t => t.id === activeStoreFilter);
+
   const html = `
-    <!-- Top Live Winning Marquee -->
+    <!-- Top Live Marquee -->
     ${renderLiveTicker()}
 
     <main class="pt-8 pb-32 px-container-margin max-w-[1240px] mx-auto page-enter">
       
       <!-- Hero Banner -->
-      <section class="mb-10">
+      <section class="mb-12">
         <div class="relative rounded-3xl overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 md:p-12 text-white shadow-2xl border border-slate-800">
           <div class="absolute -right-16 -bottom-16 w-80 h-80 bg-primary/30 rounded-full blur-3xl pointer-events-none"></div>
           <div class="absolute -left-16 -top-16 w-80 h-80 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -492,21 +425,21 @@ export function render() {
           <div class="relative z-10 max-w-2xl">
             <div class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-full text-amber-300 font-extrabold text-xs mb-4 shadow-sm">
               <span class="material-symbols-outlined text-sm">verified_user</span>
-              100% 정품 보장 · 블라인드 큐레이션 쇼핑몰 (꽝 없음)
+              100% 정품 실물 정가 쇼핑몰 · 구매 고객 사은 래플
             </div>
 
             <h1 class="font-black text-3xl md:text-5xl leading-tight mb-4 tracking-tight">
-              꽝 없는 서프라이즈 쇼핑!<br>
-              <span class="gold-gradient-text">100% 정품 실물 득템</span> + <span class="text-amber-300">구매 사은 래플</span>
+              실속 있는 정가 쇼핑!<br>
+              <span class="gold-gradient-text">100% 실물 상품 정가 구매</span> + <span class="text-amber-300">구매 사은 래플</span>
             </h1>
             <p class="text-sm md:text-base text-slate-300 mb-8 leading-relaxed">
-              소비자가 기준 최저 보장 가치 100% 보장! 엄선된 디지털·생활 잡화 전 품목 100% 정품 출고 & 구매 사은 골든 티켓으로 <strong>스페셜 사은품(아이폰 16 Pro 등)에 자유롭게 응모</strong>하세요. (인원 미달 시 티켓 100% 자동 반환)
+              5,000원 / 10,000원 / 20,000원 엄선된 실물 정가 상품을 자유롭게 구매하시고, 구매 금액에 따라 무료 증정되는 사은 골든티켓으로 <strong>스페셜 사은품(아이폰 16 Pro, 명품백 등)에 자유롭게 응모</strong>하세요!
             </p>
 
             <div class="flex flex-wrap items-center gap-4">
-              <a href="#box_lineup" class="px-8 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-2">
-                <span class="material-symbols-outlined">package_2</span>
-                블라인드 큐레이션 라인업 둘러보기
+              <a href="#store_lineup" class="px-8 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-xl transition-all active:scale-95 flex items-center gap-2">
+                <span class="material-symbols-outlined">shopping_bag</span>
+                정가 상품 둘러보기
               </a>
               ${loggedIn ? `
               <div class="flex items-center gap-3 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-xs">
@@ -557,18 +490,42 @@ export function render() {
         `}
       </section>
 
-      <!-- Main Showcase: Random Box Lineup -->
-      <section id="box_lineup" class="mb-16">
-        <div class="flex justify-between items-end mb-6">
+      <!-- Main Fixed-Price Store Products Showcase -->
+      <section id="store_lineup" class="mb-16">
+        <div class="flex flex-col sm:flex-row justify-between sm:items-end mb-6 gap-4">
           <div>
-            <span class="text-xs font-black text-primary uppercase tracking-widest">100% GUARANTEED LUCKYBOX</span>
-            <h2 class="text-2xl md:text-3xl font-black text-gray-900 mt-1">등급별 럭키박스 라인업</h2>
+            <span class="text-xs font-black text-primary uppercase tracking-widest">100% AUTHENTIC FIXED-PRICE COMMERCE</span>
+            <h2 class="text-2xl md:text-3xl font-black text-gray-900 mt-1">정가 상품 스토어 (구매 사은 골든티켓 증정)</h2>
           </div>
-          <span class="text-xs text-gray-500 hidden sm:block">전 품목 실물 배송 가능 · 공정위 확률 고지 준수</span>
+          <span class="text-xs text-gray-500">100% 정품 실물 배송 가능 · 구매 시 골든티켓 무료 사은 증정</span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          ${boxes.map(box => renderRandomBoxCard(box)).join('')}
+        <!-- Filter Tabs -->
+        <div id="store-filter-tabs" class="flex flex-wrap gap-2 mb-8 border-b border-slate-200 pb-4">
+          <button onclick="window.__filterStoreProducts('all')" data-filter="all" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'all' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
+            <span>전체 상품</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full ${activeStoreFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}">9개</span>
+          </button>
+          
+          <button onclick="window.__filterStoreProducts('box_basic')" data-filter="box_basic" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'box_basic' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
+            <span>5,000원 상품관</span>
+            <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+2장</span>
+          </button>
+
+          <button onclick="window.__filterStoreProducts('box_premium')" data-filter="box_premium" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'box_premium' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
+            <span>10,000원 상품관</span>
+            <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+5장</span>
+          </button>
+
+          <button onclick="window.__filterStoreProducts('box_vip')" data-filter="box_vip" class="store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${activeStoreFilter === 'box_vip' ? 'bg-amber-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
+            <span>20,000원 상품관</span>
+            <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+11장</span>
+          </button>
+        </div>
+
+        <!-- Products Grid (3 items per tier) -->
+        <div id="store-products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          ${displayTiers.flatMap(tier => (tier.items || []).map(item => renderStoreProductCard(item, tier))).join('')}
         </div>
       </section>
 
@@ -594,6 +551,37 @@ export function render() {
       countdownIntervals.push(interval);
     });
   }, 100);
+
+  // Store Filter Handler (Smooth local DOM update without resetting timers/scroll)
+  window.__filterStoreProducts = (filter) => {
+    activeStoreFilter = filter;
+    const allTiers = getRandomBoxTiers();
+    const currentDisplayTiers = activeStoreFilter === 'all' 
+      ? allTiers 
+      : allTiers.filter(t => t.id === activeStoreFilter);
+
+    const grid = document.getElementById('store-products-grid');
+    if (grid) {
+      grid.innerHTML = currentDisplayTiers.flatMap(tier => (tier.items || []).map(item => renderStoreProductCard(item, tier))).join('');
+    }
+
+    // Update active tab styles
+    const buttons = document.querySelectorAll('.store-filter-btn');
+    buttons.forEach(btn => {
+      const f = btn.getAttribute('data-filter');
+      const isSelected = f === activeStoreFilter;
+      btn.className = `store-filter-btn px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${
+        isSelected 
+          ? (f === 'box_basic' ? 'bg-blue-600 text-white shadow-md' : f === 'box_premium' ? 'bg-purple-600 text-white shadow-md' : f === 'box_vip' ? 'bg-amber-600 text-white shadow-md' : 'bg-slate-900 text-white shadow-md')
+          : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'
+      }`;
+    });
+  };
+
+  // Fixed-Price Product Direct Purchase Modal Trigger
+  window.__openProductPurchase = (itemId, tierId) => {
+    openProductPurchaseModal(itemId, tierId);
+  };
 
   // Handlers
   window.__requireLoginForRaffle = () => {
@@ -666,4 +654,6 @@ export function cleanup() {
   delete window.__openTransparencyModal;
   delete window.__closeTransparencyModal;
   delete window.__cancelTicket;
+  delete window.__filterStoreProducts;
+  delete window.__openProductPurchase;
 }

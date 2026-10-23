@@ -1,168 +1,158 @@
 // ============================================
-// LuckyPick - Interactive Unboxing & Payment Integration
+// LuckyPick - Fixed-Price Product Purchase & Checkout Modal
+// 100% Zero-Probability Direct Purchase + Free Golden Tickets
 // ============================================
 import { 
   getRandomBoxTiers, 
-  openRandomBox, 
+  getAllStoreProducts,
+  getStoreProductById,
+  purchaseFixedPriceProduct,
   convertVaultItemToPoints, 
   getUserPoints, 
   setUserPoints, 
   getAvailableGoldenTicketsCount,
   getUserVault,
   openLuckyBoxServer,
+  purchaseProductServer,
   convertVaultItemToPointsServer
 } from './randombox.js';
 import { saveUserDocData } from './firestore.js';
 import { requestDanalCardPayment, requestDanalPhonePayment } from './payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
 
-export function showProbabilityModal(boxId) {
+// Open Fixed-Price Product Purchase Modal
+export function openProductPurchaseModal(itemId, tierId) {
+  if (!requireLogin('상품 구매 및 사은 골든티켓 적립은 로그인 후 이용하실 수 있습니다.')) return;
+
   const tiers = getRandomBoxTiers();
-  const tier = tiers.find(b => b.id === boxId);
-  if (!tier) return;
+  let tier = tiers.find(b => b.id === tierId);
+  let item = null;
+
+  if (tier) {
+    item = (tier.items || []).find(it => it.id === itemId);
+  } else {
+    for (const t of tiers) {
+      const it = (t.items || []).find(i => i.id === itemId);
+      if (it) {
+        tier = t;
+        item = it;
+        break;
+      }
+    }
+  }
+
+  if (!item) {
+    const all = getAllStoreProducts();
+    item = all.find(p => p.id === itemId) || all[0];
+    tier = tiers.find(t => t.id === item?.tierId) || tiers[0];
+  }
+
+  const currentPts = getUserPoints();
+  const price = Number(item.retailPrice || tier.price || 5000);
+  const earnedTickets = Number(tier.goldenTickets) || (price >= 20000 ? 11 : price >= 10000 ? 5 : 2);
+  const hasEnoughPoints = currentPts >= price;
 
   const modalHtml = `
-    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop animate-in fade-in" id="prob-modal" onclick="if(event.target===this)window.__closeProbModal()">
-      <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
-        <div class="p-6 bg-gradient-to-r ${tier.color} text-white flex justify-between items-center">
+    <div class="fixed inset-0 z-[90] flex items-center justify-center p-4 modal-backdrop" id="purchase-confirm-modal" onclick="if(event.target===this)window.__closePurchaseModal()">
+      <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col">
+        <!-- Header -->
+        <div class="p-5 bg-gradient-to-r ${tier.color || 'from-slate-900 to-indigo-950'} text-white flex justify-between items-center">
           <div>
-            <span class="text-[10px] font-extrabold bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">투명한 공정 확률 100% 공개</span>
-            <h3 class="text-xl font-bold mt-1">${tier.name} 등장 품목 및 확률표</h3>
-            <p class="text-xs text-white/80">구매 시 아래 실물 상품 중 1개가 100% 무조건 지급됩니다 (꽝 없음)</p>
+            <span class="text-[10px] font-black bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              100% 정품 실물 정가 구매
+            </span>
+            <h3 class="text-lg font-black mt-1">상품 주문 / 결제</h3>
           </div>
-          <button onclick="window.__closeProbModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+          <button onclick="window.__closePurchaseModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
             <span class="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
-        <div class="p-6 overflow-y-auto space-y-3 custom-scrollbar">
-          <div class="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-900 text-xs">
-            <span class="material-symbols-outlined text-amber-600 text-2xl">verified_user</span>
-            <div>
-              <p class="font-bold">전자상거래 등에서의 소비자보호법 준수</p>
-              <p class="text-[11px] text-amber-800">최소 보장 가치 <strong>₩${tier.minGuaranteedValue.toLocaleString()}원</strong> 이상이며, 모든 품목의 당첨 확률 합은 정확히 100%입니다.</p>
+        <div class="p-6 space-y-5">
+          <!-- Product Preview Card -->
+          <div class="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+            <div class="w-20 h-20 rounded-xl bg-white border border-slate-200 p-1 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-xs">
+              <img src="${item.image || 'assets/products/phonestand_metal.jpg'}" alt="${item.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
+            </div>
+            <div class="flex-grow min-w-0">
+              <span class="text-[10px] font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded">${tier.name}</span>
+              <h4 class="font-extrabold text-sm text-gray-900 mt-1 line-clamp-2 leading-snug">${item.name}</h4>
+              <div class="flex items-baseline gap-1 mt-1">
+                <span class="text-xs text-gray-400 font-bold">정가:</span>
+                <span class="text-base font-black text-gray-900 font-mono">₩${price.toLocaleString()}원</span>
+              </div>
             </div>
           </div>
 
-          <div class="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden shadow-xs">
-            ${tier.items.map((item) => {
-              const probPercent = (item.prob * 100).toFixed(1);
-              const gradeColors = {
-                LEGENDARY: 'bg-amber-100 text-amber-800 border-amber-300',
-                EPIC: 'bg-purple-100 text-purple-800 border-purple-300',
-                RARE: 'bg-blue-100 text-blue-800 border-blue-300',
-                NORMAL: 'bg-gray-100 text-gray-700 border-gray-200'
-              };
-              const gradeClass = gradeColors[item.grade] || gradeColors.NORMAL;
+          <!-- Bonus Golden Ticket Promotion Box -->
+          <div class="p-3.5 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-amber-500/10 border border-amber-300 rounded-2xl flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-xs">
+                🎫
+              </span>
+              <div>
+                <p class="font-bold text-amber-950">구매 고객 사은 골든티켓 무료 증정</p>
+                <p class="text-[11px] text-amber-800">구매 즉시 <strong>골든티켓 +${earnedTickets}장</strong>이 적립됩니다 (스페셜 래플 응모권)</p>
+              </div>
+            </div>
+            <span class="text-xs font-black text-amber-600 font-mono">+${earnedTickets}장</span>
+          </div>
 
-              return `
-                <div class="flex items-center gap-3 p-3 bg-white hover:bg-slate-50 transition-colors">
-                  <img src="${item.image}" alt="${item.name}" class="w-14 h-14 rounded-xl object-cover border border-gray-100 flex-shrink-0">
-                  <div class="flex-grow min-w-0">
-                    <div class="flex items-center gap-1.5 mb-0.5">
-                      <span class="text-[9px] font-extrabold px-2 py-0.2 rounded border ${gradeClass}">${item.grade}</span>
-                      <span class="text-xs font-bold text-gray-900 truncate">${item.name}</span>
-                    </div>
-                    <p class="text-[11px] text-gray-500">소비자가: <strong>₩${item.retailPrice.toLocaleString()}원</strong></p>
-                  </div>
-                  <div class="text-right flex-shrink-0">
-                    <span class="text-sm font-extrabold text-primary font-mono">${probPercent}%</span>
-                  </div>
-                </div>`;
-            }).join('')}
+          <!-- Payment Summary -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-500">주문 금액</span>
+              <span class="font-black text-gray-900 text-sm font-mono">₩${price.toLocaleString()}원</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-500">배송 보관 방식</span>
+              <span class="font-bold text-emerald-700">결제 즉시 내 보관함에 안전 보관 (언제든 배송 신청)</span>
+            </div>
+            <div class="flex justify-between items-center border-t border-slate-200 pt-2">
+              <span class="text-gray-500">내 보유 포인트</span>
+              <span class="font-bold ${hasEnoughPoints ? 'text-gray-900' : 'text-red-500'} font-mono">
+                ₩${currentPts.toLocaleString()} P ${!hasEnoughPoints ? '(부족)' : ''}
+              </span>
+            </div>
+          </div>
+
+          <!-- Payment Options -->
+          <div class="space-y-2.5">
+            ${hasEnoughPoints ? `
+              <button onclick="window.__executePurchaseWithPoints('${item.id}', '${tier.id}')" class="w-full py-4 bg-gradient-to-r from-primary to-indigo-700 text-white font-black rounded-2xl shadow-lg hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-xl">shopping_cart_checkout</span>
+                <span>보유 포인트로 바로 결제 (₩${price.toLocaleString()}P)</span>
+              </button>
+            ` : `
+              <div class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 text-left">
+                ⚠️ 보유 포인트가 부족합니다. 아래 결제수단으로 즉시 결제하실 수 있습니다.
+              </div>
+            `}
+
+            <button onclick="window.__openDirectPaymentModal('${tier.id}', ${price}, '${item.id}')" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
+              <span class="material-symbols-outlined text-sm">credit_card</span>
+              <span>신용카드 / 휴대폰 결제로 즉시 구매 (다날)</span>
+            </button>
           </div>
         </div>
 
-        <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-          <button onclick="window.__closeProbModal()" class="px-6 py-2.5 bg-gray-800 text-white font-bold rounded-xl text-xs hover:bg-gray-900 transition-colors">
-            확인 및 닫기
+        <div class="p-3.5 bg-gray-50 border-t border-gray-100 text-center">
+          <button onclick="window.__closePurchaseModal()" class="text-xs font-bold text-gray-400 hover:text-gray-600">
+            취소 및 닫기
           </button>
         </div>
       </div>
     </div>`;
 
-  const existing = document.getElementById('prob-modal');
+  const existing = document.getElementById('purchase-confirm-modal');
   if (existing) existing.remove();
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-export function startUnboxingFlow(boxId) {
-  if (!requireLogin('럭키박스 개봉 및 100% 실물 득템은 로그인 후 이용하실 수 있습니다.')) return;
-  const tiers = getRandomBoxTiers();
-  const tier = tiers.find(b => b.id === boxId);
-  if (!tier) return;
-
-  const currentPts = getUserPoints();
-  const hasEnoughPoints = currentPts >= tier.price;
-
-  // Render Selection & Payment Confirmation Modal
-  const confirmModal = `
-    <div class="fixed inset-0 z-[90] flex items-center justify-center p-4 modal-backdrop" id="unboxing-confirm-modal" onclick="if(event.target===this)window.__closeConfirmModal()">
-      <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
-        <div class="relative w-28 h-28 mx-auto mb-4">
-          <img src="${tier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-cover rounded-2xl shadow-lg border-2 border-primary/20 float-anim" alt="${tier.name}">
-          <span class="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-md">
-            골든티켓 +${tier.goldenTickets}장 적립
-          </span>
-        </div>
-
-        <h3 class="font-headline-sm text-xl font-extrabold text-gray-900 mb-1">${tier.name}</h3>
-        <p class="text-xs text-gray-500 mb-4">${tier.tagline}</p>
-
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left space-y-2 mb-6 text-xs">
-          <div class="flex justify-between">
-            <span class="text-gray-500">결제 금액</span>
-            <span class="font-extrabold text-primary text-sm font-mono">₩${tier.price.toLocaleString()}원</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-gray-500">최소 보장 실물 가치</span>
-            <span class="font-bold text-emerald-600">₩${tier.minGuaranteedValue.toLocaleString()}원 상당 (100% 당첨)</span>
-          </div>
-          <div class="flex justify-between border-t border-slate-200 pt-2">
-            <span class="text-gray-500">내 보유 포인트</span>
-            <span class="font-bold ${hasEnoughPoints ? 'text-gray-800' : 'text-red-500'} font-mono">
-              ₩${currentPts.toLocaleString()} P ${!hasEnoughPoints ? '(부족)' : ''}
-            </span>
-          </div>
-        </div>
-
-        ${hasEnoughPoints ? `
-          <div class="flex flex-col gap-2.5">
-            <button onclick="window.__executeOpenBoxWithPoints('${tier.id}')" class="w-full py-3.5 bg-gradient-to-r ${tier.color} text-white font-extrabold rounded-2xl shadow-lg hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined">inventory_2</span>
-              포인트로 즉시 개봉하기 (₩${tier.price.toLocaleString()}P)
-            </button>
-            <button onclick="window.__openDirectPaymentModal('${tier.id}', ${tier.price})" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1">
-              <span class="material-symbols-outlined text-sm">credit_card</span>
-              다른 결제수단(신용카드/간편결제)으로 바로 구매
-            </button>
-          </div>
-        ` : `
-          <div class="space-y-3">
-            <div class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 text-left">
-              ⚠️ 보유 포인트가 부족합니다. 아래 결제수단으로 즉시 결제 후 바로 개봉할 수 있습니다.
-            </div>
-            <button onclick="window.__openDirectPaymentModal('${tier.id}', ${tier.price})" class="w-full py-3.5 bg-primary text-white font-extrabold rounded-2xl shadow-lg hover:bg-primary-container active:scale-95 transition-all flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined">payments</span>
-              ₩${tier.price.toLocaleString()}원 결제하고 즉시 개봉
-            </button>
-          </div>
-        `}
-
-        <button onclick="window.__closeConfirmModal()" class="w-full mt-2.5 py-2 text-gray-400 font-semibold rounded-xl text-xs hover:text-gray-600 transition-colors">
-          닫기
-        </button>
-      </div>
-    </div>`;
-
-  const existing = document.getElementById('unboxing-confirm-modal');
-  if (existing) existing.remove();
-  document.body.insertAdjacentHTML('beforeend', confirmModal);
-}
-
-export function openDirectPaymentModal(tierId, amount) {
+// Direct PG Payment Modal (Credit Card / Phone)
+export function openDirectPaymentModal(tierId, amount, itemId = null) {
   if (!requireLogin()) return;
-  const confirmModal = document.getElementById('unboxing-confirm-modal');
+  const confirmModal = document.getElementById('purchase-confirm-modal') || document.getElementById('unboxing-confirm-modal');
   if (confirmModal) confirmModal.remove();
 
   const modalHtml = `
@@ -171,7 +161,7 @@ export function openDirectPaymentModal(tierId, amount) {
         <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
             <h3 class="font-bold text-lg">결제 수단 선택</h3>
-            <p class="text-xs text-slate-400">결제 완료 즉시 럭키박스가 자동으로 개봉됩니다</p>
+            <p class="text-xs text-slate-400">결제 완료 즉시 상품이 내 보관함에 보관되고 골든티켓이 지급됩니다</p>
           </div>
           <button onclick="window.__closeDirectPayModal()" class="text-slate-400 hover:text-white">
             <span class="material-symbols-outlined">close</span>
@@ -181,12 +171,12 @@ export function openDirectPaymentModal(tierId, amount) {
         <div class="p-6 space-y-4">
           <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center">
             <span class="text-xs font-bold text-gray-500">결제 대상 금액</span>
-            <span class="font-black text-2xl text-primary font-mono">₩${amount.toLocaleString()}원</span>
+            <span class="font-black text-2xl text-primary font-mono">₩${Number(amount).toLocaleString()}원</span>
           </div>
 
           <div class="space-y-2.5">
             <!-- 1. Credit Card / KakaoPay / EasyPay -->
-            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_card')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
+            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_card', '${itemId || ''}')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
               <div class="flex items-center gap-3">
                 <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold shadow-sm">
                   <span class="material-symbols-outlined text-xl">credit_card</span>
@@ -203,7 +193,7 @@ export function openDirectPaymentModal(tierId, amount) {
             </button>
 
             <!-- 2. Phone Micro-payment -->
-            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_phone')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
+            <button onclick="window.__processDirectPayment('${tierId}', ${amount}, 'danal_phone', '${itemId || ''}')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-all text-left group shadow-xs">
               <div class="flex items-center gap-3">
                 <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">
                   <span class="material-symbols-outlined text-xl">smartphone</span>
@@ -234,154 +224,126 @@ export function openDirectPaymentModal(tierId, amount) {
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-export async function executeUnboxingAnimation(boxId, payMethod = 'points') {
-  const confirmModal = document.getElementById('unboxing-confirm-modal');
-  if (confirmModal) confirmModal.remove();
-  const directPay = document.getElementById('direct-pay-modal');
-  if (directPay) directPay.remove();
-
-  const tiers = getRandomBoxTiers();
-  const tier = tiers.find(b => b.id === boxId);
-  if (!tier) return;
-
-  // Stage 1: Shaking Box Animation Modal
-  const animModalHtml = `
-    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" id="unboxing-stage-modal">
-      <div class="ray-spin-bg"></div>
-
-      <div class="relative z-10 text-center text-white max-w-md w-full" id="unboxing-stage-content">
-        <div id="anim-stage-1" class="space-y-6">
-          <div class="relative w-44 h-44 mx-auto">
-            <img src="${tier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80'}" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80';" class="w-full h-full object-cover rounded-3xl shadow-2xl border-4 border-amber-400 box-shake-anim" alt="Opening Box">
+// Show Purchase Success Modal
+export function showPurchaseSuccessModal(purchasedItem, earnedTickets, totalTickets, newPoints) {
+  const modalHtml = `
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in" id="purchase-success-modal">
+      <div class="relative z-10 text-center text-white max-w-md w-full animate-in zoom-in-95">
+        <div class="bg-white text-gray-900 rounded-3xl p-6 shadow-2xl border-2 border-amber-400 max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <!-- Header -->
+          <div class="text-center mb-4">
+            <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-500 text-white shadow-sm">
+              ✓ 100% 정가 상품 구매 완료
+            </span>
+            <h2 class="text-xl font-black text-gray-900 mt-2">구매가 성공적으로 완료되었습니다!</h2>
           </div>
+
+          <!-- Purchased Item Card -->
+          <div class="bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 text-center mb-4 shadow-sm relative overflow-hidden">
+            <div class="w-24 h-24 mx-auto mb-3 relative flex items-center justify-center bg-white rounded-xl p-2 border border-slate-200 shadow-xs">
+              <img src="${purchasedItem.imageUrl || purchasedItem.image || 'assets/products/phonestand_metal.jpg'}" class="w-full h-full object-contain" alt="${purchasedItem.title || purchasedItem.name}">
+            </div>
+            <h3 class="font-extrabold text-base text-gray-900 mb-1 leading-snug">${purchasedItem.title || purchasedItem.name}</h3>
+            <div class="flex items-center justify-center gap-2 text-xs">
+              <span class="text-gray-500">결제 금액: <strong class="text-gray-900">₩${(purchasedItem.retailPrice || 0).toLocaleString()}원</strong></span>
+              <span class="text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-md">내 보관함 적재</span>
+            </div>
+          </div>
+
+          <!-- Bonus Golden Raffle Tickets Earned -->
+          <div class="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-amber-950 rounded-2xl p-4 mb-5 shadow-lg border border-amber-300 text-left">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-1.5 font-black text-sm">
+                <span class="material-symbols-outlined text-lg">confirmation_number</span>
+                <span>골든 티켓 +${earnedTickets}장 사은 지급 완료!</span>
+              </div>
+              <span class="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full">
+                총 보유: ${totalTickets}장
+              </span>
+            </div>
+            <p class="text-[11px] text-amber-950/80 leading-relaxed">
+              사은 지급된 골든티켓으로 <strong>아이폰 16 Pro 등 스페셜 사은품에 즉시 무료 응모</strong>하실 수 있습니다!
+            </p>
+          </div>
+
+          <!-- Action Buttons -->
           <div class="space-y-2">
-            <h2 class="text-2xl font-black text-amber-300 animate-pulse tracking-wider">럭키박스 개봉 중...</h2>
-            <p class="text-sm text-gray-300">100% 실물 득템과 골든 래플 티켓을 확인하는 중입니다!</p>
+            <button onclick="window.__closeSuccessModal(); window.location.hash='#'; window.scrollTo({top: 400, behavior: 'smooth'});" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-sm">
+              <span class="material-symbols-outlined text-lg">military_tech</span>
+              <span>스페셜 래플(아이폰 16 Pro 등) 응모하기 ↗</span>
+            </button>
+            
+            <button onclick="window.__closeSuccessModal(); window.location.hash='#profile';" class="w-full py-3 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5 text-xs">
+              <span class="material-symbols-outlined text-base">local_shipping</span>
+              <span>내 보관함(배송 신청) 확인하기</span>
+            </button>
+
+            <button onclick="window.__closeSuccessModal()" class="w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl text-xs hover:bg-gray-200 transition-colors">
+              계속 쇼핑하기
+            </button>
           </div>
         </div>
       </div>
     </div>`;
 
-  document.body.insertAdjacentHTML('beforeend', animModalHtml);
-
-  try {
-    // Perform server-side atomic draw
-    const serverResult = await openLuckyBoxServer(boxId, payMethod);
-    const wonItem = serverResult.wonItem;
-    const earnedGoldenTickets = tier.goldenTickets || 2;
-    const totalGoldenTickets = serverResult.newTickets;
-
-    // Immediately synchronize client cache and local vault (most recent won item at top)
-    const currentVault = getUserVault();
-    const updatedVault = [wonItem, ...currentVault.filter(v => v.id !== wonItem.id)];
-    await saveUserDocData({
-      vault: updatedVault,
-      points: serverResult.newPoints,
-      goldenTickets: serverResult.newTickets
-    });
-
-    // Stage 2: Reveal Results after 1.6s
-    setTimeout(() => {
-      const stageContent = document.getElementById('unboxing-stage-content');
-      if (!stageContent) return;
-
-      const gradeBadges = {
-        LEGENDARY: 'bg-amber-400 text-amber-950 font-black',
-        EPIC: 'bg-purple-500 text-white font-bold',
-        RARE: 'bg-blue-500 text-white font-bold',
-        NORMAL: 'bg-emerald-500 text-white font-bold'
-      };
-
-      stageContent.innerHTML = `
-        <div class="reveal-pop bg-white text-gray-900 rounded-3xl p-6 shadow-2xl border-2 border-amber-400 max-h-[90vh] overflow-y-auto custom-scrollbar">
-          <!-- Header -->
-          <div class="text-center mb-4">
-            <span class="text-[10px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full ${gradeBadges[wonItem.grade] || 'bg-gray-800 text-white'}">
-              🎉 ${wonItem.grade} GRADE 획득!
-            </span>
-            <h2 class="text-xl font-black text-gray-900 mt-2">축하합니다! 실물 상품 당첨</h2>
-          </div>
-
-          <!-- 1. Won Physical Item Card -->
-          <div class="bg-gradient-to-b from-amber-50/60 to-orange-50/30 border-2 border-amber-300 rounded-2xl p-4 text-center mb-4 shadow-sm relative overflow-hidden">
-            <div class="w-28 h-28 mx-auto mb-3 relative">
-              <img src="${wonItem.imageUrl || wonItem.image}" class="w-full h-full object-cover rounded-xl shadow-md border border-amber-200" alt="${wonItem.title || wonItem.name}">
-            </div>
-            <h3 class="font-extrabold text-base text-gray-900 mb-1 leading-snug">${wonItem.title || wonItem.name}</h3>
-            <div class="flex items-center justify-center gap-2 text-xs">
-              <span class="text-gray-500">소비자가: <strong class="text-gray-900">₩${(wonItem.retailPrice || 0).toLocaleString()}원</strong></span>
-              <span class="text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-md">실물 100% 지급</span>
-            </div>
-          </div>
-
-          <!-- 2. Bonus Golden Raffle Tickets Earned -->
-          <div class="ticket-stamp-anim bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-amber-950 rounded-2xl p-4 mb-5 shadow-lg border border-amber-300 text-left">
-            <div class="flex items-center justify-between mb-1.5">
-              <div class="flex items-center gap-1.5 font-black text-sm">
-                <span class="material-symbols-outlined text-lg">confirmation_number</span>
-                <span>골든 티켓 +${earnedGoldenTickets}장 적립 완료!</span>
-              </div>
-              <span class="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full">
-                보유 티켓: ${totalGoldenTickets}장
-              </span>
-            </div>
-            <p class="text-[11px] text-amber-950/80 leading-relaxed">
-              적립된 골든 티켓은 아이폰 16 Pro, PS5 Pro 등 <strong>원하는 스페셜 상품에 자유롭게 분배하여 응모</strong>할 수 있습니다!
-            </p>
-          </div>
-
-          <!-- 3. Immediate Action Choice -->
-          <div class="space-y-2">
-            <button onclick="window.__openVaultItemShipping('${wonItem.id}')" class="w-full py-3.5 bg-primary text-white font-extrabold rounded-2xl shadow-md hover:bg-primary-container transition-all flex items-center justify-center gap-2">
-              <span class="material-symbols-outlined">local_shipping</span>
-              내 보관함에서 배송 신청하기
-            </button>
-            
-            <button onclick="window.__quickConvertPoints('${wonItem.id}')" class="w-full py-3 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-2xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 text-xs">
-              <span class="material-symbols-outlined text-base">published_with_changes</span>
-              배송 대신 단순변심 반품 (+₩${(wonItem.refundPoints || 0).toLocaleString()}P 적립)
-            </button>
-
-            <button onclick="window.__closeStageModal()" class="w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl text-xs hover:bg-gray-200 transition-colors">
-              보관함에 보관하고 계속 둘러보기
-            </button>
-          </div>
-          <p class="text-[10px] text-gray-400 text-center mt-2">
-            ※ 실물 배송을 희망하지 않으실 경우 전자상거래 반품 절차에 따라 80% 스토어 적립금으로 즉시 전환됩니다.
-          </p>
-        </div>`;
-    }, 1600);
-  } catch (err) {
-    const modal = document.getElementById('unboxing-stage-modal');
-    if (modal) modal.remove();
-    alert(`개봉 실패: ${err.message || '오류가 발생했습니다.'}`);
-  }
+  const existing = document.getElementById('purchase-success-modal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 // Global Handlers
-window.__showProbModal = (boxId) => showProbabilityModal(boxId);
-window.__closeProbModal = () => {
-  const modal = document.getElementById('prob-modal');
+window.__openProductPurchase = (itemId, tierId) => openProductPurchaseModal(itemId, tierId);
+
+window.__startUnboxing = (boxId) => {
+  const tiers = getRandomBoxTiers();
+  const tier = tiers.find(t => t.id === boxId) || tiers[0];
+  const firstItem = (tier.items && tier.items[0]) || null;
+  openProductPurchaseModal(firstItem?.id, tier.id);
+};
+
+window.__closePurchaseModal = () => {
+  const modal = document.getElementById('purchase-confirm-modal');
   if (modal) modal.remove();
 };
 
-window.__startUnboxing = (boxId) => startUnboxingFlow(boxId);
-window.__closeConfirmModal = () => {
-  const modal = document.getElementById('unboxing-confirm-modal');
-  if (modal) modal.remove();
-};
+window.__closeConfirmModal = () => window.__closePurchaseModal();
 
-window.__openDirectPaymentModal = (tierId, amount) => openDirectPaymentModal(tierId, amount);
+window.__openDirectPaymentModal = (tierId, amount, itemId) => openDirectPaymentModal(tierId, amount, itemId);
 window.__closeDirectPayModal = () => {
   const modal = document.getElementById('direct-pay-modal');
   if (modal) modal.remove();
 };
 
-window.__processDirectPayment = async (tierId, amount, method) => {
+window.__closeSuccessModal = () => {
+  const modal = document.getElementById('purchase-success-modal');
+  if (modal) modal.remove();
+  window.dispatchEvent(new CustomEvent('vaultUpdated'));
+  window.dispatchEvent(new CustomEvent('userDataChanged'));
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+};
+
+window.__executePurchaseWithPoints = async (itemId, tierId) => {
+  if (!requireLogin()) return;
+  const confirmModal = document.getElementById('purchase-confirm-modal');
+  if (confirmModal) confirmModal.remove();
+
+  try {
+    const result = await purchaseFixedPriceProduct(itemId, tierId, 'points');
+    const item = result.purchasedItem || result.wonItem;
+    const earnedTickets = result.earnedTickets || (item.retailPrice >= 20000 ? 11 : item.retailPrice >= 10000 ? 5 : 2);
+    const totalTickets = result.newTickets || getAvailableGoldenTicketsCount();
+
+    showPurchaseSuccessModal(item, earnedTickets, totalTickets, result.newPoints);
+  } catch (err) {
+    alert(`구매 실패: ${err.message || '결제 중 오류가 발생했습니다.'}`);
+  }
+};
+
+window.__processDirectPayment = async (tierId, amount, method, itemId) => {
   if (!requireLogin()) return;
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(b => b.id === tierId);
-  const tierName = tier ? tier.name : '럭키박스';
+  const tierName = tier ? tier.name : '상품 구매';
 
   const modalContainer = document.querySelector('#direct-pay-modal .space-y-2\\.5');
   const originalHtml = modalContainer ? modalContainer.innerHTML : '';
@@ -412,7 +374,8 @@ window.__processDirectPayment = async (tierId, amount, method) => {
       await requestDanalCardPayment({
         amount: Number(amount),
         itemName: tierName,
-        productId: tierId
+        productId: tierId,
+        metadata: { itemId }
       });
     } catch (err) {
       console.error('[DanalCard] Error:', err);
@@ -428,7 +391,8 @@ window.__processDirectPayment = async (tierId, amount, method) => {
       await requestDanalPhonePayment({
         amount: Number(amount),
         itemName: tierName,
-        productId: tierId
+        productId: tierId,
+        metadata: { itemId }
       });
     } catch (err) {
       console.error('[DanalPhone] Error:', err);
@@ -439,40 +403,20 @@ window.__processDirectPayment = async (tierId, amount, method) => {
   }
 };
 
-window.__executeOpenBoxWithPoints = (boxId) => {
-  if (!requireLogin()) return;
-  const tiers = getRandomBoxTiers();
-  const tier = tiers.find(b => b.id === boxId);
-  const currentPts = getUserPoints();
-  if (tier && currentPts < tier.price) {
-    alert('포인트가 부족합니다.');
-    return;
-  }
-  executeUnboxingAnimation(boxId, 'points');
-};
-
-window.__closeStageModal = () => {
-  const modal = document.getElementById('unboxing-stage-modal');
-  if (modal) modal.remove();
-  window.dispatchEvent(new CustomEvent('vaultUpdated'));
-  window.dispatchEvent(new CustomEvent('userDataChanged'));
-  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-};
-
+// Legacy alias handlers for profile/vault
 window.__quickConvertPoints = async (vaultId) => {
   if (!requireLogin()) return;
   try {
     const res = await convertVaultItemToPointsServer(vaultId);
     alert(`🎉 [${res.item?.title || res.item?.name || '상품'}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
 
-    // Immediately synchronize local client cache
     const currentVault = getUserVault().filter(v => v.id !== vaultId);
     await saveUserDocData({
       vault: currentVault,
       points: res.newPoints
     });
 
-    window.__closeStageModal();
+    window.__closeSuccessModal();
     window.location.hash = '#profile';
     if (typeof window.__switchProfileTab === 'function') {
       window.__switchProfileTab('vault');
@@ -483,9 +427,27 @@ window.__quickConvertPoints = async (vaultId) => {
 };
 
 window.__openVaultItemShipping = (vaultId) => {
-  window.__closeStageModal();
+  window.__closeSuccessModal();
   window.location.hash = `#profile`;
   if (typeof window.__switchProfileTab === 'function') {
     window.__switchProfileTab('vault');
   }
 };
+
+// Legacy compatibility export for app.js and router
+export async function executeUnboxingAnimation(tierOrItemId, paymentMethod = 'points') {
+  const all = getAllStoreProducts();
+  const product = all.find(p => p.id === tierOrItemId) || all.find(p => p.tierId === tierOrItemId) || all[0];
+  if (!product) return;
+
+  if (paymentMethod === 'danal' || paymentMethod === 'danal_phone') {
+    try {
+      const res = await purchaseProductServer(product.id, product.tierId || 'tier_5k', paymentMethod);
+      showPurchaseSuccessModal(res.item, res.tier, res.earnedTickets, res.newPoints, res.newGoldenTickets);
+    } catch (err) {
+      alert(`구매 처리 오류: ${err.message || err}`);
+    }
+  } else {
+    openProductPurchaseModal(product.id, product.tierId);
+  }
+}

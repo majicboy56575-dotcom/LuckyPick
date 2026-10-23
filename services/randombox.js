@@ -17,6 +17,7 @@ import {
   deleteShippingInfoFromFirestore,
   ensureInitialFirestoreData,
   openLuckyBoxServer,
+  purchaseProductServer,
   convertVaultItemToPointsServer,
   applyGoldenRaffleServer,
   cancelGoldenRaffleServer,
@@ -26,66 +27,60 @@ import {
 } from './firestore.js';
 import { getCurrentAuthUser } from './auth.js';
 
-// Default Catalog Configuration (Used for initial Firestore seed)
+// Default Catalog Configuration (3 Tiers x 3 Items = 9 Fixed-Price Products)
 export const DEFAULT_BOX_TIERS = [
   {
     id: 'box_basic',
-    name: '베이직 럭키박스',
-    nameEn: 'Basic LuckyBox',
-    tagline: '5천원으로 즐기는 100% 실물 득템 & 골든티켓 2장',
+    name: '5,000원 상품관',
+    nameEn: '5,000 KRW Store',
+    tagline: '알찬 실속 디지털 & 생활 잡화 정가 구매 (구매 사은 골든티켓 2장)',
     price: 5000,
-    minGuaranteedValue: 3900,
+    minGuaranteedValue: 5000,
     color: 'from-blue-600 via-indigo-600 to-blue-800',
     accentColor: '#3b82f6',
-    boxImage: 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
+    boxImage: 'assets/products/phonestand_metal.jpg',
     goldenTickets: 2,
-    badge: 'BEST POPULAR',
+    badge: '5,000원 BEST',
     items: [
-      { id: 'b_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 9900, wholesalePrice: 4800, prob: 0.010, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개' },
-      { id: 'b_item_2', name: '차량용 듀얼 초고속 충전 시가잭 45W', retailPrice: 7900, wholesalePrice: 3500, prob: 0.020, image: 'assets/products/carcharger_45w.jpg', grade: 'RARE', moq: '1개' },
-      { id: 'b_item_3', name: '304 스테인리스 이중 진공 보온보냉 텀블러 500ml', retailPrice: 6500, wholesalePrice: 2800, prob: 0.080, image: 'assets/products/tumbler_500ml.jpg', grade: 'NORMAL', moq: '1개' },
-      { id: 'b_item_4', name: '휴대용 접이식 각도조절 메탈 스마트폰 거치대', retailPrice: 4900, wholesalePrice: 1800, prob: 0.300, image: 'assets/products/phonestand_metal.jpg', grade: 'NORMAL', moq: '1개' },
-      { id: 'b_item_5', name: '3in1 패브릭 메탈 초고속 충전 케이블 1.5M', retailPrice: 3900, wholesalePrice: 1400, prob: 0.590, image: 'assets/products/cable_3in1_braided.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'b_item_1', name: '휴대용 접이식 각도조절 메탈 스마트폰 거치대', retailPrice: 5000, wholesalePrice: 1800, prob: 0.334, image: 'assets/products/phonestand_metal.jpg', grade: 'NORMAL', moq: '1개', badge: '인기 1위', description: '고강도 알루미늄 합금, 자유로운 각도 조절 및 안정적인 미끄럼 방지 실리콘' },
+      { id: 'b_item_2', name: '3in1 패브릭 메탈 초고속 충전 케이블 1.5M', retailPrice: 5000, wholesalePrice: 1400, prob: 0.333, image: 'assets/products/cable_3in1_braided.jpg', grade: 'NORMAL', moq: '1개', badge: 'MD추천', description: 'C타입, 8핀, 5핀 동시 고속 충전, 단선 방지 고내구성 나일론 브레이디드' },
+      { id: 'b_item_3', name: '304 스테인리스 이중 진공 보온보냉 텀블러 500ml', retailPrice: 5000, wholesalePrice: 2800, prob: 0.333, image: 'assets/products/tumbler_500ml.jpg', grade: 'NORMAL', moq: '1개', badge: '스테디셀러', description: '식품용 최고급 304 스테인리스, 24시간 보온/보냉 완벽 유지 진공 텀블러' },
     ]
   },
   {
     id: 'box_premium',
-    name: '프리미엄 럭키박스',
-    nameEn: 'Premium LuckyBox',
-    tagline: '만원의 행복! 스마트 IT & 라이프스타일 (골든티켓 5장)',
+    name: '10,000원 상품관',
+    nameEn: '10,000 KRW Store',
+    tagline: '스마트 IT & 고성능 고속 충전 기기 정가 구매 (구매 사은 골든티켓 5장)',
     price: 10000,
-    minGuaranteedValue: 7500,
+    minGuaranteedValue: 10000,
     color: 'from-purple-600 via-fuchsia-600 to-indigo-800',
     accentColor: '#a855f7',
-    boxImage: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=80',
+    boxImage: 'assets/products/powerbank_10000mah.jpg',
     goldenTickets: 5,
-    badge: 'HOT CHOICE',
+    badge: '10,000원 HIT',
     items: [
-      { id: 'p_item_1', name: '블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰', retailPrice: 19900, wholesalePrice: 8900, prob: 0.010, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'p_item_2', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 15900, wholesalePrice: 6800, prob: 0.020, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'p_item_3', name: 'GaN 45W 초고속 듀얼 충전기', retailPrice: 12900, wholesalePrice: 5200, prob: 0.080, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'p_item_4', name: '맥세이프 15W 3in1 무선 고속 충전패드', retailPrice: 9900, wholesalePrice: 3900, prob: 0.300, image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80', grade: 'NORMAL', moq: '1개' },
-      { id: 'p_item_5', name: '고속 충전 대용량 슬림 보조배터리 10,000mAh', retailPrice: 7500, wholesalePrice: 2900, prob: 0.590, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'p_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 10000, wholesalePrice: 4800, prob: 0.334, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개', badge: '베스트셀러', description: '1% 단위 정밀 LED 배터리 잔량 표시, 듀얼 초고속 동시 충전' },
+      { id: 'p_item_2', name: '맥세이프 15W 3in1 무선 고속 충전패드', retailPrice: 10000, wholesalePrice: 3900, prob: 0.333, image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개', badge: 'HIT', description: '스마트폰, 무선이어폰, 스마트워치를 케이블 하나로 동시 고속 무선 충전' },
+      { id: 'p_item_3', name: 'GaN 45W 초고속 듀얼 충전기', retailPrice: 10000, wholesalePrice: 5200, prob: 0.333, image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개', badge: '고출력', description: '차세대 질화갈륨(GaN) 기술 적용, 초소형 초경량 45W 초고속 듀얼 포트' },
     ]
   },
   {
     id: 'box_vip',
-    name: 'VIP 하이엔드 럭키박스',
-    nameEn: 'VIP High-End LuckyBox',
-    tagline: '하이엔드 프리미엄 라이프 굿즈 100% 지급 (골든티켓 11장)',
+    name: '20,000원 상품관',
+    nameEn: '20,000 KRW Store',
+    tagline: '프리미엄 하이엔드 라이프스타일 굿즈 정가 구매 (구매 사은 골든티켓 11장)',
     price: 20000,
-    minGuaranteedValue: 15000,
+    minGuaranteedValue: 20000,
     color: 'from-amber-500 via-yellow-600 to-amber-800',
     accentColor: '#eab308',
-    boxImage: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=600&auto=format&fit=crop&q=80',
+    boxImage: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80',
     goldenTickets: 11,
-    badge: '👑 HIGH-END',
+    badge: '20,000원 VIP',
     items: [
-      { id: 'v_item_1', name: '무선 고출력 딥티슈 전동 마사지건 (헤드 4종)', retailPrice: 39900, wholesalePrice: 16500, prob: 0.010, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&auto=format&fit=crop&q=80', grade: 'LEGENDARY', moq: '1개' },
-      { id: 'v_item_2', name: '3D 온열 지압 무선 목 어깨 안마기', retailPrice: 29900, wholesalePrice: 12000, prob: 0.030, image: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개' },
-      { id: 'v_item_3', name: '스마트 터치 무드등 블루투스 스피커 & 무선충전기', retailPrice: 24900, wholesalePrice: 9800, prob: 0.050, image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'v_item_4', name: '고출력 무선 터보 에어건 먼지제거기 100,000RPM', retailPrice: 19900, wholesalePrice: 7800, prob: 0.150, image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개' },
-      { id: 'v_item_5', name: '초고속 프리미엄 PD 65W 20,000mAh 보조배터리', retailPrice: 15000, wholesalePrice: 5900, prob: 0.760, image: 'assets/products/powerbank_10000mah.jpg', grade: 'NORMAL', moq: '1개' },
+      { id: 'v_item_1', name: '블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰', retailPrice: 20000, wholesalePrice: 8900, prob: 0.334, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개', badge: '👑 프리미엄', description: '최신 Bluetooth 5.3 탑재, ENC 통화 노이즈 캔슬링 및 Hi-Fi 고음질 사운드' },
+      { id: 'v_item_2', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 20000, wholesalePrice: 6800, prob: 0.333, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개', badge: '감성 캠핑', description: '무선 대용량 배터리 내장, 3단계 풍속 조절 및 감성 웜톤 LED 무드등' },
+      { id: 'v_item_3', name: '초고속 프리미엄 PD 65W 20,000mAh 보조배터리', retailPrice: 20000, wholesalePrice: 5900, prob: 0.333, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개', badge: '대용량', description: '노트북까지 충전 가능한 65W 초고출력 PD 고속 충전 및 메탈릭 슬림 바디' },
     ]
   }
 ];
@@ -632,6 +627,67 @@ export async function deleteShippingRequest(shippingId) {
   return await deleteShippingInfoFromFirestore(shippingId);
 }
 
+// Fixed-Price Store Products Helper Functions
+export function getAllStoreProducts() {
+  const tiers = getRandomBoxTiers();
+  const products = [];
+  tiers.forEach(tier => {
+    (tier.items || []).forEach(item => {
+      products.push({
+        ...item,
+        tierId: tier.id,
+        tierName: tier.name,
+        tierPrice: tier.price,
+        goldenTickets: tier.goldenTickets,
+        badge: item.badge || tier.badge,
+        color: tier.color,
+        accentColor: tier.accentColor
+      });
+    });
+  });
+  return products;
+}
+
+export function getStoreProductById(itemId) {
+  const all = getAllStoreProducts();
+  return all.find(p => p.id === itemId) || null;
+}
+
+// Purchase Fixed-Price Product (100% Zero-Probability Direct Purchase)
+export async function purchaseFixedPriceProduct(itemId, tierId, payMethod = 'points') {
+  const tiers = getRandomBoxTiers();
+  let tier = tiers.find(t => t.id === tierId);
+  let item = null;
+  if (tier) {
+    item = (tier.items || []).find(it => it.id === itemId);
+  } else {
+    for (const t of tiers) {
+      const it = (t.items || []).find(i => i.id === itemId);
+      if (it) {
+        tier = t;
+        item = it;
+        break;
+      }
+    }
+  }
+
+  if (!item) throw new Error('구매할 상품을 찾을 수 없습니다.');
+  if (!tier) tier = tiers[0];
+
+  const result = await purchaseProductServer({
+    tierId: tier.id,
+    itemId: item.id,
+    item: {
+      ...item,
+      tierName: tier.name,
+      goldenTickets: tier.goldenTickets
+    },
+    payMethod
+  });
+
+  return result;
+}
+
 export function createDemoShippingRequest() {
   const authUser = getCurrentAuthUser();
   const demo = {
@@ -657,6 +713,7 @@ export function createDemoShippingRequest() {
 
 export {
   openLuckyBoxServer,
+  purchaseProductServer,
   convertVaultItemToPointsServer
 };
 

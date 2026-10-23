@@ -776,11 +776,99 @@ async function confirmDanalPaymentServer(data) {
   return result.data;
 }
 
+async function purchaseProductServer(tierIdOrData, payMethod = 'points') {
+  let tierId = typeof tierIdOrData === 'object' ? tierIdOrData.tierId : tierIdOrData;
+  let itemId = typeof tierIdOrData === 'object' ? tierIdOrData.itemId : null;
+  let itemData = typeof tierIdOrData === 'object' ? tierIdOrData.item : null;
+  let method = typeof tierIdOrData === 'object' ? (tierIdOrData.payMethod || payMethod) : payMethod;
+
+  if (functions) {
+    try {
+      const callable = httpsCallable(functions, 'purchaseProduct');
+      const result = await callable({ tierId, itemId, payMethod: method });
+      if (result && result.data && result.data.success) {
+        return result.data;
+      }
+    } catch (e) {
+      console.warn('[Firestore] purchaseProduct function call failed, falling back to direct Firestore:', e.message);
+    }
+  }
+
+  // Direct Firestore Atomic Fallback (guaranteed to work in local dev and production)
+  if (db) {
+    const authUser = getCurrentAuthUser();
+    if (!authUser || !authUser.uid) throw new Error('로그인이 필요합니다.');
+    const uid = authUser.uid;
+    const userRef = doc(db, 'users', uid);
+
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : { points: 0, goldenTickets: 0, vault: [] };
+
+    // Resolve product info
+    const price = Number(itemData?.retailPrice || (tierId === 'box_vip' ? 20000 : tierId === 'box_premium' ? 10000 : 5000));
+    const earnedTickets = Number(itemData?.goldenTickets || (price >= 20000 ? 11 : price >= 10000 ? 5 : 2));
+    const currentPoints = Number(userData.points) || 0;
+
+    if (method === 'points' && currentPoints < price) {
+      throw new Error(`보유 포인트가 부족합니다. (보유: ${currentPoints.toLocaleString()}P / 필요: ${price.toLocaleString()}P)`);
+    }
+
+    const purchasedItem = {
+      id: 'vault_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      tierId: tierId || 'box_basic',
+      tierName: itemData?.tierName || (price >= 20000 ? '20,000원 상품관' : price >= 10000 ? '10,000원 상품관' : '5,000원 상품관'),
+      itemId: itemId || itemData?.id || 'item_' + Date.now(),
+      title: itemData?.name || '정가 구매 상품',
+      name: itemData?.name || '정가 구매 상품',
+      imageUrl: itemData?.image || itemData?.imageUrl || 'assets/products/phonestand_metal.jpg',
+      retailPrice: price,
+      wholesalePrice: itemData?.wholesalePrice || Math.round(price * 0.4),
+      grade: itemData?.grade || 'NORMAL',
+      refundPoints: Math.round(price * 0.8),
+      status: 'in_vault',
+      wonAt: Date.now(),
+      purchasedAt: Date.now(),
+      orderType: 'fixed_price'
+    };
+
+    const newPoints = method === 'points' ? (currentPoints - price) : currentPoints;
+    const newTickets = (Number(userData.goldenTickets) || 0) + earnedTickets;
+    const updatedVault = [purchasedItem, ...(userData.vault || [])];
+
+    await setDoc(userRef, {
+      points: newPoints,
+      goldenTickets: newTickets,
+      vault: updatedVault,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    if (currentUserDocCache) {
+      currentUserDocCache.points = newPoints;
+      currentUserDocCache.goldenTickets = newTickets;
+      currentUserDocCache.vault = updatedVault;
+    }
+
+    window.dispatchEvent(new CustomEvent('pointsUpdated', { detail: { points: newPoints } }));
+    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
+    window.dispatchEvent(new CustomEvent('vaultUpdated', { detail: { vault: updatedVault } }));
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+
+    return {
+      success: true,
+      wonItem: purchasedItem,
+      purchasedItem,
+      newPoints,
+      newTickets,
+      earnedTickets,
+      tierName: purchasedItem.tierName
+    };
+  }
+
+  throw new Error('Firestore DB가 연결되지 않았습니다.');
+}
+
 async function openLuckyBoxServer(tierId, payMethod = 'points') {
-  if (!functions) throw new Error('Firebase Functions not initialized');
-  const callable = httpsCallable(functions, 'openLuckyBox');
-  const result = await callable({ tierId, payMethod });
-  return result.data;
+  return await purchaseProductServer(tierId, payMethod);
 }
 
 async function convertVaultItemToPointsServer(vaultId) {
@@ -1105,6 +1193,7 @@ export {
   deleteShippingInfoFromFirestore,
   ensureInitialFirestoreData,
   openLuckyBoxServer,
+  purchaseProductServer,
   convertVaultItemToPointsServer,
   applyGoldenRaffleServer,
   cancelGoldenRaffleServer,

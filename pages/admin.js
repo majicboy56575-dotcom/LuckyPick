@@ -32,7 +32,7 @@ let shippingFilter = 'all'; // 'all' | 'pending' | 'shipped'
 
 function renderSidebar() {
   const menuItems = [
-    { id: 'boxes', icon: 'package_2', label: '럭키박스 품목 관리' },
+    { id: 'boxes', icon: 'storefront', label: '정가 상품 관리' },
     { id: 'raffles', icon: 'military_tech', label: '스페셜 골든래플 관리' },
     { id: 'shipping', icon: 'local_shipping', label: '배송 요청 관리' },
     { id: 'users', icon: 'group', label: '회원 및 포인트 관리' },
@@ -76,68 +76,52 @@ function renderBoxesTab() {
   const boxes = getRandomBoxTiers();
   const currentBox = boxes.find(b => b.id === selectedBoxId) || boxes[0];
 
-  const totalProb = currentBox.items.reduce((acc, it) => acc + (it.prob || 0), 0);
-  const probPercent = Math.round(totalProb * 100);
-  const isProbValid = Math.abs(totalProb - 1.0) < 0.001;
-
   return `
     <div class="space-y-6">
-      <!-- Box Tier Tabs -->
+      <!-- Tier Tabs (5,000 / 10,000 / 20,000) -->
       <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 items-center justify-between">
         <div class="flex flex-wrap gap-2">
           ${boxes.map(b => `
-            <button onclick="window.__selectAdminBox('${b.id}')" class="px-5 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center gap-2 ${selectedBoxId === b.id ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
+            <button onclick="window.__selectAdminBox('${b.id}')" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 ${selectedBoxId === b.id ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-slate-100 border border-slate-200'}">
               <span>${b.name}</span>
-              <span class="text-[10px] font-mono bg-white/20 px-2 py-0.5 rounded-full">₩${b.price.toLocaleString()}원</span>
+              <span class="text-[10px] font-mono bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-bold">+${b.goldenTickets}장 사은</span>
             </button>
           `).join('')}
         </div>
 
         <button onclick="window.__openEditBoxTierModal('${currentBox.id}')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors border border-slate-200">
           <span class="material-symbols-outlined text-sm">settings</span>
-          현재 박스 기본설정 수정
+          현재 상품관 설정 수정
         </button>
       </div>
 
-      <!-- Selected Box Overview & Prob Validation -->
+      <!-- Selected Tier Overview -->
       <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2">
             <h3 class="font-black text-xl text-gray-900">${currentBox.name}</h3>
-            <span class="text-[10px] font-extrabold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">골든티켓 +${currentBox.goldenTickets}장 지급</span>
+            <span class="text-[10px] font-black bg-amber-100 text-amber-900 px-2.5 py-1 rounded-full border border-amber-300">
+              구매 사은 골든티켓 +${currentBox.goldenTickets}장 증정
+            </span>
           </div>
           <p class="text-xs text-gray-500 mt-1">
-            박스 가격: <strong>₩${currentBox.price.toLocaleString()}원</strong> | 최소 보장 가치: <strong>₩${currentBox.minGuaranteedValue.toLocaleString()}원</strong> | 등록 품목: <strong>${currentBox.items.length}개</strong>
+            정가 판매가: <strong>₩${currentBox.price.toLocaleString()}원</strong> | 등록 상품 수: <strong>${currentBox.items.length}개</strong> | 슬로건: ${currentBox.tagline || ''}
           </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-          <div class="text-right">
-            <span class="text-[10px] text-gray-400 font-bold block">확률 합계</span>
-            <span class="font-black text-lg font-mono ${isProbValid ? 'text-emerald-600' : 'text-red-500'}">
-              ${probPercent}% ${isProbValid ? '✓ 정상' : '⚠️ 100% 불일치'}
-            </span>
-          </div>
-
-          ${!isProbValid ? `
-            <button onclick="window.__autoBalanceProbs('${currentBox.id}')" class="px-3.5 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-xl text-xs flex items-center gap-1 transition-colors">
-              <span class="material-symbols-outlined text-sm">balance</span>
-              확률 100% 자동 맞춤
-            </button>
-          ` : ''}
-
-          <button onclick="window.__openAddItemModal('${currentBox.id}')" class="px-4 py-3 bg-primary text-white font-bold rounded-xl text-xs shadow-sm hover:bg-primary-container transition-all flex items-center gap-1.5 active:scale-95">
-            <span class="material-symbols-outlined text-base">add_box</span>
-            새 품목 추가
+          <button onclick="window.__openAddItemModal('${currentBox.id}')" class="px-5 py-3 bg-primary text-white font-black rounded-xl text-xs shadow-md hover:bg-primary-container transition-all flex items-center gap-2 active:scale-95">
+            <span class="material-symbols-outlined text-base">add_shopping_cart</span>
+            <span>새 정가 상품 등록</span>
           </button>
         </div>
       </div>
 
-      <!-- Items Table -->
+      <!-- Products Table -->
       <div class="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
         <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h4 class="font-bold text-sm text-gray-900">등장 품목 리스트 및 원가표 (${currentBox.items.length}개 품목)</h4>
-          <span class="text-xs text-gray-400">행 클릭 또는 [수정] 버튼으로 이미지/가격/확률 수정 가능</span>
+          <h4 class="font-black text-sm text-gray-900">판매 상품 목록 (${currentBox.items.length}개 등록됨)</h4>
+          <span class="text-xs text-gray-400">행 클릭 또는 [수정] 버튼으로 이미지/가격/상세정보 수정 가능</span>
         </div>
 
         <div class="overflow-x-auto">
@@ -145,54 +129,55 @@ function renderBoxesTab() {
             <thead class="bg-slate-50 text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-slate-200">
               <tr>
                 <th class="p-4">상품 정보</th>
-                <th class="p-4">등급</th>
-                <th class="p-4">최소주문(MOQ)</th>
-                <th class="p-4">도매 사입가</th>
+                <th class="p-4">뱃지 / 태그</th>
                 <th class="p-4">소비자 정가</th>
+                <th class="p-4">도매 사입원가</th>
+                <th class="p-4">구매 사은 혜택</th>
                 <th class="p-4">80% 반품적립액</th>
-                <th class="p-4">당첨 확률</th>
                 <th class="p-4 text-right">관리</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 font-medium">
               ${currentBox.items.map((item) => {
-                const refundPts = Math.round(item.retailPrice * 0.8);
-                const isOverCost = refundPts >= currentBox.price;
+                const refundPts = Math.round(Number(item.retailPrice || currentBox.price) * 0.8);
+                const price = Number(item.retailPrice || currentBox.price);
                 return `
                 <tr class="hover:bg-blue-50/40 transition-colors cursor-pointer group">
                   <td class="p-4 flex items-center gap-3" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
-                    <img src="${item.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-2xs group-hover:scale-105 transition-transform" alt="">
+                    <div class="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center flex-shrink-0 shadow-2xs group-hover:scale-105 transition-transform overflow-hidden">
+                      <img src="${item.image}" class="w-full h-full object-contain" alt="">
+                    </div>
                     <div>
-                      <p class="font-bold text-gray-900 group-hover:text-primary transition-colors flex items-center gap-1.5">
+                      <p class="font-extrabold text-sm text-gray-900 group-hover:text-primary transition-colors flex items-center gap-1.5">
                         ${item.name}
                         <span class="material-symbols-outlined text-xs text-gray-300 group-hover:text-primary">edit</span>
                       </p>
-                      <p class="text-[10px] text-gray-400 font-mono">ID: ${item.id}</p>
+                      <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-1">${item.description || '100% 정품 실물 상품'}</p>
+                      <p class="text-[10px] text-gray-400 font-mono mt-0.5">ID: ${item.id}</p>
                     </div>
                   </td>
                   <td class="p-4" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
-                    <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">${item.grade}</span>
-                  </td>
-                  <td class="p-4" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
-                    <span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
-                      ${item.moq || '1개 (낱개발송)'}
+                    <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-slate-900 text-white shadow-2xs">
+                      ${item.badge || currentBox.badge || '인기'}
                     </span>
                   </td>
+                  <td class="p-4 font-mono font-black text-gray-900 text-sm" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
+                    ₩${price.toLocaleString()}원
+                  </td>
                   <td class="p-4 font-mono font-bold text-emerald-600" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
-                    ₩${(item.wholesalePrice || Math.round(item.retailPrice * 0.25)).toLocaleString()}원
+                    ₩${(item.wholesalePrice || Math.round(price * 0.4)).toLocaleString()}원
                   </td>
-                  <td class="p-4 font-mono font-bold text-gray-900" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
-                    ₩${item.retailPrice.toLocaleString()}원
+                  <td class="p-4" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
+                    <span class="font-mono font-black text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md text-[11px]">
+                      🎫 티켓 +${currentBox.goldenTickets}장
+                    </span>
                   </td>
-                  <td class="p-4 font-mono font-bold ${isOverCost ? 'text-amber-600' : 'text-slate-600'}" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
+                  <td class="p-4 font-mono font-bold text-slate-600" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
                     ₩${refundPts.toLocaleString()} P
-                  </td>
-                  <td class="p-4 font-mono font-black text-primary text-sm" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
-                    ${(item.prob * 100).toFixed(1)}%
                   </td>
                   <td class="p-4 text-right">
                     <div class="flex items-center justify-end gap-1.5">
-                      <button onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1" title="수정">
+                      <button onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1" title="수정">
                         <span class="material-symbols-outlined text-xs">edit</span>
                         수정
                       </button>
@@ -1033,29 +1018,32 @@ export function render() {
   };
 
   window.__openAddItemModal = (boxId) => {
+    const boxes = getRandomBoxTiers();
+    const box = boxes.find(b => b.id === boxId) || boxes[0];
+    const defaultPrice = box.price || 5000;
+
     const modalHtml = `
       <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="admin-item-modal" onclick="if(event.target===this)window.__closeAdminModal()">
         <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar">
           <div class="flex justify-between items-center border-b pb-3">
-            <h3 class="font-bold text-lg text-gray-900">새 럭키박스 품목 추가</h3>
+            <h3 class="font-bold text-lg text-gray-900">${box.name} 새 상품 등록</h3>
             <button onclick="window.__closeAdminModal()" class="text-gray-400 hover:text-gray-600">
               <span class="material-symbols-outlined text-sm">close</span>
             </button>
           </div>
           <div class="space-y-3 text-xs">
             <div>
-              <label class="font-bold block text-gray-700 mb-1">품목명</label>
-              <input type="text" id="modal-item-name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" placeholder="예: 무선 블루투스 마우스">
+              <label class="font-bold block text-gray-700 mb-1">상품명</label>
+              <input type="text" id="modal-item-name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" placeholder="예: 무선 블루투스 마우스">
+            </div>
+            <div>
+              <label class="font-bold block text-gray-700 mb-1">상품 간단 설명</label>
+              <input type="text" id="modal-item-desc" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" placeholder="예: 초경량 무소음 무선 연결 및 고감도 DPI 센서">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="font-bold block text-gray-700 mb-1">등급</label>
-                <select id="modal-item-grade" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold">
-                  <option value="NORMAL">NORMAL</option>
-                  <option value="RARE">RARE</option>
-                  <option value="EPIC">EPIC</option>
-                  <option value="LEGENDARY">LEGENDARY</option>
-                </select>
+                <label class="font-bold block text-gray-700 mb-1">뱃지 / 태그</label>
+                <input type="text" id="modal-item-badge" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" placeholder="인기 1위, MD추천 등" value="MD추천">
               </div>
               <div>
                 <label class="font-bold block text-gray-700 mb-1">최소주문(MOQ)</label>
@@ -1065,16 +1053,12 @@ export function render() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="font-bold block text-gray-700 mb-1">소비자 정가 (원)</label>
-                <input type="number" id="modal-item-retail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder="15000">
+                <input type="number" id="modal-item-retail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-gray-900" value="${defaultPrice}">
               </div>
               <div>
-                <label class="font-bold block text-gray-700 mb-1">도매 사입가 (원)</label>
-                <input type="number" id="modal-item-wholesale" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-600" placeholder="3500">
+                <label class="font-bold block text-gray-700 mb-1">도매 사입원가 (원)</label>
+                <input type="number" id="modal-item-wholesale" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-600" value="${Math.round(defaultPrice * 0.4)}">
               </div>
-            </div>
-            <div>
-              <label class="font-bold block text-gray-700 mb-1">당첨 확률 (0.01 = 1% / 0.35 = 35%)</label>
-              <input type="number" step="0.01" id="modal-item-prob" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-primary" placeholder="0.25">
             </div>
 
             <!-- Laptop File Upload + URL Input -->
@@ -1082,7 +1066,7 @@ export function render() {
               <label class="font-bold block text-gray-700">상품 이미지 (노트북 사진 업로드 / URL)</label>
               <div class="flex items-center gap-3">
                 <div class="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:border-primary shadow-2xs" onclick="document.getElementById('modal-item-file').click()" title="클릭하여 내 노트북에서 사진 선택">
-                  <img id="modal-item-preview" src="https://images.unsplash.com/photo-1544816155-12df9643f363?w=400" class="w-full h-full object-contain bg-white p-0.5" alt="">
+                  <img id="modal-item-preview" src="assets/products/phonestand_metal.jpg" class="w-full h-full object-contain bg-white p-0.5" alt="">
                 </div>
                 <div class="flex-1 space-y-1.5">
                   <button type="button" id="modal-add-item-upload-btn" onclick="document.getElementById('modal-item-file').click()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 shadow-xs transition-colors">
@@ -1090,14 +1074,14 @@ export function render() {
                     내 노트북에서 사진 올리기
                   </button>
                   <input type="file" id="modal-item-file" accept="image/*" class="hidden" onchange="window.__handleImageUpload(event, 'modal-item-img', 'modal-item-preview', 'modal-add-item-upload-btn'); this.value = '';">
-                  <input type="text" id="modal-item-img" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-gray-600" value="https://images.unsplash.com/photo-1544816155-12df9643f363?w=400" placeholder="또는 웹 이미지 URL 입력">
+                  <input type="text" id="modal-item-img" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] font-mono text-gray-600" value="assets/products/phonestand_metal.jpg" placeholder="또는 웹 이미지 URL 입력">
                 </div>
               </div>
             </div>
           </div>
           <div class="flex gap-2 pt-2 border-t">
             <button onclick="window.__closeAdminModal()" class="flex-1 py-2.5 bg-gray-100 text-gray-600 font-bold rounded-xl text-xs">취소</button>
-            <button onclick="window.__saveNewItem('${boxId}')" class="flex-1 py-2.5 bg-primary text-white font-bold rounded-xl text-xs shadow-md">추가하기</button>
+            <button onclick="window.__saveNewItem('${boxId}')" class="flex-1 py-2.5 bg-primary text-white font-bold rounded-xl text-xs shadow-md">등록하기</button>
           </div>
         </div>
       </div>`;
@@ -1116,7 +1100,7 @@ export function render() {
         <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar">
           <div class="flex justify-between items-center border-b pb-3">
             <div>
-              <h3 class="font-bold text-lg text-gray-900">품목 세부사항 수정</h3>
+              <h3 class="font-bold text-lg text-gray-900">상품 정보 수정</h3>
               <p class="text-[10px] text-gray-400 font-mono">ID: ${item.id}</p>
             </div>
             <button onclick="window.__closeAdminModal()" class="text-gray-400 hover:text-gray-600">
@@ -1125,18 +1109,17 @@ export function render() {
           </div>
           <div class="space-y-3 text-xs">
             <div>
-              <label class="font-bold block text-gray-700 mb-1">품목명</label>
+              <label class="font-bold block text-gray-700 mb-1">상품명</label>
               <input type="text" id="modal-item-name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" value="${item.name}">
+            </div>
+            <div>
+              <label class="font-bold block text-gray-700 mb-1">상품 간단 설명</label>
+              <input type="text" id="modal-item-desc" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" value="${item.description || ''}">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="font-bold block text-gray-700 mb-1">등급</label>
-                <select id="modal-item-grade" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold">
-                  <option value="NORMAL" ${item.grade === 'NORMAL' ? 'selected' : ''}>NORMAL</option>
-                  <option value="RARE" ${item.grade === 'RARE' ? 'selected' : ''}>RARE</option>
-                  <option value="EPIC" ${item.grade === 'EPIC' ? 'selected' : ''}>EPIC</option>
-                  <option value="LEGENDARY" ${item.grade === 'LEGENDARY' ? 'selected' : ''}>LEGENDARY</option>
-                </select>
+                <label class="font-bold block text-gray-700 mb-1">뱃지 / 태그</label>
+                <input type="text" id="modal-item-badge" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" value="${item.badge || '인기'}">
               </div>
               <div>
                 <label class="font-bold block text-gray-700 mb-1">최소주문(MOQ)</label>
@@ -1146,16 +1129,12 @@ export function render() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="font-bold block text-gray-700 mb-1">소비자 정가 (원)</label>
-                <input type="number" id="modal-item-retail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" value="${item.retailPrice}">
+                <input type="number" id="modal-item-retail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-gray-900" value="${item.retailPrice}">
               </div>
               <div>
-                <label class="font-bold block text-gray-700 mb-1">도매 사입가 (원)</label>
-                <input type="number" id="modal-item-wholesale" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-600" value="${item.wholesalePrice || Math.round(item.retailPrice * 0.25)}">
+                <label class="font-bold block text-gray-700 mb-1">도매 사입원가 (원)</label>
+                <input type="number" id="modal-item-wholesale" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-600" value="${item.wholesalePrice || Math.round(item.retailPrice * 0.4)}">
               </div>
-            </div>
-            <div>
-              <label class="font-bold block text-gray-700 mb-1">당첨 확률 (0.01 = 1% / 0.35 = 35%)</label>
-              <input type="number" step="0.01" id="modal-item-prob" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-primary" value="${item.prob}">
             </div>
 
             <!-- Laptop File Upload + URL Input -->
@@ -1192,14 +1171,14 @@ export function render() {
 
   window.__saveNewItem = async (boxId) => {
     const name = document.getElementById('modal-item-name')?.value?.trim();
-    const retail = parseFloat(document.getElementById('modal-item-retail')?.value) || 10000;
-    const wholesale = parseFloat(document.getElementById('modal-item-wholesale')?.value) || 2500;
-    const grade = document.getElementById('modal-item-grade')?.value || 'NORMAL';
+    const desc = document.getElementById('modal-item-desc')?.value?.trim() || '';
+    const badge = document.getElementById('modal-item-badge')?.value?.trim() || 'MD추천';
+    const retail = parseFloat(document.getElementById('modal-item-retail')?.value) || 5000;
+    const wholesale = parseFloat(document.getElementById('modal-item-wholesale')?.value) || Math.round(retail * 0.4);
     const moq = document.getElementById('modal-item-moq')?.value?.trim() || '1개';
-    const prob = parseFloat(document.getElementById('modal-item-prob')?.value) || 0.1;
     const img = document.getElementById('modal-item-img')?.value?.trim();
 
-    if (!name) { alert('품목명을 입력해주세요.'); return; }
+    if (!name) { alert('상품명을 입력해주세요.'); return; }
 
     const boxes = getRandomBoxTiers();
     const box = boxes.find(b => b.id === boxId);
@@ -1207,17 +1186,19 @@ export function render() {
       box.items.push({
         id: 'item_' + Date.now(),
         name,
+        description: desc,
+        badge,
         retailPrice: retail,
         wholesalePrice: wholesale,
-        grade,
+        grade: 'NORMAL',
         moq,
-        prob,
-        image: img || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=400'
+        prob: 0.333,
+        image: img || 'assets/products/phonestand_metal.jpg'
       });
       try {
         await saveRandomBoxTiers(boxes);
         window.__closeAdminModal();
-        alert('✓ 새 품목이 서버 DB에 정상 추가되었습니다.');
+        alert('✓ 새 정가 상품이 서버 DB에 정상 추가되었습니다.');
         window.__switchAdminTab('boxes');
       } catch (err) {
         console.error('[Admin] saveNewItem error:', err);
@@ -1228,14 +1209,14 @@ export function render() {
 
   window.__saveEditedItem = async (boxId, itemId) => {
     const name = document.getElementById('modal-item-name')?.value?.trim();
-    const retail = parseFloat(document.getElementById('modal-item-retail')?.value) || 10000;
-    const wholesale = parseFloat(document.getElementById('modal-item-wholesale')?.value) || 2500;
-    const grade = document.getElementById('modal-item-grade')?.value || 'NORMAL';
+    const desc = document.getElementById('modal-item-desc')?.value?.trim() || '';
+    const badge = document.getElementById('modal-item-badge')?.value?.trim() || '인기';
+    const retail = parseFloat(document.getElementById('modal-item-retail')?.value) || 5000;
+    const wholesale = parseFloat(document.getElementById('modal-item-wholesale')?.value) || Math.round(retail * 0.4);
     const moq = document.getElementById('modal-item-moq')?.value?.trim() || '1개';
-    const prob = parseFloat(document.getElementById('modal-item-prob')?.value) || 0.1;
     const img = document.getElementById('modal-item-img')?.value?.trim();
 
-    if (!name) { alert('품목명을 입력해주세요.'); return; }
+    if (!name) { alert('상품명을 입력해주세요.'); return; }
 
     const boxes = getRandomBoxTiers();
     const box = boxes.find(b => b.id === boxId);
@@ -1243,16 +1224,16 @@ export function render() {
       const item = box.items.find(it => it.id === itemId);
       if (item) {
         item.name = name;
+        item.description = desc;
+        item.badge = badge;
         item.retailPrice = retail;
         item.wholesalePrice = wholesale;
-        item.grade = grade;
         item.moq = moq;
-        item.prob = prob;
         item.image = img || item.image;
         try {
           await saveRandomBoxTiers(boxes);
           window.__closeAdminModal();
-          alert('✓ 품목 세부 정보가 서버 DB에 성공적으로 저장되었습니다.');
+          alert('✓ 상품 정보가 서버 DB에 성공적으로 저장되었습니다.');
           window.__switchAdminTab('boxes');
         } catch (err) {
           console.error('[Admin] saveEditedItem error:', err);

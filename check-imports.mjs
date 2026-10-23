@@ -37,6 +37,7 @@ for (const filePath of TARGET_FILES) {
     // 2. Cross-reference check: detect calls to Server functions
     const criticalServerFuncs = [
       'openLuckyBoxServer',
+      'purchaseProductServer',
       'convertVaultItemToPointsServer',
       'readyDanalPayment',
       'confirmDanalPayment',
