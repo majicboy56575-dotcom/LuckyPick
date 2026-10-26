@@ -397,7 +397,7 @@ function renderPointsPaymentModal(points, amount) {
         <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
             <h3 class="font-bold text-lg">포인트 충전 결제</h3>
-            <p class="text-xs text-slate-400">충전 즉시 1P = 1원으로 럭키박스 개봉에 사용됩니다</p>
+            <p class="text-xs text-slate-400">충전 즉시 1P = 1원으로 원하는 상품 픽 구매에 사용됩니다</p>
           </div>
           <button onclick="window.__closeChargePayModal()" class="text-slate-400 hover:text-white">
             <span class="material-symbols-outlined">close</span>
@@ -464,9 +464,9 @@ function renderVaultTab(vault) {
           <span class="material-symbols-outlined text-4xl">inventory_2</span>
         </div>
         <h3 class="font-bold text-lg text-gray-900 mb-1">보관함이 비어있습니다</h3>
-        <p class="text-xs text-gray-500 mb-6">100% 실물 득템 럭키박스를 개봉하고 상품을 챙겨가세요!</p>
+        <p class="text-xs text-gray-500 mb-6">100% 실물 정품 상품을 픽하고 배송받으세요!</p>
         <button onclick="window.location.hash='#home'" class="px-6 py-3 bg-primary text-white font-bold rounded-2xl text-xs shadow-md hover:opacity-95">
-          럭키박스 둘러보러 가기
+          인기 상품 픽 둘러보러 가기
         </button>
       </div>`;
   }
@@ -498,12 +498,13 @@ function renderVaultTab(vault) {
         const isSpecialRaffle = item.tierId === 'super_raffle' || (item.tierId && String(item.tierId).includes('raffle')) || item.grade === 'LEGENDARY';
         const defaultRate = isSpecialRaffle ? 0.8 : 0.6;
         const refundAmount = item.refundPoints || Math.round(item.retailPrice * defaultRate);
+        const displayTierName = item.tierName ? item.tierName.replace(/럭키박스/g, '픽') : '정가 픽';
 
         return `
           <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
             <div>
               <div class="flex justify-between items-center mb-3">
-                <span class="text-[10px] font-bold text-gray-400">${item.tierName || '럭키박스'} 획득</span>
+                <span class="text-[10px] font-bold text-gray-400">${displayTierName} 획득</span>
                 <div class="flex items-center gap-1.5">
                   ${currentBadge}
                   <button type="button" onclick="window.__deleteVaultItem('${item.id}', '${item.title.replace(/'/g, "\\'")}')" class="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-colors cursor-pointer" title="보관함에서 이 아이템 삭제">
@@ -700,7 +701,7 @@ function renderChargeTab() {
     <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
       <div>
         <h3 class="font-black text-xl text-gray-900">포인트 즉시 충전 (1P = 1원)</h3>
-        <p class="text-xs text-gray-500 mt-1">원하는 결제수단(신용카드, 간편결제)으로 포인트를 충전하고 럭키박스를 개봉하세요.</p>
+        <p class="text-xs text-gray-500 mt-1">원하는 결제수단(신용카드, 간편결제)으로 포인트를 충전하고 원하는 상품을 픽하세요.</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

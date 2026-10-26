@@ -86,7 +86,7 @@ async function readyDanalCardPayment({
     SUBCPID: '',
     AMOUNT: Number(amount),
     CURRENCY: '410',
-    ITEMNAME: itemName || '럭키박스',
+    ITEMNAME: itemName || '럭키픽 상품',
     USERAGENT: 'PC',
     ORDERID: orderId,
     OFFERPERIOD: '',
@@ -133,7 +133,7 @@ async function confirmDanalCardPayment({ returnParams, amount }) {
  */
 function readyDanalPhonePayment({ amount, itemName, orderId, returnUrl, cancelUrl }) {
   const itemAmt = String(amount);
-  const itemInfo = `${DANAL_PHONE_CONFIG.ITEM_CODE[0]}|${itemAmt}|1|${DANAL_PHONE_CONFIG.ITEM_CODE}|${itemName || '럭키박스'}`;
+  const itemInfo = `${DANAL_PHONE_CONFIG.ITEM_CODE[0]}|${itemAmt}|1|${DANAL_PHONE_CONFIG.ITEM_CODE}|${itemName || '럭키픽 상품'}`;
   
   return {
     startUrl: DANAL_PHONE_CONFIG.START_URL,
@@ -144,7 +144,7 @@ function readyDanalPhonePayment({ amount, itemName, orderId, returnUrl, cancelUr
       PWD: DANAL_PHONE_CONFIG.PWD,
       CPName: '럭키픽',
       ItemInfo: itemInfo,
-      ItemName: itemName || '럭키박스',
+      ItemName: itemName || '럭키픽 상품',
       ItemAmt: itemAmt,
       TargetURL: returnUrl,
       BackURL: cancelUrl,

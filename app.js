@@ -9,10 +9,10 @@ import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 
-import * as homePage from './pages/home.js?v=20261026_V51';
-import * as historyPage from './pages/history.js?v=20261026_V51';
-import * as profilePage from './pages/profile.js?v=20261026_V51';
-import * as adminPage from './pages/admin.js?v=20261026_V51';
+import * as homePage from './pages/home.js?v=20261026_V52';
+import * as historyPage from './pages/history.js?v=20261026_V52';
+import * as profilePage from './pages/profile.js?v=20261026_V52';
+import * as adminPage from './pages/admin.js?v=20261026_V52';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;
@@ -65,7 +65,7 @@ function renderBottomNav(pageName) {
   if (pageName === 'admin') return '';
 
   const tabs = [
-    { key: 'home', icon: 'package_2', label: '럭키박스' },
+    { key: 'home', icon: 'shopping_bag', label: '상품 픽' },
     { key: 'history', icon: 'military_tech', label: '당첨자' },
     { key: 'profile', icon: 'inventory_2', label: '내 보관함' },
   ];
@@ -329,8 +329,8 @@ function navigate() {
       window.location.reload();
       return;
     }
-    // Default: LuckyBox Unboxing
-    alert(`🎉 [${payMethod} 결제 완료] 럭키박스를 개봉합니다.`);
+    // Default: Fixed-Price Item Purchase
+    alert(`🎉 [${payMethod} 결제 완료] 상품 구매가 완료되었습니다.`);
     executeUnboxingAnimation(prodId, payMethod === '다날 휴대폰 소액결제' ? 'danal_phone' : 'danal');
   };
 
@@ -586,7 +586,7 @@ const POLICY_CONTENT = {
 
         <h4 class="font-bold text-on-surface text-sm">2. 충전 포인트 환불 및 사용처 규정</h4>
         <p>• <strong>미사용 포인트 환불:</strong> 유료 결제로 충전한 포인트 중 사용하지 않은 잔여 포인트는 결제일로부터 7일 이내 요청 시 <u>구매자의 원래 결제 방법(신용카드 승인 취소, 휴대폰 결제 취소)으로 100% 전액 환불됩니다.</u><br>
-        • <strong>포인트 사용처 한정:</strong> 충전된 포인트는 오직 해당 사이트(럭키픽) 내에서만 사용이 가능하며(럭키박스 개봉 및 택배 배송비 결제), 타인에게 양도하거나 외부 이전, 현금 환전/인출은 절대 불가합니다.<br>
+        • <strong>포인트 사용처 한정:</strong> 충전된 포인트는 오직 해당 사이트(럭키픽) 내에서만 사용이 가능하며(상품 픽 구매 및 택배 배송비 결제), 타인에게 양도하거나 외부 이전, 현금 환전/인출은 절대 불가합니다.<br>
         • <strong>무상 보너스 포인트:</strong> 프로모션/이벤트로 무상 지급된 보너스 포인트는 현금 환불 대상에서 제외되며 원 결제 취소 시 자동 회수됩니다.</p>
 
         <h4 class="font-bold text-on-surface text-sm">3. 배송 전 단순변심 반품 (스토어 적립금 전환)</h4>

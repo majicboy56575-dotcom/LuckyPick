@@ -1040,7 +1040,7 @@ exports.readyDanalPayment = onRequest(
       const {
         method = "card", // "card" | "phone"
         amount,
-        itemName = "럭키박스",
+        itemName = "럭키픽 상품",
         productId,
         returnUrl,
         cancelUrl,
@@ -2006,7 +2006,7 @@ exports.saveBoxCatalogAdmin = onCall({ region: "asia-northeast3" }, async (reque
 
   const { tiers } = request.data;
   if (!tiers || !Array.isArray(tiers)) {
-    throw new HttpsError("invalid-argument", "올바른 럭키박스 카탈로그 데이터가 필요합니다.");
+    throw new HttpsError("invalid-argument", "올바른 상품 픽 카탈로그 데이터가 필요합니다.");
   }
 
   const catRef = db.collection("box_catalogs").doc("default");

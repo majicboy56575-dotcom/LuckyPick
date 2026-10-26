@@ -678,7 +678,7 @@ function renderAnalyticsTab() {
 
       <!-- Box Performance Breakdown -->
       <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <h4 class="font-bold text-sm text-gray-900">등급별 럭키박스 마진 및 사입 구조 분석</h4>
+        <h4 class="font-bold text-sm text-gray-900">등급별 상품 픽 마진 및 사입 구조 분석</h4>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs text-gray-600">
             <thead class="bg-slate-50 text-[11px] font-bold text-gray-400 uppercase border-b">
@@ -979,7 +979,7 @@ export function render() {
     try {
       await updateBoxTierSettings(boxId, { name, tagline, price, goldenTickets, minGuaranteedValue });
       window.__closeAdminModal();
-      alert('✓ 럭키박스 기본 설정이 서버 DB에 정상 저장되었습니다.');
+      alert('✓ 상품 픽 기본 설정이 서버 DB에 정상 저장되었습니다.');
       window.__switchAdminTab('boxes');
     } catch (err) {
       console.error('[Admin] saveEditedBoxTier error:', err);

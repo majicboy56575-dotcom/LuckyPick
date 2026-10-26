@@ -127,13 +127,15 @@ if (isFirebaseConfigured()) {
         if (snap.exists() && snap.data()?.tiers) {
           const serverData = snap.data();
           const serverUpdatedAt = serverData.updatedAt || Date.now();
-          // Server (Firestore) is the single source of truth: always apply snapshot.
-          // (Previously a newer local timestamp from a failed admin save could block server data forever.)
-          boxCatalogCache = serverData.tiers;
+          const sanitizedTiers = (serverData.tiers || []).map(t => ({
+            ...t,
+            name: t.name ? t.name.replace(/럭키박스/g, '픽') : t.name
+          }));
+          boxCatalogCache = sanitizedTiers;
           try {
-            localStorage.setItem('lp_box_catalog', JSON.stringify(serverData.tiers));
+            localStorage.setItem('lp_box_catalog', JSON.stringify(sanitizedTiers));
             localStorage.setItem('lp_box_catalog_updatedAt', String(serverUpdatedAt));
-            localStorage.setItem('lp_box_catalog_version', '3.0_V12');
+            localStorage.setItem('lp_box_catalog_version', '3.0_V51');
           } catch (e) {}
           window.dispatchEvent(new CustomEvent('boxCatalogChanged', { detail: boxCatalogCache }));
           window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
@@ -314,7 +316,10 @@ function getBoxCatalogCache() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          boxCatalogCache = parsed;
+          boxCatalogCache = parsed.map(t => ({
+            ...t,
+            name: t.name ? t.name.replace(/럭키박스/g, '픽') : t.name
+          }));
         }
       }
     } catch (e) {}
@@ -826,7 +831,7 @@ async function purchaseProductServer(tierIdOrData, payMethod = 'points') {
     const purchasedItem = {
       id: 'vault_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       tierId: tierId || 'box_basic',
-      tierName: itemData?.tierName || (price >= 20000 ? '20,000원 상품관' : price >= 10000 ? '10,000원 상품관' : '5,000원 상품관'),
+      tierName: itemData?.tierName || (price >= 20000 ? 'VIP 하이엔드 픽' : price >= 10000 ? '프리미엄 픽' : '베이직 픽'),
       itemId: itemId || itemData?.id || 'item_' + Date.now(),
       title: itemData?.name || '정가 구매 상품',
       name: itemData?.name || '정가 구매 상품',

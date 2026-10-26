@@ -32,7 +32,7 @@ function getSelectedMethod() {
 /**
  * --- Danal Credit Card & EasyPay (KakaoPay, NaverPay, SamsungPay) Integration ---
  */
-async function requestDanalCardPayment({ amount, itemName = '럭키박스', productId }) {
+async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', productId }) {
   trackMetaEvent('InitiateCheckout', {
     content_name: itemName,
     content_ids: [productId],
@@ -148,7 +148,7 @@ async function requestDanalCardPayment({ amount, itemName = '럭키박스', prod
 /**
  * --- Danal Phone Micro-payment Integration ---
  */
-async function requestDanalPhonePayment({ amount, itemName = '럭키박스', productId }) {
+async function requestDanalPhonePayment({ amount, itemName = '럭키픽 상품', productId }) {
   trackMetaEvent('InitiateCheckout', {
     content_name: itemName,
     content_ids: [productId],

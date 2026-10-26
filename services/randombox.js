@@ -31,16 +31,16 @@ import { getCurrentAuthUser } from './auth.js';
 export const DEFAULT_BOX_TIERS = [
   {
     id: 'box_basic',
-    name: '5,000원 상품관',
-    nameEn: '5,000 KRW Store',
-    tagline: '알찬 실속 디지털 & 생활 잡화 정가 구매 (구매 사은 골든티켓 2장)',
+    name: '베이직 픽',
+    nameEn: 'Basic Pick',
+    tagline: '5천원으로 즐기는 100% 정품 실물 픽 & 골든티켓 2장',
     price: 5000,
     minGuaranteedValue: 5000,
     color: 'from-blue-600 via-indigo-600 to-blue-800',
     accentColor: '#3b82f6',
     boxImage: 'assets/products/phonestand_metal.jpg',
     goldenTickets: 2,
-    badge: '5,000원 BEST',
+    badge: 'BEST POPULAR',
     items: [
       { id: 'b_item_1', name: '휴대용 접이식 각도조절 메탈 스마트폰 거치대', retailPrice: 5000, wholesalePrice: 1800, prob: 0.334, image: 'assets/products/phonestand_metal.jpg', grade: 'NORMAL', moq: '1개', badge: '인기 1위', description: '고강도 알루미늄 합금, 자유로운 각도 조절 및 안정적인 미끄럼 방지 실리콘' },
       { id: 'b_item_2', name: '3in1 패브릭 메탈 초고속 충전 케이블 1.5M', retailPrice: 5000, wholesalePrice: 1400, prob: 0.333, image: 'assets/products/cable_3in1_braided.jpg', grade: 'NORMAL', moq: '1개', badge: 'MD추천', description: 'C타입, 8핀, 5핀 동시 고속 충전, 단선 방지 고내구성 나일론 브레이디드' },
@@ -49,16 +49,16 @@ export const DEFAULT_BOX_TIERS = [
   },
   {
     id: 'box_premium',
-    name: '10,000원 상품관',
-    nameEn: '10,000 KRW Store',
-    tagline: '스마트 IT & 고성능 고속 충전 기기 정가 구매 (구매 사은 골든티켓 5장)',
+    name: '프리미엄 픽',
+    nameEn: 'Premium Pick',
+    tagline: '만원의 행복! 스마트 IT & 라이프스타일 픽 (골든티켓 5장)',
     price: 10000,
     minGuaranteedValue: 10000,
     color: 'from-purple-600 via-fuchsia-600 to-indigo-800',
     accentColor: '#a855f7',
     boxImage: 'assets/products/powerbank_10000mah.jpg',
     goldenTickets: 5,
-    badge: '10,000원 HIT',
+    badge: 'HOT CHOICE',
     items: [
       { id: 'p_item_1', name: '대용량 LED 디지털 잔량표시 보조배터리 10,000mAh', retailPrice: 10000, wholesalePrice: 4800, prob: 0.334, image: 'assets/products/powerbank_10000mah.jpg', grade: 'RARE', moq: '1개', badge: '베스트셀러', description: '1% 단위 정밀 LED 배터리 잔량 표시, 듀얼 초고속 동시 충전' },
       { id: 'p_item_2', name: '맥세이프 15W 3in1 무선 고속 충전패드', retailPrice: 10000, wholesalePrice: 3900, prob: 0.333, image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개', badge: 'HIT', description: '스마트폰, 무선이어폰, 스마트워치를 케이블 하나로 동시 고속 무선 충전' },
@@ -67,16 +67,16 @@ export const DEFAULT_BOX_TIERS = [
   },
   {
     id: 'box_vip',
-    name: '20,000원 상품관',
-    nameEn: '20,000 KRW Store',
-    tagline: '프리미엄 하이엔드 라이프스타일 굿즈 정가 구매 (구매 사은 골든티켓 11장)',
+    name: 'VIP 하이엔드 픽',
+    nameEn: 'VIP High-End Pick',
+    tagline: '하이엔드 프리미엄 라이프 굿즈 100% 지급 (골든티켓 11장)',
     price: 20000,
     minGuaranteedValue: 20000,
     color: 'from-amber-500 via-yellow-600 to-amber-800',
     accentColor: '#eab308',
     boxImage: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80',
     goldenTickets: 11,
-    badge: '20,000원 VIP',
+    badge: '👑 HIGH-END',
     items: [
       { id: 'v_item_1', name: '블루투스 5.3 초경량 무선 노이즈캔슬링 이어폰', retailPrice: 20000, wholesalePrice: 8900, prob: 0.334, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400&auto=format&fit=crop&q=80', grade: 'EPIC', moq: '1개', badge: '👑 프리미엄', description: '최신 Bluetooth 5.3 탑재, ENC 통화 노이즈 캔슬링 및 Hi-Fi 고음질 사운드' },
       { id: 'v_item_2', name: '캠핑/테이블 휴대용 무선 무드등 서큘레이터', retailPrice: 20000, wholesalePrice: 6800, prob: 0.333, image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&auto=format&fit=crop&q=80', grade: 'RARE', moq: '1개', badge: '감성 캠핑', description: '무선 대용량 배터리 내장, 3단계 풍속 조절 및 감성 웜톤 LED 무드등' },
@@ -148,14 +148,19 @@ export function getRandomBoxTiers() {
         };
       });
 
+      const rawName = serverTier.name || defaultTier.name;
+      const formattedName = rawName ? rawName.replace(/럭키박스/g, '픽') : defaultTier.name;
+      const rawTagline = serverTier.tagline || defaultTier.tagline;
+      const formattedTagline = rawTagline ? rawTagline.replace(/럭키박스/g, '픽') : defaultTier.tagline;
+
       return {
         ...defaultTier,
         ...serverTier,
-        name: serverTier.name || defaultTier.name,
+        name: formattedName,
         price: (serverTier.price !== undefined && serverTier.price !== null) ? Number(serverTier.price) : defaultTier.price,
         goldenTickets: (serverTier.goldenTickets !== undefined && serverTier.goldenTickets !== null) ? Number(serverTier.goldenTickets) : defaultTier.goldenTickets,
         minGuaranteedValue: (serverTier.minGuaranteedValue !== undefined && serverTier.minGuaranteedValue !== null) ? Number(serverTier.minGuaranteedValue) : defaultTier.minGuaranteedValue,
-        tagline: serverTier.tagline || defaultTier.tagline,
+        tagline: formattedTagline,
         boxImage: serverTier.boxImage || defaultTier.boxImage || 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=600&auto=format&fit=crop&q=80',
         color: serverTier.color || defaultTier.color || 'from-blue-600 via-indigo-600 to-blue-800',
         accentColor: serverTier.accentColor || defaultTier.accentColor || '#3b82f6',
@@ -449,7 +454,7 @@ export function reopenRaffle(raffleId, extendDays = 3) {
 export async function updateBoxTierSettings(boxId, newSettings) {
   const boxes = getRandomBoxTiers();
   const box = boxes.find(b => b.id === boxId);
-  if (!box) throw new Error('해당 럭키박스를 찾을 수 없습니다.');
+  if (!box) throw new Error('해당 픽 상품을 찾을 수 없습니다.');
 
   if (newSettings.name) box.name = newSettings.name;
   if (newSettings.tagline) box.tagline = newSettings.tagline;
@@ -525,7 +530,7 @@ export function clearTicketRefundNotices() {
 export function openRandomBox(tierId) {
   const tiers = getRandomBoxTiers();
   const tier = tiers.find(t => t.id === tierId);
-  if (!tier) throw new Error('존재하지 않는 럭키박스입니다.');
+  if (!tier) throw new Error('존재하지 않는 상품 픽입니다.');
 
   const rand = Math.random();
   let cumulative = 0;
