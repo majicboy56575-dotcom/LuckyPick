@@ -310,10 +310,12 @@ async function deleteSuperRaffleFromFirestore(raffleId) {
 function getBoxCatalogCache() {
   if (!boxCatalogCache) {
     try {
-      const savedVersion = localStorage.getItem('lp_box_catalog_version');
       const saved = localStorage.getItem('lp_box_catalog');
-      if (saved && (savedVersion === '3.0_V13' || savedVersion === '3.0_V14' || savedVersion === '3.0_V15' || savedVersion === '3.0_V16' || savedVersion === '3.0_V17' || savedVersion === '3.0_V18')) {
-        boxCatalogCache = JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          boxCatalogCache = parsed;
+        }
       }
     } catch (e) {}
   }
@@ -326,7 +328,7 @@ async function saveBoxCatalogToFirestore(tiers) {
   try {
     localStorage.setItem('lp_box_catalog', JSON.stringify(tiers));
     localStorage.setItem('lp_box_catalog_updatedAt', String(Date.now()));
-    localStorage.setItem('lp_box_catalog_version', '3.0_V18');
+    localStorage.setItem('lp_box_catalog_version', '3.0_V49');
   } catch (e) {
     console.warn('[Firestore] localStorage error:', e);
   }
@@ -342,7 +344,7 @@ async function saveBoxCatalogToFirestore(tiers) {
   // 2. Direct Firestore setDoc & Cloud Function Sync
   if (db) {
     try {
-      await setDoc(doc(db, 'box_catalogs', 'default'), payload, { merge: true });
+      await setDoc(doc(db, 'box_catalogs', 'default'), payload);
     } catch (e) {
       console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
       try {

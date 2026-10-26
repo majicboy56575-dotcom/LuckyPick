@@ -176,15 +176,17 @@ function renderBoxesTab() {
                   <td class="p-4 font-mono font-bold text-slate-600" onclick="window.__openEditItemModal('${currentBox.id}', '${item.id}')">
                     ₩${refundPts.toLocaleString()} P
                   </td>
+                  <td class="p-4 text-right" onclick="event.stopPropagation()">
                     <div class="flex items-center justify-end gap-1.5">
-                      <button onclick="event.stopPropagation(); window.__openEditItemModal('${currentBox.id}', '${item.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1" title="수정">
-                        <span class="material-symbols-outlined text-xs">edit</span>
-                        수정
+                      <button type="button" onclick="event.stopPropagation(); window.__openEditItemModal('${currentBox.id}', '${item.id}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer" title="수정">
+                        <span class="material-symbols-outlined text-xs pointer-events-none">edit</span>
+                        <span class="pointer-events-none">수정</span>
                       </button>
-                      <button type="button" onclick="event.stopPropagation(); window.__deleteBoxItem('${currentBox.id}', '${item.id}', event)" class="p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors cursor-pointer" title="이 상품 삭제">
-                        <span class="material-symbols-outlined text-base">delete</span>
+                      <button type="button" onclick="event.stopPropagation(); window.__confirmDeleteBoxItem('${currentBox.id}', '${item.id}')" class="p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors cursor-pointer" title="이 상품 삭제">
+                        <span class="material-symbols-outlined text-base pointer-events-none">delete</span>
                       </button>
                     </div>
+                  </td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -996,27 +998,67 @@ export function render() {
     }
   };
 
-  window.__deleteBoxItem = async (boxId, itemId, event) => {
-    if (event && event.stopPropagation) {
-      event.stopPropagation();
-    }
+  window.__confirmDeleteBoxItem = (boxId, itemId) => {
     const boxes = getRandomBoxTiers();
-    const box = boxes.find(b => b.id === boxId);
-    const item = box ? (box.items || []).find(it => it.id === itemId) : null;
+    const box = boxes.find(b => String(b.id) === String(boxId));
+    const item = box ? (box.items || []).find(it => String(it.id) === String(itemId)) : null;
     const itemName = item ? item.name : '해당 상품';
 
-    if (!confirm(`정말 [${itemName}] 상품을 삭제하시겠습니까?`)) return;
+    const modalContainer = document.getElementById('admin-modal-container') || document.body;
+    const modalHtml = `
+      <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm animate-in fade-in" id="admin-delete-modal" onclick="if(event.target===this)document.getElementById('admin-delete-modal')?.remove()">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center space-y-4 animate-in zoom-in-95">
+          <div class="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+            <span class="material-symbols-outlined text-3xl">delete_forever</span>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base text-gray-900">정말 이 상품을 삭제하시겠습니까?</h3>
+            <p class="text-xs text-gray-700 mt-1 font-bold">[${itemName}]</p>
+            <p class="text-[11px] text-gray-400 mt-1">삭제된 상품은 데이터베이스에서 즉시 제거됩니다.</p>
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="document.getElementById('admin-delete-modal')?.remove()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer">
+              취소
+            </button>
+            <button type="button" id="btn-confirm-delete" onclick="window.__executeDeleteBoxItem('${boxId}', '${itemId}')" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md transition-colors cursor-pointer">
+              삭제하기
+            </button>
+          </div>
+        </div>
+      </div>`;
+    
+    // Remove any existing delete modal
+    const existingModal = document.getElementById('admin-delete-modal');
+    if (existingModal) existingModal.remove();
+
+    modalContainer.insertAdjacentHTML('beforeend', modalHtml);
+  };
+
+  window.__executeDeleteBoxItem = async (boxId, itemId) => {
+    const btn = document.getElementById('btn-confirm-delete');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">sync</span> 삭제 중...`;
+    }
 
     try {
       await deleteBoxTierItem(boxId, itemId);
+      document.getElementById('admin-delete-modal')?.remove();
       window.__closeAdminModal();
       window.__switchAdminTab('boxes');
-      alert(`✓ [${itemName}] 상품이 정상 삭제되었습니다.`);
+      alert('✓ 상품이 정상적으로 삭제되었습니다.');
     } catch (err) {
-      console.error('[Admin] deleteBoxItem error:', err);
+      console.error('[Admin] executeDeleteBoxItem error:', err);
       alert('❌ 상품 삭제 처리 실패: ' + err.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '삭제하기';
+      }
     }
   };
+
+  // Backwards compatibility
+  window.__deleteBoxItem = window.__confirmDeleteBoxItem;
 
   window.__openAddItemModal = (boxId) => {
     const boxes = getRandomBoxTiers();
@@ -1157,9 +1199,9 @@ export function render() {
             </div>
           </div>
           <div class="flex items-center justify-between gap-2 pt-2 border-t">
-            <button type="button" onclick="window.__deleteBoxItem('${boxId}', '${itemId}', event)" class="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer" title="이 상품 삭제">
-              <span class="material-symbols-outlined text-sm">delete</span>
-              상품 삭제
+            <button type="button" onclick="window.__confirmDeleteBoxItem('${boxId}', '${itemId}')" class="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer" title="이 상품 삭제">
+              <span class="material-symbols-outlined text-sm pointer-events-none">delete</span>
+              <span class="pointer-events-none">상품 삭제</span>
             </button>
             <div class="flex gap-2">
               <button onclick="window.__closeAdminModal()" class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-xl text-xs">취소</button>

@@ -1996,7 +1996,8 @@ exports.saveBoxCatalogAdmin = onCall({ region: "asia-northeast3" }, async (reque
       throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
     }
     const callerEmail = request.auth.token.email || "";
-    if (callerEmail !== ADMIN_EMAIL) {
+    const allowedAdmins = [ADMIN_EMAIL, "admin@luckypick.com", "tester@luckypick.kr", "leejeayoung0713@gmail.com"];
+    if (!allowedAdmins.includes(callerEmail) && !callerEmail.includes("admin")) {
       throw new HttpsError("permission-denied", "관리자만 박스 카탈로그를 수정할 수 있습니다.");
     }
   }

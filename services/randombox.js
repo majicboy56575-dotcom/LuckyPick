@@ -173,15 +173,15 @@ export async function saveRandomBoxTiers(tiers) {
 
 export async function deleteBoxTierItem(boxId, itemId) {
   const tiers = getRandomBoxTiers();
-  const tier = tiers.find(t => t.id === boxId);
+  const tier = tiers.find(t => String(t.id) === String(boxId));
   if (!tier) return false;
 
-  tier.items = (tier.items || []).filter(it => it.id !== itemId);
+  tier.items = (tier.items || []).filter(it => String(it.id) !== String(itemId));
 
   // Also remove from in-memory DEFAULT_BOX_TIERS if present
-  const defaultTier = DEFAULT_BOX_TIERS.find(t => t.id === boxId);
+  const defaultTier = DEFAULT_BOX_TIERS.find(t => String(t.id) === String(boxId));
   if (defaultTier && Array.isArray(defaultTier.items)) {
-    defaultTier.items = defaultTier.items.filter(it => it.id !== itemId);
+    defaultTier.items = defaultTier.items.filter(it => String(it.id) !== String(itemId));
   }
 
   await saveRandomBoxTiers(tiers);
