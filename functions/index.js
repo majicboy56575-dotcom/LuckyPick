@@ -1544,7 +1544,9 @@ exports.convertVaultItemToPoints = onCall({ region: "asia-northeast3" }, async (
       throw new HttpsError("failed-precondition", "이미 포인트로 전환 완료된 상품입니다.");
     }
 
-    const refundPoints = item.refundPoints || Math.round(Number(item.retailPrice || 5000) * 0.6);
+    const isSpecialRaffle = item.tierId === "super_raffle" || (item.tierId && item.tierId.includes("raffle")) || item.grade === "LEGENDARY";
+    const defaultRate = isSpecialRaffle ? 0.8 : 0.6;
+    const refundPoints = item.refundPoints || Math.round(Number(item.retailPrice || 5000) * defaultRate);
     item.status = "converted_to_points";
     item.refundPoints = refundPoints;
     item.convertedAt = Date.now();
@@ -1754,7 +1756,7 @@ exports.forceDrawRaffle = onCall({ region: "asia-northeast3" }, async (request) 
             imageUrl: raffle.imageUrl || "",
             retailPrice: raffle.retailPrice || 1000000,
             grade: "LEGENDARY",
-            refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.6),
+            refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
             status: "in_vault",
             wonAt: Date.now()
           });

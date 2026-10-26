@@ -495,7 +495,9 @@ function renderVaultTab(vault) {
           currentBadge = '<span class="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">✓ 제세공과금 승인 완료</span>';
         }
 
-        const refundAmount = item.refundPoints || Math.round(item.retailPrice * 0.6);
+        const isSpecialRaffle = item.tierId === 'super_raffle' || (item.tierId && String(item.tierId).includes('raffle')) || item.grade === 'LEGENDARY';
+        const defaultRate = isSpecialRaffle ? 0.8 : 0.6;
+        const refundAmount = item.refundPoints || Math.round(item.retailPrice * defaultRate);
 
         return `
           <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
