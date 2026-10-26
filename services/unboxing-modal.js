@@ -153,7 +153,7 @@ export function openProductPurchaseModal(itemId, tierId) {
 
             <button onclick="window.__openDirectPaymentModal('${tier.id}', ${price}, '${item.id}')" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
               <span class="material-symbols-outlined text-sm">credit_card</span>
-              <span>신용카드 / 휴대폰 결제로 즉시 구매 (다날)</span>
+              <span>신용카드 / 휴대폰 결제로 즉시 구매</span>
             </button>
           </div>
         </div>
@@ -377,7 +377,7 @@ window.__processDirectPayment = async (tierId, amount, method, itemId) => {
           <div class="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto"></div>
           <div>
             <h4 class="font-extrabold text-base text-gray-900">${label}</h4>
-            <p class="text-xs text-gray-500 mt-1">다날 보안 결제창을 안전하게 호출하고 있습니다...</p>
+            <p class="text-xs text-gray-500 mt-1">보안 결제창을 안전하게 호출하고 있습니다...</p>
           </div>
         </div>
       `;
@@ -400,9 +400,9 @@ window.__processDirectPayment = async (tierId, amount, method, itemId) => {
         metadata: { itemId }
       });
     } catch (err) {
-      console.error('[DanalCard] Error:', err);
+      console.error('[CardPayment] Error:', err);
       restoreModal();
-      alert(`다날 카드 결제 준비 실패: ${err.message || err}`);
+      alert(`카드 결제 준비 실패: ${err.message || err}`);
     }
     return;
   }
@@ -417,9 +417,9 @@ window.__processDirectPayment = async (tierId, amount, method, itemId) => {
         metadata: { itemId }
       });
     } catch (err) {
-      console.error('[DanalPhone] Error:', err);
+      console.error('[PhonePayment] Error:', err);
       restoreModal();
-      alert(`다날 휴대폰 결제 준비 실패: ${err.message || err}`);
+      alert(`휴대폰 결제 준비 실패: ${err.message || err}`);
     }
     return;
   }

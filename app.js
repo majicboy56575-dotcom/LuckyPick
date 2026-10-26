@@ -9,10 +9,10 @@ import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 
-import * as homePage from './pages/home.js?v=20261026_V52';
-import * as historyPage from './pages/history.js?v=20261026_V52';
-import * as profilePage from './pages/profile.js?v=20261026_V52';
-import * as adminPage from './pages/admin.js?v=20261026_V52';
+import * as homePage from './pages/home.js?v=20261026_V53';
+import * as historyPage from './pages/history.js?v=20261026_V53';
+import * as profilePage from './pages/profile.js?v=20261026_V53';
+import * as adminPage from './pages/admin.js?v=20261026_V53';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;

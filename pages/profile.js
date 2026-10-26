@@ -1258,7 +1258,7 @@ export function render() {
           submitBtn.innerHTML = originalBtnHtml;
         }
         sessionStorage.removeItem('danal_pending_shipping_' + vaultId);
-        alert(`다날 배송비 결제창 호출 실패: ${danalErr.message || danalErr}`);
+        alert(`배송비 결제창 호출 실패: ${danalErr.message || danalErr}`);
       }
       return;
     }
@@ -1326,7 +1326,7 @@ export function render() {
       }
     } catch (err) {
       console.error('[Charge Payment] Error:', err);
-      alert(`다날 결제창 호출 실패: ${err.message || err}`);
+      alert(`결제창 호출 실패: ${err.message || err}`);
     }
   };
 
