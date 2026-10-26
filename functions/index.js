@@ -1472,7 +1472,7 @@ exports.purchaseProduct = onCall({ region: "asia-northeast3" }, async (request) 
       retailPrice: itemPrice,
       wholesalePrice: selectedItem.wholesalePrice || Math.round(itemPrice * 0.4),
       grade: selectedItem.grade || "NORMAL",
-      refundPoints: Math.round(itemPrice * 0.8),
+      refundPoints: Math.round(itemPrice * 0.6),
       status: "in_vault",
       wonAt: Date.now(),
       purchasedAt: Date.now(),
@@ -1507,7 +1507,7 @@ exports.purchaseProduct = onCall({ region: "asia-northeast3" }, async (request) 
 exports.openLuckyBox = exports.purchaseProduct;
 
 // ============================================
-// 15. convertVaultItemToPoints (Callable) - Server 80% Refund
+// 15. convertVaultItemToPoints (Callable) - Server 60% Refund
 // ============================================
 exports.convertVaultItemToPoints = onCall({ region: "asia-northeast3" }, async (request) => {
   if (!request.auth) {
@@ -1544,7 +1544,7 @@ exports.convertVaultItemToPoints = onCall({ region: "asia-northeast3" }, async (
       throw new HttpsError("failed-precondition", "이미 포인트로 전환 완료된 상품입니다.");
     }
 
-    const refundPoints = item.refundPoints || Math.round(Number(item.retailPrice || 5000) * 0.8);
+    const refundPoints = item.refundPoints || Math.round(Number(item.retailPrice || 5000) * 0.6);
     item.status = "converted_to_points";
     item.refundPoints = refundPoints;
     item.convertedAt = Date.now();
@@ -1754,7 +1754,7 @@ exports.forceDrawRaffle = onCall({ region: "asia-northeast3" }, async (request) 
             imageUrl: raffle.imageUrl || "",
             retailPrice: raffle.retailPrice || 1000000,
             grade: "LEGENDARY",
-            refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
+            refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.6),
             status: "in_vault",
             wonAt: Date.now()
           });

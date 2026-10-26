@@ -495,7 +495,7 @@ function renderVaultTab(vault) {
           currentBadge = '<span class="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">✓ 제세공과금 승인 완료</span>';
         }
 
-        const refundAmount = item.refundPoints || Math.round(item.retailPrice * 0.8);
+        const refundAmount = item.refundPoints || Math.round(item.retailPrice * 0.6);
 
         return `
           <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">

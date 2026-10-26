@@ -834,7 +834,7 @@ async function purchaseProductServer(tierIdOrData, payMethod = 'points') {
       retailPrice: price,
       wholesalePrice: itemData?.wholesalePrice || Math.round(price * 0.4),
       grade: itemData?.grade || 'NORMAL',
-      refundPoints: Math.round(price * 0.8),
+      refundPoints: Math.round(price * 0.6),
       status: 'in_vault',
       wonAt: Date.now(),
       purchasedAt: Date.now(),

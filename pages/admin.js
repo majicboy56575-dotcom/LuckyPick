@@ -134,13 +134,13 @@ function renderBoxesTab() {
                 <th class="p-4">소비자 정가</th>
                 <th class="p-4">도매 사입원가</th>
                 <th class="p-4">구매 사은 혜택</th>
-                <th class="p-4">80% 반품적립액</th>
+                <th class="p-4">60% 반품적립액</th>
                 <th class="p-4 text-right">관리</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 font-medium">
               ${currentBox.items.map((item) => {
-                const refundPts = Math.round(Number(item.retailPrice || currentBox.price) * 0.8);
+                const refundPts = Math.round(Number(item.retailPrice || currentBox.price) * 0.6);
                 const price = Number(item.retailPrice || currentBox.price);
                 return `
                 <tr class="hover:bg-blue-50/40 transition-colors cursor-pointer group">
