@@ -1360,6 +1360,12 @@ export function render() {
     const raffle = raffles.find(r => r.id === raffleId);
     if (!raffle) return;
 
+    // Remaining duration calculation
+    const now = Date.now();
+    const remainingMs = Math.max(0, (raffle.endTime || now) - now);
+    const remainingDays = remainingMs > 0 ? (remainingMs / 86400000).toFixed(1) : '3';
+    const remainingHours = Math.ceil(remainingMs / 3600000);
+
     const modalHtml = `
       <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="admin-raffle-modal" onclick="if(event.target===this)window.__closeAdminModal()">
         <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -1387,9 +1393,26 @@ export function render() {
                 <input type="number" id="raffle-unit-size" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold" value="${raffle.unitSize || 200}">
               </div>
             </div>
-            <div>
-              <label class="font-bold block text-gray-700 mb-1">배지 문구</label>
-              <input type="text" id="raffle-badge" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" value="${raffle.badge || 'SUPER RAFFLE'}">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="font-bold block text-gray-700 mb-1">배지 문구</label>
+                <input type="text" id="raffle-badge" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" value="${raffle.badge || 'SUPER RAFFLE'}">
+              </div>
+              <div>
+                <label class="font-bold block text-gray-700 mb-1">진행 시간 (마감 기한)</label>
+                <div class="relative">
+                  <input type="number" id="raffle-days" step="0.1" min="0.01" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-bold pr-10" value="${remainingDays}">
+                  <span class="absolute right-2.5 top-2 text-xs text-gray-500 font-bold">일 후</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between px-1 text-[11px] text-gray-500">
+              <span>남은 시간: <strong class="text-amber-700 font-mono">${remainingHours}시간</strong></span>
+              <div class="flex gap-1">
+                <button type="button" onclick="document.getElementById('raffle-days').value = '1'" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-bold text-slate-700">1일</button>
+                <button type="button" onclick="document.getElementById('raffle-days').value = '3'" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-bold text-slate-700">3일</button>
+                <button type="button" onclick="document.getElementById('raffle-days').value = '7'" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-[10px] font-bold text-slate-700">7일</button>
+              </div>
             </div>
 
             <!-- Laptop File Upload + URL Input -->
@@ -1458,6 +1481,7 @@ export function render() {
     const retail = parseFloat(document.getElementById('raffle-retail')?.value) || 1000000;
     const unitSize = parseInt(document.getElementById('raffle-unit-size')?.value, 10) || 200;
     const badge = document.getElementById('raffle-badge')?.value?.trim() || 'SUPER RAFFLE';
+    const days = parseFloat(document.getElementById('raffle-days')?.value);
     const img = document.getElementById('raffle-img')?.value?.trim();
 
     if (!title) { alert('래플 상품명을 입력해주세요.'); return; }
@@ -1470,6 +1494,12 @@ export function render() {
       raffle.unitSize = unitSize;
       raffle.badge = badge;
       delete raffle.winnerBonus;
+      if (!isNaN(days) && days > 0) {
+        raffle.endTime = Date.now() + Math.round(days * 86400000);
+        if (raffle.status === 'closed' && (raffle.entries?.length || 0) < (raffle.unitSize || 200)) {
+          raffle.status = 'active';
+        }
+      }
       if (img) raffle.imageUrl = img;
       try {
         await saveSuperRaffles(raffles);
