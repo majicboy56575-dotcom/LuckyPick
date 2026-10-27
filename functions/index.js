@@ -1601,8 +1601,8 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
 
     // 1인당 상품별 1일 최대 10회 응모 제한 (Daily Cap)
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const dailyByProduct = userData.dailyRaffleByProduct || {};
-    const productStats = dailyByProduct[raffleId] || {};
+    const dailyRaffleByProduct = userData.dailyRaffleByProduct || {};
+    const productStats = dailyRaffleByProduct[raffleId] || {};
     const usedToday = productStats.date === today ? (Number(productStats.count) || 0) : 0;
     const remainingToday = Math.max(0, 10 - usedToday);
 
@@ -1640,7 +1640,7 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
 
     const newTickets = curTickets - applyCount;
     const newDailyCount = usedToday + applyCount;
-    dailyByProduct[raffleId] = { date: today, count: newDailyCount };
+    dailyRaffleByProduct[raffleId] = { date: today, count: newDailyCount };
 
     transaction.update(userRef, { 
       goldenTickets: newTickets, 
@@ -1709,9 +1709,9 @@ exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (reques
     const newTickets = (Number(userData.goldenTickets) || 0) + 1;
 
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const dailyByProduct = userData.dailyRaffleByProduct || {};
-    if (dailyByProduct[raffleId] && dailyByProduct[raffleId].date === today && (dailyByProduct[raffleId].count || 0) > 0) {
-      dailyByProduct[raffleId].count = Math.max(0, dailyByProduct[raffleId].count - 1);
+    const dailyRaffleByProduct = userData.dailyRaffleByProduct || {};
+    if (dailyRaffleByProduct[raffleId] && dailyRaffleByProduct[raffleId].date === today && (dailyRaffleByProduct[raffleId].count || 0) > 0) {
+      dailyRaffleByProduct[raffleId].count = Math.max(0, dailyRaffleByProduct[raffleId].count - 1);
     }
 
     transaction.update(userRef, { 

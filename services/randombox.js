@@ -482,9 +482,9 @@ export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, user
     } catch (e) {}
 
     const docData = getCurrentUserDocCache() || {};
-    const dailyByProduct = docData.dailyRaffleByProduct || {};
-    dailyByProduct[raffleId] = { date: todayKstStr, count: newUsed };
-    docData.dailyRaffleByProduct = dailyByProduct;
+    const dailyRaffleByProduct = docData.dailyRaffleByProduct || {};
+    dailyRaffleByProduct[raffleId] = { date: todayKstStr, count: newUsed };
+    docData.dailyRaffleByProduct = dailyRaffleByProduct;
     saveUserDocData({ dailyRaffleByProduct });
 
     return {
