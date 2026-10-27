@@ -244,7 +244,7 @@ export function getUserVault() {
 // Unassigned Golden Tickets (100% Firestore User Doc goldenTickets backed)
 export const DAILY_RAFFLE_LIMIT = 10;
 
-export function getDailyRaffleStats() {
+export function getDailyRaffleStats(raffleId) {
   const authUser = getCurrentAuthUser();
   const myId = authUser?.uid;
   const myEmail = authUser?.email;
@@ -255,11 +255,12 @@ export function getDailyRaffleStats() {
   const startOfTodayKst = new Date(todayKstStr + 'T00:00:00+09:00').getTime();
   const endOfTodayKst = startOfTodayKst + 24 * 3600 * 1000;
 
-  // 2. Count actual active tickets entered TODAY across all super raffles in DB (SSOT)
+  // 2. Count actual active tickets entered TODAY for THIS specific raffle (SSOT)
   let entriesAppliedToday = 0;
   try {
     const raffles = getSuperRaffles();
-    raffles.forEach(raffle => {
+    const targetRaffles = raffleId ? raffles.filter(r => r.id === raffleId) : raffles;
+    targetRaffles.forEach(raffle => {
       (raffle.entries || []).forEach(entry => {
         const isMe = (myId && entry.userId === myId) || 
                      (myEmail && entry.userEmail === myEmail) ||
@@ -274,21 +275,28 @@ export function getDailyRaffleStats() {
     console.warn('[Raffle] Error counting today entries:', e);
   }
 
-  // 3. Multi-layer persistence: LocalStorage & Firestore User Doc cache
-  const localKey = `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
+  // 3. Multi-layer persistence: LocalStorage & Firestore User Doc cache per product
+  const localKey = raffleId ? `lp_daily_raffle_${myId || 'guest'}_${raffleId}_${todayKstStr}` : `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
   let localCount = 0;
   try {
     localCount = parseInt(localStorage.getItem(localKey) || '0', 10) || 0;
   } catch (e) {}
 
   const docData = getCurrentUserDocCache() || {};
-  const docCount = (docData.dailyRaffleDate === todayKstStr) ? (Number(docData.dailyRaffleCount) || 0) : 0;
+  let docCount = 0;
+  if (raffleId && docData.dailyRaffleByProduct && docData.dailyRaffleByProduct[raffleId]) {
+    const pStats = docData.dailyRaffleByProduct[raffleId];
+    docCount = (pStats.date === todayKstStr) ? (Number(pStats.count) || 0) : 0;
+  } else if (!raffleId && docData.dailyRaffleDate === todayKstStr) {
+    docCount = Number(docData.dailyRaffleCount) || 0;
+  }
 
-  // Maximum across all sources guarantees persistent cap even after window/modal toggle or page reload
+  // Maximum across all sources guarantees persistent cap per product
   const usedToday = Math.max(entriesAppliedToday, localCount, docCount);
 
   return {
     today: todayKstStr,
+    raffleId,
     usedToday,
     limit: DAILY_RAFFLE_LIMIT,
     remaining: Math.max(0, DAILY_RAFFLE_LIMIT - usedToday)
@@ -451,34 +459,33 @@ export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, user
   try {
     const count = Math.max(1, parseInt(ticketCount, 10) || 1);
 
-    // 1. Strict Daily Cap Verification
-    const stats = getDailyRaffleStats();
+    // 1. Strict Per-Product Daily Cap Verification
+    const stats = getDailyRaffleStats(raffleId);
     if (stats.remaining <= 0) {
-      throw new Error('골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!');
+      throw new Error('해당 상품의 오늘 응모 한도(10회)를 모두 사용하셨습니다. 다른 스페셜 상품에 응모하시거나 내일 다시 응모해주세요!');
     }
     if (count > stats.remaining) {
-      throw new Error(`골든티켓 1일 응모 한도(최대 10회)를 초과했습니다. 오늘 추가 응모 가능 횟수는 ${stats.remaining}회입니다.`);
+      throw new Error(`해당 상품의 오늘 추가 응모 가능 횟수는 최대 ${stats.remaining}회입니다. (상품별 1일 10회 한도)`);
     }
 
     const res = await applyGoldenRaffleServer(raffleId, count);
 
-    // 2. Multi-layer immediate persistence
+    // 2. Multi-layer immediate persistence per product
     const authUser = getCurrentAuthUser();
     const myId = authUser?.uid;
     const now = new Date();
     const todayKstStr = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const localKey = `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
+    const localKey = `lp_daily_raffle_${myId || 'guest'}_${raffleId}_${todayKstStr}`;
     const newUsed = stats.usedToday + count;
     try {
       localStorage.setItem(localKey, String(newUsed));
     } catch (e) {}
 
-    const docData = getCurrentUserDocCache();
-    if (docData) {
-      docData.dailyRaffleDate = todayKstStr;
-      docData.dailyRaffleCount = newUsed;
-    }
-    saveUserDocData({ dailyRaffleDate: todayKstStr, dailyRaffleCount: newUsed });
+    const docData = getCurrentUserDocCache() || {};
+    const dailyByProduct = docData.dailyRaffleByProduct || {};
+    dailyByProduct[raffleId] = { date: todayKstStr, count: newUsed };
+    docData.dailyRaffleByProduct = dailyByProduct;
+    saveUserDocData({ dailyRaffleByProduct });
 
     return {
       appliedCount: res.appliedCount || count,
@@ -497,21 +504,24 @@ export async function cancelGoldenTicketApplication(raffleId, ticketId) {
   try {
     const res = await cancelGoldenRaffleServer(raffleId, ticketId);
 
-    // Decrement local daily count if today
+    // Decrement local daily count per product if today
     const authUser = getCurrentAuthUser();
     const myId = authUser?.uid;
     const now = new Date();
     const todayKstStr = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const localKey = `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
+    const localKey = `lp_daily_raffle_${myId || 'guest'}_${raffleId}_${todayKstStr}`;
     try {
       const localCount = parseInt(localStorage.getItem(localKey) || '0', 10);
       if (localCount > 0) localStorage.setItem(localKey, String(localCount - 1));
     } catch (e) {}
 
     const docData = getCurrentUserDocCache();
-    if (docData && docData.dailyRaffleDate === todayKstStr && (docData.dailyRaffleCount || 0) > 0) {
-      docData.dailyRaffleCount -= 1;
-      saveUserDocData({ dailyRaffleCount: docData.dailyRaffleCount });
+    if (docData && docData.dailyRaffleByProduct && docData.dailyRaffleByProduct[raffleId]) {
+      const pStats = docData.dailyRaffleByProduct[raffleId];
+      if (pStats.date === todayKstStr && (pStats.count || 0) > 0) {
+        pStats.count = Math.max(0, pStats.count - 1);
+        saveUserDocData({ dailyRaffleByProduct: docData.dailyRaffleByProduct });
+      }
     }
 
     return {

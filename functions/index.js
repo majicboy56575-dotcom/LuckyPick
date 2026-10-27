@@ -1599,16 +1599,18 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
       throw new HttpsError("failed-precondition", `보유 골든티켓이 부족합니다. (보유: ${curTickets}장 / 요청: ${applyCount}장)`);
     }
 
-    // 1인당 1일 최대 10회 응모 제한 (Daily Cap)
+    // 1인당 상품별 1일 최대 10회 응모 제한 (Daily Cap)
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const usedToday = userData.dailyRaffleDate === today ? (Number(userData.dailyRaffleCount) || 0) : 0;
+    const dailyByProduct = userData.dailyRaffleByProduct || {};
+    const productStats = dailyByProduct[raffleId] || {};
+    const usedToday = productStats.date === today ? (Number(productStats.count) || 0) : 0;
     const remainingToday = Math.max(0, 10 - usedToday);
 
     if (usedToday >= 10) {
-      throw new HttpsError("failed-precondition", "골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!");
+      throw new HttpsError("failed-precondition", "해당 상품의 오늘 응모 한도(10회)를 모두 사용하셨습니다. 다른 스페셜 상품에 응모하시거나 내일 다시 응모해주세요!");
     }
     if (usedToday + applyCount > 10) {
-      throw new HttpsError("failed-precondition", `골든티켓 1일 응모 한도(최대 10회)를 초과했습니다. 오늘 추가 응모 가능 횟수는 ${remainingToday}회입니다.`);
+      throw new HttpsError("failed-precondition", `해당 상품의 오늘 추가 응모 가능 횟수는 최대 ${remainingToday}회입니다. (상품별 1일 10회 한도)`);
     }
 
     const raffle = raffleDoc.data();
@@ -1638,11 +1640,11 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
 
     const newTickets = curTickets - applyCount;
     const newDailyCount = usedToday + applyCount;
+    dailyByProduct[raffleId] = { date: today, count: newDailyCount };
 
     transaction.update(userRef, { 
       goldenTickets: newTickets, 
-      dailyRaffleDate: today,
-      dailyRaffleCount: newDailyCount,
+      dailyRaffleByProduct,
       updatedAt: Date.now() 
     });
     transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
@@ -1707,13 +1709,14 @@ exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (reques
     const newTickets = (Number(userData.goldenTickets) || 0) + 1;
 
     const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const updatedDailyCount = (userData.dailyRaffleDate === today && (userData.dailyRaffleCount || 0) > 0)
-      ? Math.max(0, (userData.dailyRaffleCount || 0) - 1)
-      : (userData.dailyRaffleCount || 0);
+    const dailyByProduct = userData.dailyRaffleByProduct || {};
+    if (dailyByProduct[raffleId] && dailyByProduct[raffleId].date === today && (dailyByProduct[raffleId].count || 0) > 0) {
+      dailyByProduct[raffleId].count = Math.max(0, dailyByProduct[raffleId].count - 1);
+    }
 
     transaction.update(userRef, { 
       goldenTickets: newTickets, 
-      dailyRaffleCount: updatedDailyCount,
+      dailyRaffleByProduct,
       updatedAt: Date.now() 
     });
     transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
