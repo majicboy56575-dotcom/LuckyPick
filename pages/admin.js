@@ -239,7 +239,6 @@ function renderRafflesTab() {
                   <div class="min-w-0">
                     <h4 class="font-extrabold text-base text-gray-900 truncate">${r.title}</h4>
                     <p class="text-xs text-gray-500 mt-0.5 font-mono">소비자 정가: <strong>₩${r.retailPrice.toLocaleString()}원</strong></p>
-                    <p class="text-[11px] text-amber-700 font-bold mt-1 truncate">🎁 ${r.winnerBonus || '추가 특별 혜택'}</p>
                   </div>
                 </div>
 
@@ -1328,10 +1327,6 @@ export function render() {
                 <input type="number" id="raffle-days" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono" value="3">
               </div>
             </div>
-            <div>
-              <label class="font-bold block text-gray-700 mb-1">당첨자 추가 보너스 혜택</label>
-              <input type="text" id="raffle-bonus" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" value="공식 애플케어 플러스 무상 증정">
-            </div>
 
             <!-- Laptop File Upload + URL Input -->
             <div class="space-y-1.5 pt-1">
@@ -1396,10 +1391,6 @@ export function render() {
               <label class="font-bold block text-gray-700 mb-1">배지 문구</label>
               <input type="text" id="raffle-badge" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold" value="${raffle.badge || 'SUPER RAFFLE'}">
             </div>
-            <div>
-              <label class="font-bold block text-gray-700 mb-1">당첨자 추가 보너스 혜택</label>
-              <input type="text" id="raffle-bonus" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" value="${raffle.winnerBonus || ''}">
-            </div>
 
             <!-- Laptop File Upload + URL Input -->
             <div class="space-y-1.5 pt-1">
@@ -1434,7 +1425,6 @@ export function render() {
     const unitSize = parseInt(document.getElementById('raffle-unit-size')?.value, 10) || 200;
     const badge = document.getElementById('raffle-badge')?.value?.trim() || 'SUPER RAFFLE';
     const days = parseFloat(document.getElementById('raffle-days')?.value) || 3;
-    const bonus = document.getElementById('raffle-bonus')?.value?.trim() || '무상 보증 혜택';
     const img = document.getElementById('raffle-img')?.value?.trim() || 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600';
 
     if (!title) { alert('래플 상품명을 입력해주세요.'); return; }
@@ -1447,7 +1437,6 @@ export function render() {
       imageUrl: img,
       unitSize: unitSize,
       endTime: Date.now() + days * 86400000,
-      winnerBonus: bonus,
       badge,
       status: 'active',
       entries: []
@@ -1469,7 +1458,6 @@ export function render() {
     const retail = parseFloat(document.getElementById('raffle-retail')?.value) || 1000000;
     const unitSize = parseInt(document.getElementById('raffle-unit-size')?.value, 10) || 200;
     const badge = document.getElementById('raffle-badge')?.value?.trim() || 'SUPER RAFFLE';
-    const bonus = document.getElementById('raffle-bonus')?.value?.trim() || '';
     const img = document.getElementById('raffle-img')?.value?.trim();
 
     if (!title) { alert('래플 상품명을 입력해주세요.'); return; }
@@ -1481,7 +1469,7 @@ export function render() {
       raffle.retailPrice = retail;
       raffle.unitSize = unitSize;
       raffle.badge = badge;
-      raffle.winnerBonus = bonus;
+      delete raffle.winnerBonus;
       if (img) raffle.imageUrl = img;
       try {
         await saveSuperRaffles(raffles);

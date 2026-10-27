@@ -94,7 +94,6 @@ export const DEFAULT_SUPER_RAFFLES = [
     imageUrl: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600&auto=format&fit=crop&q=80',
     unitSize: 200, // 200 tickets per Group
     endTime: Date.now() + 86400000 * 2.5,
-    winnerBonus: '공식 애플케어 플러스 무상 증정',
     badge: 'SUPER RAFFLE #1',
     status: 'active',
     entries: [] // Queue of active participants
@@ -106,7 +105,6 @@ export const DEFAULT_SUPER_RAFFLES = [
     imageUrl: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&auto=format&fit=crop&q=80',
     unitSize: 250, // 250 tickets per Group
     endTime: 1791980800000,
-    winnerBonus: '공식 인보이스 영수증 및 보증서 동봉',
     badge: 'SUPER RAFFLE #2',
     status: 'active',
     entries: []
