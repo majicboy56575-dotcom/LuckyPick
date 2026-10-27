@@ -245,11 +245,50 @@ export function getUserVault() {
 export const DAILY_RAFFLE_LIMIT = 10;
 
 export function getDailyRaffleStats() {
+  const authUser = getCurrentAuthUser();
+  const myId = authUser?.uid;
+  const myEmail = authUser?.email;
+
+  // 1. Calculate today's date in KST (Asia/Seoul)
+  const now = new Date();
+  const todayKstStr = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const startOfTodayKst = new Date(todayKstStr + 'T00:00:00+09:00').getTime();
+  const endOfTodayKst = startOfTodayKst + 24 * 3600 * 1000;
+
+  // 2. Count actual active tickets entered TODAY across all super raffles in DB (SSOT)
+  let entriesAppliedToday = 0;
+  try {
+    const raffles = getSuperRaffles();
+    raffles.forEach(raffle => {
+      (raffle.entries || []).forEach(entry => {
+        const isMe = (myId && entry.userId === myId) || 
+                     (myEmail && entry.userEmail === myEmail) ||
+                     (!myId && (entry.userId === 'my_user_id' || entry.userEmail === 'user@example.com'));
+        const appliedTime = Number(entry.appliedAt) || 0;
+        if (isMe && appliedTime >= startOfTodayKst && appliedTime < endOfTodayKst) {
+          entriesAppliedToday++;
+        }
+      });
+    });
+  } catch (e) {
+    console.warn('[Raffle] Error counting today entries:', e);
+  }
+
+  // 3. Multi-layer persistence: LocalStorage & Firestore User Doc cache
+  const localKey = `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
+  let localCount = 0;
+  try {
+    localCount = parseInt(localStorage.getItem(localKey) || '0', 10) || 0;
+  } catch (e) {}
+
   const docData = getCurrentUserDocCache() || {};
-  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-  const usedToday = docData.dailyRaffleDate === today ? (Number(docData.dailyRaffleCount) || 0) : 0;
+  const docCount = (docData.dailyRaffleDate === todayKstStr) ? (Number(docData.dailyRaffleCount) || 0) : 0;
+
+  // Maximum across all sources guarantees persistent cap even after window/modal toggle or page reload
+  const usedToday = Math.max(entriesAppliedToday, localCount, docCount);
+
   return {
-    today,
+    today: todayKstStr,
     usedToday,
     limit: DAILY_RAFFLE_LIMIT,
     remaining: Math.max(0, DAILY_RAFFLE_LIMIT - usedToday)
@@ -409,7 +448,36 @@ export function getRaffleGroupData(raffle, currentUserId) {
 export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, userInfo = {}) {
   try {
     const count = Math.max(1, parseInt(ticketCount, 10) || 1);
+
+    // 1. Strict Daily Cap Verification
+    const stats = getDailyRaffleStats();
+    if (stats.remaining <= 0) {
+      throw new Error('골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!');
+    }
+    if (count > stats.remaining) {
+      throw new Error(`골든티켓 1일 응모 한도(최대 10회)를 초과했습니다. 오늘 추가 응모 가능 횟수는 ${stats.remaining}회입니다.`);
+    }
+
     const res = await applyGoldenRaffleServer(raffleId, count);
+
+    // 2. Multi-layer immediate persistence
+    const authUser = getCurrentAuthUser();
+    const myId = authUser?.uid;
+    const now = new Date();
+    const todayKstStr = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const localKey = `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
+    const newUsed = stats.usedToday + count;
+    try {
+      localStorage.setItem(localKey, String(newUsed));
+    } catch (e) {}
+
+    const docData = getCurrentUserDocCache();
+    if (docData) {
+      docData.dailyRaffleDate = todayKstStr;
+      docData.dailyRaffleCount = newUsed;
+    }
+    saveUserDocData({ dailyRaffleDate: todayKstStr, dailyRaffleCount: newUsed });
+
     return {
       appliedCount: res.appliedCount || count,
       remainingTickets: res.newTickets,
@@ -426,6 +494,24 @@ export async function applyGoldenTicketsToRaffle(raffleId, ticketCount = 1, user
 export async function cancelGoldenTicketApplication(raffleId, ticketId) {
   try {
     const res = await cancelGoldenRaffleServer(raffleId, ticketId);
+
+    // Decrement local daily count if today
+    const authUser = getCurrentAuthUser();
+    const myId = authUser?.uid;
+    const now = new Date();
+    const todayKstStr = new Date(now.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const localKey = `lp_daily_raffle_${myId || 'guest'}_${todayKstStr}`;
+    try {
+      const localCount = parseInt(localStorage.getItem(localKey) || '0', 10);
+      if (localCount > 0) localStorage.setItem(localKey, String(localCount - 1));
+    } catch (e) {}
+
+    const docData = getCurrentUserDocCache();
+    if (docData && docData.dailyRaffleDate === todayKstStr && (docData.dailyRaffleCount || 0) > 0) {
+      docData.dailyRaffleCount -= 1;
+      saveUserDocData({ dailyRaffleCount: docData.dailyRaffleCount });
+    }
+
     return {
       refundedTickets: 1,
       newAvailableBalance: res.newTickets,

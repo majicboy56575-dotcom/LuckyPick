@@ -579,6 +579,11 @@ export function render() {
 
   window.__openApplyTicketModal = (raffleId, title, tickets) => {
     if (!requireLogin()) return;
+    const dailyStats = getDailyRaffleStats();
+    if (dailyStats.remaining <= 0) {
+      alert('골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!');
+      return;
+    }
     const container = document.getElementById('home-modal-container') || document.body;
     const existing = document.getElementById('apply-ticket-modal');
     if (existing) existing.remove();

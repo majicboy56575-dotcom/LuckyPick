@@ -898,6 +898,10 @@ async function applyGoldenRaffleServer(raffleId, count = 1) {
     try {
       const callable = httpsCallable(functions, 'applyGoldenRaffle');
       const result = await callable({ raffleId, count });
+      if (result?.data?.newTickets !== undefined) {
+        if (currentUserDocCache) currentUserDocCache.goldenTickets = result.data.newTickets;
+        window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: result.data.newTickets } }));
+      }
       return result.data;
     } catch (e) {
       console.warn('[Firestore] Cloud function applyGoldenRaffle failed, attempting direct Firestore entry:', e.message);
