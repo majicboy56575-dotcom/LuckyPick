@@ -438,6 +438,8 @@ export function getRaffleGroupData(raffle, currentUserId) {
 
   return {
     totalParticipants: totalCount,
+    totalActiveEntries: totalCount,
+    totalCount,
     unitSize,
     completedGroupsCount,
     groups

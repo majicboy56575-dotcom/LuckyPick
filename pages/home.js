@@ -16,7 +16,7 @@ import {
   checkAndResolveRaffleExpirations
 } from '../services/randombox.js';
 import { openProductPurchaseModal } from '../services/unboxing-modal.js';
-import { isLoggedIn, requireLogin } from '../services/auth.js';
+import { isLoggedIn, requireLogin, getCurrentAuthUser } from '../services/auth.js';
 
 let countdownIntervals = [];
 
@@ -136,7 +136,8 @@ function renderSuperRaffleCard(raffle, index) {
   const isClosed = raffle.status === 'closed';
   const remaining = Math.max(0, raffle.endTime - Date.now());
   const loggedIn = isLoggedIn();
-  const groupData = getRaffleGroupData(raffle, 'my_user_id');
+  const authUser = getCurrentAuthUser();
+  const groupData = getRaffleGroupData(raffle, authUser?.uid || 'my_user_id');
   if (!loggedIn) groupData.groups.forEach(g => { g.hasMyTicket = false; g.myTicketCount = 0; });
 
   return `
@@ -199,7 +200,7 @@ function renderSuperRaffleCard(raffle, index) {
               <span class="material-symbols-outlined text-base">format_list_numbered</span>
               <span>현재 참여 큐 현황</span>
             </div>
-            <span class="text-slate-300 font-mono">총 참여: <strong>${groupData.totalActiveEntries}장</strong></span>
+            <span class="text-slate-300 font-mono">총 참여: <strong>${Number(groupData.totalActiveEntries ?? groupData.totalParticipants ?? raffle.entries?.length ?? 0).toLocaleString()}장</strong></span>
           </div>
 
           <!-- Group Status Tags -->
@@ -250,7 +251,8 @@ function renderTransparencyModal(raffleId) {
   const raffle = allRaffles.find(r => r.id === raffleId);
   if (!raffle) return '';
 
-  const groupData = getRaffleGroupData(raffle, 'my_user_id');
+  const authUser = getCurrentAuthUser();
+  const groupData = getRaffleGroupData(raffle, authUser?.uid || 'my_user_id');
   const isClosed = raffle.status === 'closed';
   const loggedIn = isLoggedIn();
 
@@ -297,7 +299,7 @@ function renderTransparencyModal(raffleId) {
                 ${g.entries.length === 0 ? `
                   <div class="p-6 text-center text-xs text-gray-400">아직 해당 그룹에 응모된 티켓이 없습니다.</div>
                 ` : g.entries.map(e => {
-                  const isMine = loggedIn && e.userId === 'my_user_id';
+                  const isMine = loggedIn && ((authUser?.uid && e.userId === authUser.uid) || (authUser?.email && e.userEmail === authUser.email) || (e.userId === 'my_user_id'));
                   const isWinner = groupWinner && (groupWinner.ticketId === e.ticketId || groupWinner.ticketNumber === e.ticketNumber);
                   
                   return `
