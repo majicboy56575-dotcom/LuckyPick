@@ -244,6 +244,20 @@ export function getUserVault() {
 }
 
 // Unassigned Golden Tickets (100% Firestore User Doc goldenTickets backed)
+export const DAILY_RAFFLE_LIMIT = 10;
+
+export function getDailyRaffleStats() {
+  const docData = getCurrentUserDocCache() || {};
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const usedToday = docData.dailyRaffleDate === today ? (Number(docData.dailyRaffleCount) || 0) : 0;
+  return {
+    today,
+    usedToday,
+    limit: DAILY_RAFFLE_LIMIT,
+    remaining: Math.max(0, DAILY_RAFFLE_LIMIT - usedToday)
+  };
+}
+
 export function getAvailableGoldenTicketsCount() {
   const docData = getCurrentUserDocCache();
   if (docData && docData.goldenTickets !== undefined && docData.goldenTickets !== null) {

@@ -1599,6 +1599,18 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
       throw new HttpsError("failed-precondition", `보유 골든티켓이 부족합니다. (보유: ${curTickets}장 / 요청: ${applyCount}장)`);
     }
 
+    // 1인당 1일 최대 10회 응모 제한 (Daily Cap)
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const usedToday = userData.dailyRaffleDate === today ? (Number(userData.dailyRaffleCount) || 0) : 0;
+    const remainingToday = Math.max(0, 10 - usedToday);
+
+    if (usedToday >= 10) {
+      throw new HttpsError("failed-precondition", "골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!");
+    }
+    if (usedToday + applyCount > 10) {
+      throw new HttpsError("failed-precondition", `골든티켓 1일 응모 한도(최대 10회)를 초과했습니다. 오늘 추가 응모 가능 횟수는 ${remainingToday}회입니다.`);
+    }
+
     const raffle = raffleDoc.data();
     if (raffle.status === "closed") {
       throw new HttpsError("failed-precondition", "이미 마감된 래플입니다.");
@@ -1625,8 +1637,14 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
     }
 
     const newTickets = curTickets - applyCount;
+    const newDailyCount = usedToday + applyCount;
 
-    transaction.update(userRef, { goldenTickets: newTickets, updatedAt: Date.now() });
+    transaction.update(userRef, { 
+      goldenTickets: newTickets, 
+      dailyRaffleDate: today,
+      dailyRaffleCount: newDailyCount,
+      updatedAt: Date.now() 
+    });
     transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
 
     return { 
@@ -1688,7 +1706,16 @@ exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (reques
     const userData = userDoc.exists ? userDoc.data() : { goldenTickets: 0 };
     const newTickets = (Number(userData.goldenTickets) || 0) + 1;
 
-    transaction.update(userRef, { goldenTickets: newTickets, updatedAt: Date.now() });
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const updatedDailyCount = (userData.dailyRaffleDate === today && (userData.dailyRaffleCount || 0) > 0)
+      ? Math.max(0, (userData.dailyRaffleCount || 0) - 1)
+      : (userData.dailyRaffleCount || 0);
+
+    transaction.update(userRef, { 
+      goldenTickets: newTickets, 
+      dailyRaffleCount: updatedDailyCount,
+      updatedAt: Date.now() 
+    });
     transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
 
     return { newTickets, removedEntry };

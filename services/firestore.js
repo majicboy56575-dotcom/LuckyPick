@@ -920,6 +920,18 @@ async function applyGoldenRaffleServer(raffleId, count = 1) {
     const curTickets = Number(userData.goldenTickets) || 0;
     if (curTickets < count) throw new Error(`보유 골든티켓이 부족합니다. (보유: ${curTickets}장 / 요청: ${count}장)`);
 
+    // 1인당 1일 최대 10회 응모 제한 (Daily Cap) 검증
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const usedToday = userData.dailyRaffleDate === today ? (Number(userData.dailyRaffleCount) || 0) : 0;
+    const remainingToday = Math.max(0, 10 - usedToday);
+
+    if (usedToday >= 10) {
+      throw new Error('골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!');
+    }
+    if (usedToday + count > 10) {
+      throw new Error(`골든티켓 1일 응모 한도(최대 10회)를 초과했습니다. 오늘 추가 응모 가능 횟수는 ${remainingToday}회입니다.`);
+    }
+
     const raffle = raffleSnap.data();
     if (raffle.status === 'closed') throw new Error('이미 마감된 래플입니다.');
 
@@ -943,10 +955,21 @@ async function applyGoldenRaffleServer(raffleId, count = 1) {
     }
 
     const newTickets = curTickets - count;
-    await setDoc(userRef, { goldenTickets: newTickets, updatedAt: Date.now() }, { merge: true });
+    const newDailyCount = usedToday + count;
+
+    await setDoc(userRef, { 
+      goldenTickets: newTickets, 
+      dailyRaffleDate: today,
+      dailyRaffleCount: newDailyCount,
+      updatedAt: Date.now() 
+    }, { merge: true });
     await setDoc(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() }, { merge: true });
 
-    if (currentUserDocCache) currentUserDocCache.goldenTickets = newTickets;
+    if (currentUserDocCache) {
+      currentUserDocCache.goldenTickets = newTickets;
+      currentUserDocCache.dailyRaffleDate = today;
+      currentUserDocCache.dailyRaffleCount = newDailyCount;
+    }
     window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
     window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
 
@@ -993,10 +1016,22 @@ async function cancelGoldenRaffleServer(raffleId, ticketId) {
     const userData = userSnap.exists() ? userSnap.data() : { goldenTickets: 0 };
     const newTickets = (Number(userData.goldenTickets) || 0) + 1;
 
-    await setDoc(userRef, { goldenTickets: newTickets, updatedAt: Date.now() }, { merge: true });
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const updatedDailyCount = (userData.dailyRaffleDate === today && (userData.dailyRaffleCount || 0) > 0)
+      ? Math.max(0, (userData.dailyRaffleCount || 0) - 1)
+      : (userData.dailyRaffleCount || 0);
+
+    await setDoc(userRef, { 
+      goldenTickets: newTickets, 
+      dailyRaffleCount: updatedDailyCount,
+      updatedAt: Date.now() 
+    }, { merge: true });
     await setDoc(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() }, { merge: true });
 
-    if (currentUserDocCache) currentUserDocCache.goldenTickets = newTickets;
+    if (currentUserDocCache) {
+      currentUserDocCache.goldenTickets = newTickets;
+      currentUserDocCache.dailyRaffleCount = updatedDailyCount;
+    }
     window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
     window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
 

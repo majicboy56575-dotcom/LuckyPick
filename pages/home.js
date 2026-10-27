@@ -9,6 +9,7 @@ import {
   LIVE_WINNING_FEED, 
   getUserPoints, 
   getAvailableGoldenTicketsCount, 
+  getDailyRaffleStats,
   applyGoldenTicketsToRaffle,
   getRaffleGroupData,
   cancelGoldenTicketApplication,
@@ -343,6 +344,10 @@ function renderTransparencyModal(raffleId) {
 }
 
 function renderApplyTicketModal(raffleId, raffleTitle, userTickets) {
+  const dailyStats = getDailyRaffleStats();
+  const maxAllowed = Math.min(userTickets, dailyStats.remaining);
+  const isDailyLimitReached = dailyStats.remaining <= 0;
+
   return `
     <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="apply-ticket-modal" onclick="if(event.target===this)window.__closeApplyTicketModal()">
       <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 animate-in zoom-in-95">
@@ -353,30 +358,54 @@ function renderApplyTicketModal(raffleId, raffleTitle, userTickets) {
           </button>
         </div>
 
-        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-4">
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-3">
           <span class="text-xs text-gray-500 font-medium">대상 스페셜 래플</span>
           <p class="font-bold text-gray-900 mt-0.5">${raffleTitle}</p>
         </div>
 
-        ${userTickets > 0 ? `
+        <!-- Daily Cap Status Badge -->
+        <div class="flex items-center justify-between px-3.5 py-2.5 ${isDailyLimitReached ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50/80 border-indigo-100'} border rounded-2xl mb-4 text-xs">
+          <span class="font-bold flex items-center gap-1.5 ${isDailyLimitReached ? 'text-amber-900' : 'text-indigo-900'}">
+            <span class="material-symbols-outlined text-sm ${isDailyLimitReached ? 'text-amber-600' : 'text-indigo-600'}">verified_user</span>
+            1일 건전 응모 한도
+          </span>
+          <span class="font-mono font-bold ${isDailyLimitReached ? 'text-amber-700' : 'text-indigo-700'}">
+            오늘 잔여: ${dailyStats.remaining} / ${dailyStats.limit}회
+          </span>
+        </div>
+
+        ${isDailyLimitReached ? `
+          <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl mb-5 text-xs text-amber-900">
+            <p class="font-black text-sm text-amber-950 flex items-center gap-1.5 mb-1">
+              <span>⏳</span> 오늘 응모 한도(10회)를 모두 사용하셨습니다
+            </p>
+            <p class="text-amber-800 leading-relaxed">
+              골든티켓 응모는 과몰입 방지와 건전한 참여를 위해 <strong>1인당 1일 최대 10회까지만 가능</strong>합니다. 내일 다시 응모해주세요!
+            </p>
+          </div>
+          <button onclick="window.__closeApplyTicketModal()" class="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs">
+            확인 및 닫기
+          </button>
+        ` : userTickets > 0 ? `
           <div class="mb-5">
             <div class="flex justify-between text-xs text-gray-500 mb-2">
               <span>내 보유 골든 티켓</span>
               <span class="font-bold text-amber-600 font-mono">${userTickets}장</span>
             </div>
 
-            <label class="block text-xs font-semibold text-gray-700 mb-1">응모할 티켓 수량 입력</label>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">응모할 티켓 수량 입력 (오늘 최대 ${dailyStats.remaining}장)</label>
             <div class="flex items-center gap-2">
-              <input type="number" id="apply-ticket-input" min="1" max="${userTickets}" value="1" class="flex-grow p-3 bg-slate-100 border border-slate-300 rounded-xl font-bold font-mono text-center text-lg focus:outline-primary">
-              <button onclick="document.getElementById('apply-ticket-input').value = '${userTickets}'" class="px-3.5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold whitespace-nowrap">
-                최대(${userTickets}장)
+              <input type="number" id="apply-ticket-input" min="1" max="${maxAllowed}" value="1" class="flex-grow p-3 bg-slate-100 border border-slate-300 rounded-xl font-bold font-mono text-center text-lg focus:outline-primary">
+              <button onclick="document.getElementById('apply-ticket-input').value = '${maxAllowed}'" class="px-3.5 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold whitespace-nowrap">
+                최대(${maxAllowed}장)
               </button>
             </div>
 
             <div class="flex gap-1.5 mt-2">
               <button onclick="document.getElementById('apply-ticket-input').value = '1'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+1장</button>
-              ${userTickets >= 3 ? `<button onclick="document.getElementById('apply-ticket-input').value = '3'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+3장</button>` : ''}
-              ${userTickets >= 5 ? `<button onclick="document.getElementById('apply-ticket-input').value = '5'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+5장</button>` : ''}
+              ${maxAllowed >= 3 ? `<button onclick="document.getElementById('apply-ticket-input').value = '3'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+3장</button>` : ''}
+              ${maxAllowed >= 5 ? `<button onclick="document.getElementById('apply-ticket-input').value = '5'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+5장</button>` : ''}
+              ${maxAllowed >= 10 ? `<button onclick="document.getElementById('apply-ticket-input').value = '10'" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-semibold text-slate-700">+10장</button>` : ''}
             </div>
           </div>
 
@@ -566,10 +595,20 @@ export function render() {
     const input = document.getElementById('apply-ticket-input');
     const count = parseInt(input?.value || '1', 10);
 
+    const dailyStats = getDailyRaffleStats();
+    if (dailyStats.remaining <= 0) {
+      alert('골든티켓 응모는 건전한 참여를 위해 1인당 1일 최대 10회까지만 가능합니다. 내일 다시 응모해주세요!');
+      return;
+    }
+    if (count > dailyStats.remaining) {
+      alert(`오늘 추가로 응모할 수 있는 수량은 최대 ${dailyStats.remaining}장입니다. (1일 한도 10장)`);
+      return;
+    }
+
     try {
       const res = await applyGoldenTicketsToRaffle(raffleId, count);
       const title = res.raffle?.title || '스페셜 래플';
-      alert(`🎉 [${title}] 상품에 골든 티켓 ${count}장 응모가 완료되었습니다!\n(잔여 보유 티켓: ${res.remainingTickets}장)`);
+      alert(`🎉 [${title}] 상품에 골든 티켓 ${count}장 응모가 완료되었습니다!\n(잔여 보유 티켓: ${res.remainingTickets}장 / 오늘 추가 응모 가능: ${Math.max(0, dailyStats.remaining - count)}회)`);
       window.__closeApplyTicketModal();
       window.location.reload();
     } catch (err) {
