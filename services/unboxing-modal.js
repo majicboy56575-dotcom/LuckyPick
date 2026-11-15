@@ -153,7 +153,7 @@ export function openProductPurchaseModal(itemId, tierId) {
 
             <button onclick="window.__openDirectPaymentModal('${tier.id}', ${price}, '${item.id}')" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
               <span class="material-symbols-outlined text-sm">credit_card</span>
-              <span>신용카드 / 휴대폰 결제로 즉시 구매</span>
+              <span>신용·체크카드로 즉시 구매</span>
             </button>
           </div>
         </div>
