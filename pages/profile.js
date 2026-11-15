@@ -318,28 +318,16 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
                 </span>
               </label>
 
-              <!-- Option 2: Danal Card / EasyPay -->
+              <!-- Option 2: Danal Card -->
               <label class="flex items-center justify-between p-3 border-2 border-slate-200 hover:border-slate-300 rounded-2xl cursor-pointer transition-all bg-white">
                 <div class="flex items-center gap-3">
                   <input type="radio" name="ship-pay-method" value="danal_card" ${!canPayWithPoints ? 'checked' : ''} class="w-4 h-4 text-primary focus:ring-primary">
                   <div>
-                    <span class="font-bold text-gray-900">신용·체크카드 / 간편결제</span>
-                    <p class="text-[11px] text-gray-500">모든 카드사, 카카오페이, 네이버페이, 삼성페이</p>
+                    <span class="font-bold text-gray-900">신용·체크카드 결제</span>
+                    <p class="text-[11px] text-gray-500">국내 모든 신용카드 및 체크카드</p>
                   </div>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 text-sm">credit_card</span>
-              </label>
-
-              <!-- Option 3: Danal Phone -->
-              <label class="flex items-center justify-between p-3 border-2 border-slate-200 hover:border-slate-300 rounded-2xl cursor-pointer transition-all bg-white">
-                <div class="flex items-center gap-3">
-                  <input type="radio" name="ship-pay-method" value="danal_phone" class="w-4 h-4 text-primary focus:ring-primary">
-                  <div>
-                    <span class="font-bold text-gray-900">휴대폰 소액결제</span>
-                    <p class="text-[11px] text-gray-500">SKT, KT, LGU+, 알뜰폰 통신요금 합산 청구</p>
-                  </div>
-                </div>
-                <span class="material-symbols-outlined text-gray-400 text-sm">smartphone</span>
               </label>
             </div>
           </div>
@@ -418,31 +406,17 @@ function renderPointsPaymentModal(points, amount) {
 
           <div class="space-y-2.5">
             <!-- 1. Danal Card -->
-            <button onclick="window.__executeChargePayment(${points}, ${amount}, 'danal_card')" class="w-full p-4 bg-gradient-to-r from-red-50/70 to-amber-50/70 hover:from-red-100 hover:to-amber-100 border border-red-200/80 rounded-2xl flex items-center justify-between transition-colors text-left group">
+            <button onclick="window.__executeChargePayment(${points}, ${amount}, 'danal_card')" class="w-full p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100 hover:to-indigo-100 border border-blue-200/90 rounded-2xl flex items-center justify-between transition-colors text-left group">
               <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
                   <span class="material-symbols-outlined text-xl">credit_card</span>
                 </span>
                 <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-red-600">신용·체크카드 / 간편결제</h4>
-                  <p class="text-[11px] text-gray-500">모든 카드사, 카카오페이, 네이버페이, 삼성페이</p>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-primary">신용·체크카드 결제</h4>
+                  <p class="text-[11px] text-gray-500">국내 모든 신용카드 및 체크카드 결제 지원</p>
                 </div>
               </div>
-              <span class="material-symbols-outlined text-gray-400 group-hover:text-red-600">chevron_right</span>
-            </button>
-
-            <!-- 2. Danal Phone -->
-            <button onclick="window.__executeChargePayment(${points}, ${amount}, 'danal_phone')" class="w-full p-4 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex items-center justify-between transition-colors text-left group">
-              <div class="flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                  <span class="material-symbols-outlined text-xl">smartphone</span>
-                </span>
-                <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-emerald-700">휴대폰 소액결제</h4>
-                  <p class="text-[11px] text-gray-500">SKT, KT, LGU+, 알뜰폰 통신요금 합산 청구</p>
-                </div>
-              </div>
-              <span class="material-symbols-outlined text-gray-400 group-hover:text-emerald-700">chevron_right</span>
+              <span class="material-symbols-outlined text-gray-400 group-hover:text-primary">chevron_right</span>
             </button>
           </div>
         </div>
@@ -701,7 +675,7 @@ function renderChargeTab() {
     <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
       <div>
         <h3 class="font-black text-xl text-gray-900">포인트 즉시 충전 (1P = 1원)</h3>
-        <p class="text-xs text-gray-500 mt-1">원하는 결제수단(신용카드, 간편결제)으로 포인트를 충전하고 원하는 상품을 픽하세요.</p>
+        <p class="text-xs text-gray-500 mt-1">신용·체크카드로 포인트를 충전하고 원하는 상품을 픽하세요.</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -1199,7 +1173,7 @@ export function render() {
     const fee = isRemote ? 6000 : 3000;
     const methodNames = {
       points: '보유 포인트 차감',
-      danal_card: '신용·체크카드 / 간편결제',
+      danal_card: '신용·체크카드 결제',
       danal_phone: '휴대폰 소액결제'
     };
 
@@ -1266,7 +1240,7 @@ export function render() {
     // 2. Points Deduction Flow
     const currentPts = getUserPoints();
     if (currentPts < fee) {
-      alert(`⚠️ [포인트 부족]\n\n배송비 결제를 위한 보유 포인트가 부족합니다.\n• 결제 배송비: ₩${fee.toLocaleString()}P\n• 현재 잔액: ₩${currentPts.toLocaleString()}P\n\n하단의 '신용·체크카드' 또는 '휴대폰 소액결제'를 선택하여 결제해주세요.`);
+      alert(`⚠️ [포인트 부족]\n\n배송비 결제를 위한 보유 포인트가 부족합니다.\n• 결제 배송비: ₩${fee.toLocaleString()}P\n• 현재 잔액: ₩${currentPts.toLocaleString()}P\n\n하단의 '신용·체크카드'를 선택하여 결제해주세요.`);
       return;
     }
 
