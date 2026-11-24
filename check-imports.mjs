@@ -12,6 +12,7 @@ const TARGET_FILES = [
   'services/firestore.js',
   'services/auth.js',
   'services/payment.js',
+  'services/pwa-install.js',
   'pages/home.js',
   'pages/profile.js',
   'pages/admin.js'

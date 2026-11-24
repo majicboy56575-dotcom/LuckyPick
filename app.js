@@ -8,6 +8,7 @@ import { getClosedProducts, getCurrentUser, getCurrentUserDocCache, chargeUserPo
 import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
+import '/services/pwa-install.js'; // PWA: app install prompt (Android one-tap / iPhone guide / in-app browser escape)
 
 import * as homePage from './pages/home.js?v=20261026_V53';
 import * as historyPage from './pages/history.js?v=20261026_V53';
