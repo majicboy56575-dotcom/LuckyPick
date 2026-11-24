@@ -4,9 +4,9 @@ const iconv = require('iconv-lite');
 
 // Danal Credit Card & EasyPay (KakaoPay, NaverPay, SamsungPay) Config
 const DANAL_CARD_CONFIG = {
-  CPID: process.env.DANAL_CARD_CPID || '9810030929',
-  ENC_KEY: process.env.DANAL_CARD_ENC_KEY || '20ad459ab1ad2f6e541929d50d24765abb05850094a9629041bebb726814625d',
-  ENC_IV: 'd7d02c92cb930b661f107cb92690fc83',
+  CPID: process.env.DANAL_CARD_CPID || 'A010016310',
+  ENC_KEY: process.env.DANAL_CARD_ENC_KEY || 'a3282eb3821211a4ab6e123f5b7416005823e61f4cef6ad6376b536a0a144777',
+  ENC_IV: process.env.DANAL_CARD_ENC_IV || 'd7d02c92cb930b661f107cb92690fc83',
   TX_URL: 'https://tx-creditcard.danalpay.com/credit/'
 };
 
