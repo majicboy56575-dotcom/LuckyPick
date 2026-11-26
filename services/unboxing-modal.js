@@ -164,7 +164,7 @@ export function openProductPurchaseModal(itemId, tierId) {
               </div>
             `}
 
-            <button onclick="window.__openDirectPaymentModal('${tier.id}', ${price}, '${item.id}')" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
+            <button onclick="window.__processDirectPayment('${tier.id}', ${price}, 'danal_card', '${item.id}')" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
               <span class="material-symbols-outlined text-sm">credit_card</span>
               <span>${t('payWithCardDirectBtn')}</span>
             </button>
@@ -363,17 +363,17 @@ window.__processDirectPayment = async (tierId, amount, method, itemId) => {
   const tier = tiers.find(b => b.id === tierId);
   const tierName = tier ? tier.name : '상품 구매';
 
-  const modalContainer = document.querySelector('#direct-pay-modal .space-y-2\\.5');
+  const modalContainer = document.querySelector('#direct-pay-modal .space-y-2\\.5') || document.querySelector('#purchase-confirm-modal .space-y-2\\.5');
   const originalHtml = modalContainer ? modalContainer.innerHTML : '';
 
   const showLoading = (label) => {
     if (modalContainer) {
       modalContainer.innerHTML = `
-        <div class="p-8 text-center space-y-4">
-          <div class="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto"></div>
+        <div class="p-6 text-center space-y-3">
+          <div class="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto"></div>
           <div>
-            <h4 class="font-extrabold text-base text-gray-900">${label}</h4>
-            <p class="text-xs text-gray-500 mt-1">보안 결제창을 안전하게 호출하고 있습니다...</p>
+            <h4 class="font-extrabold text-sm text-gray-900">${label}</h4>
+            <p class="text-xs text-gray-500 mt-1">${t('processing')}</p>
           </div>
         </div>
       `;
