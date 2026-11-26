@@ -3,6 +3,7 @@
 // Uses real Firebase Auth only - no local mocks
 // ============================================
 import { createUserProfile, saveUserDocData } from './firestore.js';
+import { t } from '../i18n.js';
 import { firebaseConfig, isFirebaseConfigured, isLocalDev } from '../firebase-config.js';
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import {
@@ -175,7 +176,8 @@ function isLoggedIn() {
 }
 
 // In-App Login Required Modal (100% reliable, never suppressed by browser)
-function showLoginRequiredModal(message = '해당 서비스는 로그인 후 이용하실 수 있습니다.') {
+function showLoginRequiredModal(message = '') {
+  const displayMsg = message || t('loginRequiredDefault');
   const existing = document.getElementById('login-required-modal');
   if (existing) existing.remove();
 
@@ -188,16 +190,16 @@ function showLoginRequiredModal(message = '해당 서비스는 로그인 후 이
           <span class="material-symbols-outlined text-3xl">lock</span>
         </div>
         
-        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-2">로그인이 필요합니다</h3>
-        <p class="text-xs text-gray-500 mb-6 leading-relaxed whitespace-pre-line">${message}</p>
+        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-2">${t('loginRequiredTitle')}</h3>
+        <p class="text-xs text-gray-500 mb-6 leading-relaxed whitespace-pre-line">${displayMsg}</p>
 
         <div class="space-y-2">
           <button onclick="window.__goToLoginFromModal('${current}')" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs hover:bg-primary-container shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
             <span class="material-symbols-outlined text-base">login</span>
-            <span>로그인 페이지로 이동</span>
+            <span>${t('goToLoginBtn')}</span>
           </button>
           <button onclick="window.__closeLoginRequiredModal()" class="w-full py-2.5 bg-slate-100 text-slate-600 font-semibold rounded-xl text-xs hover:bg-slate-200 transition-colors cursor-pointer">
-            닫기
+            ${t('close')}
           </button>
         </div>
       </div>
@@ -218,7 +220,7 @@ window.__goToLoginFromModal = (redirectTarget = 'home') => {
 };
 
 // Returns true if logged in; otherwise displays the in-app login modal
-function requireLogin(message = '해당 서비스는 로그인 후 이용하실 수 있습니다.') {
+function requireLogin(message = '') {
   if (isLoggedIn()) return true;
   showLoginRequiredModal(message);
   return false;

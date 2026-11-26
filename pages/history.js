@@ -69,7 +69,7 @@ function renderWinnersModal(product, winners, shippingInfos) {
         </div>
 
         <div class="p-4 bg-surface-container-low/40 border-b border-outline-variant/20">
-          <input type="text" id="winner-search-input" placeholder="그룹 번호, 이름, 티켓 검색..." class="w-full bg-white border border-outline-variant/40 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" oninput="window.__filterWinners()">
+          <input type="text" id="winner-search-input" placeholder="${t('winnerSearchPlaceholder')}" class="w-full bg-white border border-outline-variant/40 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" oninput="window.__filterWinners()">
         </div>
 
         <div class="overflow-y-auto p-4 space-y-2.5 flex-1" id="winner-modal-list">
@@ -111,7 +111,7 @@ function renderHistoryCard(product, shippingInfos = []) {
   let statusBadge = `<span class="px-3 py-1 rounded-full bg-outline text-white font-label-caps text-label-caps">${t('closed')}</span>`;
   
   if (product.isSuperRaffle) {
-    statusBadge = `<span class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-[10px] uppercase shadow-xs">스페셜 래플 마감</span>`;
+    statusBadge = `<span class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-[10px] uppercase shadow-xs">${t('specialRaffleClosedBadge')}</span>`;
   } else if (shipInfo) {
     if (shipInfo.status === 'shipped') {
       statusBadge = `<span class="px-3 py-1 rounded-full bg-secondary text-on-secondary font-label-caps text-label-caps">${t('shippedComplete')}</span>`;
@@ -147,7 +147,7 @@ function renderHistoryCard(product, shippingInfos = []) {
       <div class="p-6 flex-grow flex flex-col justify-between space-y-4">
         <div>
           <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-1 leading-snug">${product.title}</h3>
-          ${product.retailPrice ? `<p class="text-xs text-gray-500 font-mono mb-3">소비자가: ₩${product.retailPrice.toLocaleString()}원</p>` : ''}
+          ${product.retailPrice ? `<p class="text-xs text-gray-500 font-mono mb-3">${t('retailPriceLabel')}: ₩${product.retailPrice.toLocaleString()}${t('wonUnit')}</p>` : ''}
 
           ${isMultiWinner ? `
             <!-- Multi-Winner Group Card -->
@@ -171,7 +171,7 @@ function renderHistoryCard(product, shippingInfos = []) {
                   <div class="p-2 rounded-lg bg-white border border-outline-variant/30 flex items-center justify-between shadow-2xs text-xs">
                     <div class="flex items-center gap-2 min-w-0">
                       <span class="text-[9px] font-bold bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded shrink-0">
-                        그룹 ${w.groupNumber}
+                        ${t('groupLabel')} ${w.groupNumber}
                       </span>
                       <div class="min-w-0">
                         <p class="font-bold text-xs text-gray-900 truncate">${w.name}</p>
@@ -189,7 +189,7 @@ function renderHistoryCard(product, shippingInfos = []) {
               <div class="flex items-center justify-between mb-1.5">
                 <div class="flex items-center gap-1.5 font-bold text-amber-950">
                   <span class="material-symbols-outlined text-amber-600 text-base">emoji_events</span>
-                  <span>1등 당첨: ${winners[0].name} 님</span>
+                  <span>${t('firstPlaceLabel')}: ${winners[0].name}</span>
                 </div>
                 <span class="font-mono font-bold text-primary">${winners[0].ticketNumber || ''}</span>
               </div>
@@ -197,7 +197,7 @@ function renderHistoryCard(product, shippingInfos = []) {
             </div>
           ` : `
             <div class="bg-slate-50 rounded-xl p-3 mb-3 text-xs text-slate-500">
-              추첨 당첨자 확인 중
+              ${t('checkingWinners')}
             </div>
           `}
 
@@ -206,9 +206,9 @@ function renderHistoryCard(product, shippingInfos = []) {
             <div class="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
               <span class="text-amber-900 font-semibold flex items-center gap-1">
                 <span class="material-symbols-outlined text-sm text-amber-600">undo</span>
-                인원 미달 그룹 (${refundedCount}명)
+                ${t('incompleteGroupLabel', { n: refundedCount })}
               </span>
-              <span class="font-bold text-amber-800">골든티켓 100% 자동 환불</span>
+              <span class="font-bold text-amber-800">${t('autoTicketRefund')}</span>
             </div>
           ` : ''}
         </div>
@@ -216,10 +216,10 @@ function renderHistoryCard(product, shippingInfos = []) {
         <div class="flex items-center justify-between pt-3 border-t border-slate-100">
           <div class="flex items-center gap-1.5 text-gray-500 text-xs">
             <span class="material-symbols-outlined text-base">groups</span>
-            <span class="font-bold">${(product.totalParticipants || 0).toLocaleString()}명 참여</span>
+            <span class="font-bold">${t('joinedCountLabel', { n: (product.totalParticipants || 0).toLocaleString() })}</span>
           </div>
           <button class="flex items-center gap-1 text-primary font-bold text-xs hover:underline cursor-pointer" onclick="window.__showHistoryParticipants('${product.id}')">
-            <span>참여자 순번 명단</span>
+            <span>${t('participantsOrderBtn')}</span>
             <span class="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
         </div>

@@ -19,10 +19,22 @@ import {
 import { saveUserDocData } from './firestore.js';
 import { requestDanalCardPayment, requestDanalPhonePayment } from './payment.js';
 import { getCurrentAuthUser, requireLogin } from './auth.js';
+import { t } from '../i18n.js';
+
+function locTierName(tier) {
+  const key = `tier_${tier?.id}_name`;
+  const val = t(key);
+  return val !== key ? val : (tier?.name || '');
+}
+function locItemName(item) {
+  const key = `item_${item?.id}_name`;
+  const val = t(key);
+  return val !== key ? val : (item?.title || item?.name || '');
+}
 
 // Open Fixed-Price Product Purchase Modal
 export function openProductPurchaseModal(itemId, tierId) {
-  if (!requireLogin('상품 구매 및 사은 골든티켓 적립은 로그인 후 이용하실 수 있습니다.')) return;
+  if (!requireLogin(t('loginForPurchaseMsg'))) return;
 
   const tiers = getRandomBoxTiers();
   let tier = tiers.find(b => b.id === tierId);
@@ -59,9 +71,9 @@ export function openProductPurchaseModal(itemId, tierId) {
         <div class="p-5 bg-gradient-to-r ${tier.color || 'from-slate-900 to-indigo-950'} text-white flex justify-between items-center">
           <div>
             <span class="text-[10px] font-black bg-white/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              100% 정품 실물 정가 구매
+              ${t('purchaseHeaderBadge')}
             </span>
-            <h3 class="text-lg font-black mt-1">상품 주문 / 결제</h3>
+            <h3 class="text-lg font-black mt-1">${t('purchaseHeaderTitle')}</h3>
           </div>
           <button onclick="window.__closePurchaseModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
             <span class="material-symbols-outlined text-lg">close</span>
@@ -69,21 +81,22 @@ export function openProductPurchaseModal(itemId, tierId) {
         </div>
 
         <div class="p-6 space-y-5">
-          <!-- 3 Products Selector (내가 지정한 상품 선택) -->
+          <!-- 3 Products Selector -->
           <div class="space-y-2">
             <div class="flex justify-between items-center text-xs">
-              <span class="font-bold text-gray-700">구매할 지정 상품 선택 (3종 중 택1)</span>
-              <span class="text-[10px] text-primary font-bold">100% 확정 정가 구매</span>
+              <span class="font-bold text-gray-700">${t('selectProductLabel')}</span>
+              <span class="text-[10px] text-primary font-bold">${t('fixedPriceGuarantee')}</span>
             </div>
             <div class="grid grid-cols-3 gap-2">
               ${(tier.items || []).map(it => {
                 const isSelected = it.id === item.id;
+                const itName = locItemName(it);
                 return `
                   <button type="button" onclick="window.__switchModalProduct('${it.id}', '${tier.id}')" class="p-2 rounded-2xl border text-left flex flex-col items-center gap-1.5 transition-all ${isSelected ? 'bg-primary/5 border-primary ring-2 ring-primary/20 text-gray-900 font-extrabold shadow-xs' : 'bg-white border-slate-200 text-gray-500 hover:bg-slate-50'}">
                     <div class="w-12 h-12 rounded-xl bg-slate-50 p-1 flex items-center justify-center overflow-hidden border border-slate-100">
-                      <img src="${it.image || 'assets/products/phonestand_metal.jpg'}" alt="${it.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
+                      <img src="${it.image || 'assets/products/phonestand_metal.jpg'}" alt="${itName}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
                     </div>
-                    <span class="text-[10px] text-center line-clamp-1 w-full text-center leading-tight">${it.name}</span>
+                    <span class="text-[10px] text-center line-clamp-1 w-full text-center leading-tight">${itName}</span>
                     <span class="text-[9px] font-mono font-bold ${isSelected ? 'text-primary' : 'text-gray-400'}">₩${(it.retailPrice || tier.price).toLocaleString()}</span>
                   </button>
                 `;
@@ -94,14 +107,14 @@ export function openProductPurchaseModal(itemId, tierId) {
           <!-- Product Preview Card -->
           <div class="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
             <div class="w-20 h-20 rounded-xl bg-white border border-slate-200 p-1 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-xs">
-              <img src="${item.image || 'assets/products/phonestand_metal.jpg'}" alt="${item.name}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
+              <img src="${item.image || 'assets/products/phonestand_metal.jpg'}" alt="${locItemName(item)}" onerror="this.onerror=null; this.src='assets/products/phonestand_metal.jpg';" class="w-full h-full object-contain">
             </div>
             <div class="flex-grow min-w-0">
-              <span class="text-[10px] font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded">${tier.name} 지정 상품</span>
-              <h4 class="font-extrabold text-sm text-gray-900 mt-1 line-clamp-2 leading-snug">${item.name}</h4>
+              <span class="text-[10px] font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded">${locTierName(tier)} ${t('selectedTierSuffix')}</span>
+              <h4 class="font-extrabold text-sm text-gray-900 mt-1 line-clamp-2 leading-snug">${locItemName(item)}</h4>
               <div class="flex items-baseline gap-1 mt-1">
-                <span class="text-xs text-gray-400 font-bold">정가:</span>
-                <span class="text-base font-black text-gray-900 font-mono">₩${price.toLocaleString()}원</span>
+                <span class="text-xs text-gray-400 font-bold">${t('retail')}:</span>
+                <span class="text-base font-black text-gray-900 font-mono">₩${price.toLocaleString()}${t('wonUnit')}</span>
               </div>
             </div>
           </div>
@@ -113,27 +126,27 @@ export function openProductPurchaseModal(itemId, tierId) {
                 🎫
               </span>
               <div>
-                <p class="font-bold text-amber-950">구매 고객 사은 골든티켓 무료 증정</p>
-                <p class="text-[11px] text-amber-800">구매 즉시 <strong>골든티켓 +${earnedTickets}장</strong>이 적립됩니다 (스페셜 래플 응모권)</p>
+                <p class="font-bold text-amber-950">${t('bonusTicketTitle')}</p>
+                <p class="text-[11px] text-amber-800">${t('bonusTicketDesc', { n: earnedTickets })}</p>
               </div>
             </div>
-            <span class="text-xs font-black text-amber-600 font-mono">+${earnedTickets}장</span>
+            <span class="text-xs font-black text-amber-600 font-mono">+${earnedTickets}${t('ticketUnit')}</span>
           </div>
 
           <!-- Payment Summary -->
           <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2">
             <div class="flex justify-between items-center">
-              <span class="text-gray-500">주문 금액</span>
-              <span class="font-black text-gray-900 text-sm font-mono">₩${price.toLocaleString()}원</span>
+              <span class="text-gray-500">${t('orderAmountLabel')}</span>
+              <span class="font-black text-gray-900 text-sm font-mono">₩${price.toLocaleString()}${t('wonUnit')}</span>
             </div>
             <div class="flex justify-between items-center">
-              <span class="text-gray-500">배송 보관 방식</span>
-              <span class="font-bold text-emerald-700">결제 즉시 내 보관함에 안전 보관 (언제든 배송 신청)</span>
+              <span class="text-gray-500">${t('deliveryStorageLabel')}</span>
+              <span class="font-bold text-emerald-700">${t('deliveryStorageValue')}</span>
             </div>
             <div class="flex justify-between items-center border-t border-slate-200 pt-2">
-              <span class="text-gray-500">내 보유 포인트</span>
+              <span class="text-gray-500">${t('myPointsLabel')}</span>
               <span class="font-bold ${hasEnoughPoints ? 'text-gray-900' : 'text-red-500'} font-mono">
-                ₩${currentPts.toLocaleString()} P ${!hasEnoughPoints ? '(부족)' : ''}
+                ₩${currentPts.toLocaleString()} P ${!hasEnoughPoints ? t('insufficientTag') : ''}
               </span>
             </div>
           </div>
@@ -143,24 +156,24 @@ export function openProductPurchaseModal(itemId, tierId) {
             ${hasEnoughPoints ? `
               <button onclick="window.__executePurchaseWithPoints('${item.id}', '${tier.id}')" class="w-full py-4 bg-gradient-to-r from-primary to-indigo-700 text-white font-black rounded-2xl shadow-lg hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2">
                 <span class="material-symbols-outlined text-xl">shopping_cart_checkout</span>
-                <span>보유 포인트로 바로 결제 (₩${price.toLocaleString()}P)</span>
+                <span>${t('payWithPointsBtn', { price: price.toLocaleString() })}</span>
               </button>
             ` : `
               <div class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 text-left">
-                ⚠️ 보유 포인트가 부족합니다. 아래 결제수단으로 즉시 결제하실 수 있습니다.
+                ${t('insufficientPointsNotice')}
               </div>
             `}
 
             <button onclick="window.__openDirectPaymentModal('${tier.id}', ${price}, '${item.id}')" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 text-xs">
               <span class="material-symbols-outlined text-sm">credit_card</span>
-              <span>신용·체크카드로 즉시 구매</span>
+              <span>${t('payWithCardDirectBtn')}</span>
             </button>
           </div>
         </div>
 
         <div class="p-3.5 bg-gray-50 border-t border-gray-100 text-center">
           <button onclick="window.__closePurchaseModal()" class="text-xs font-bold text-gray-400 hover:text-gray-600">
-            취소 및 닫기
+            ${t('cancelAndClose')}
           </button>
         </div>
       </div>
@@ -171,7 +184,7 @@ export function openProductPurchaseModal(itemId, tierId) {
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-// Direct PG Payment Modal (Credit Card / Phone)
+// Direct PG Payment Modal (Credit Card)
 export function openDirectPaymentModal(tierId, amount, itemId = null) {
   if (!requireLogin()) return;
   const confirmModal = document.getElementById('purchase-confirm-modal') || document.getElementById('unboxing-confirm-modal');
@@ -182,8 +195,8 @@ export function openDirectPaymentModal(tierId, amount, itemId = null) {
       <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
         <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
-            <h3 class="font-bold text-lg">결제 수단 선택</h3>
-            <p class="text-xs text-slate-400">결제 완료 즉시 상품이 내 보관함에 보관되고 골든티켓이 지급됩니다</p>
+            <h3 class="font-bold text-lg">${t('selectPayMethodTitle')}</h3>
+            <p class="text-xs text-slate-400">${t('selectPayMethodSub')}</p>
           </div>
           <button onclick="window.__closeDirectPayModal()" class="text-slate-400 hover:text-white">
             <span class="material-symbols-outlined">close</span>
@@ -192,8 +205,8 @@ export function openDirectPaymentModal(tierId, amount, itemId = null) {
 
         <div class="p-6 space-y-4">
           <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center">
-            <span class="text-xs font-bold text-gray-500">결제 대상 금액</span>
-            <span class="font-black text-2xl text-primary font-mono">₩${Number(amount).toLocaleString()}원</span>
+            <span class="text-xs font-bold text-gray-500">${t('payTargetAmount')}</span>
+            <span class="font-black text-2xl text-primary font-mono">₩${Number(amount).toLocaleString()}${t('wonUnit')}</span>
           </div>
 
           <div class="space-y-2.5">
@@ -205,10 +218,10 @@ export function openDirectPaymentModal(tierId, amount, itemId = null) {
                 </span>
                 <div>
                   <div class="flex items-center gap-1.5">
-                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-primary transition-colors">신용·체크카드 결제</h4>
-                    <span class="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.2 rounded font-mono">국내 전 카드사</span>
+                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-primary transition-colors">${t('creditCardPayTitle')}</h4>
+                    <span class="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.2 rounded font-mono">${t('allDomesticCardsBadge')}</span>
                   </div>
-                  <p class="text-[11px] text-gray-500">모든 국내 신용카드 및 체크카드 결제 지원</p>
+                  <p class="text-[11px] text-gray-500">${t('creditCardPaySub')}</p>
                 </div>
               </div>
               <span class="material-symbols-outlined text-gray-400 group-hover:text-primary transition-colors">chevron_right</span>
@@ -218,7 +231,7 @@ export function openDirectPaymentModal(tierId, amount, itemId = null) {
 
         <div class="p-4 bg-gray-50 border-t border-gray-100 text-center">
           <button onclick="window.__closeDirectPayModal()" class="text-xs font-bold text-gray-500 hover:text-gray-800">
-            결제 취소
+            ${t('cancelPaymentBtn')}
           </button>
         </div>
       </div>
@@ -238,20 +251,20 @@ export function showPurchaseSuccessModal(purchasedItem, earnedTickets, totalTick
           <!-- Header -->
           <div class="text-center mb-4">
             <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-500 text-white shadow-sm">
-              ✓ 100% 정가 상품 구매 완료
+              ${t('purchaseDoneBadge')}
             </span>
-            <h2 class="text-xl font-black text-gray-900 mt-2">구매가 성공적으로 완료되었습니다!</h2>
+            <h2 class="text-xl font-black text-gray-900 mt-2">${t('purchaseDoneTitle')}</h2>
           </div>
 
           <!-- Purchased Item Card -->
           <div class="bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 text-center mb-4 shadow-sm relative overflow-hidden">
             <div class="w-24 h-24 mx-auto mb-3 relative flex items-center justify-center bg-white rounded-xl p-2 border border-slate-200 shadow-xs">
-              <img src="${purchasedItem.imageUrl || purchasedItem.image || 'assets/products/phonestand_metal.jpg'}" class="w-full h-full object-contain" alt="${purchasedItem.title || purchasedItem.name}">
+              <img src="${purchasedItem.imageUrl || purchasedItem.image || 'assets/products/phonestand_metal.jpg'}" class="w-full h-full object-contain" alt="${locItemName(purchasedItem)}">
             </div>
-            <h3 class="font-extrabold text-base text-gray-900 mb-1 leading-snug">${purchasedItem.title || purchasedItem.name}</h3>
+            <h3 class="font-extrabold text-base text-gray-900 mb-1 leading-snug">${locItemName(purchasedItem)}</h3>
             <div class="flex items-center justify-center gap-2 text-xs">
-              <span class="text-gray-500">결제 금액: <strong class="text-gray-900">₩${(purchasedItem.retailPrice || 0).toLocaleString()}원</strong></span>
-              <span class="text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-md">내 보관함 적재</span>
+              <span class="text-gray-500">${t('paidAmountLabel')}: <strong class="text-gray-900">₩${(purchasedItem.retailPrice || 0).toLocaleString()}${t('wonUnit')}</strong></span>
+              <span class="text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-md">${t('storedInVaultBadge')}</span>
             </div>
           </div>
 
@@ -260,14 +273,14 @@ export function showPurchaseSuccessModal(purchasedItem, earnedTickets, totalTick
             <div class="flex items-center justify-between mb-1.5">
               <div class="flex items-center gap-1.5 font-black text-sm">
                 <span class="material-symbols-outlined text-lg">confirmation_number</span>
-                <span>골든 티켓 +${earnedTickets}장 사은 지급 완료!</span>
+                <span>${t('bonusTicketsGranted', { n: earnedTickets })}</span>
               </div>
               <span class="text-xs font-black bg-amber-950 text-amber-300 px-2.5 py-0.5 rounded-full">
-                총 보유: ${totalTickets}장
+                ${t('totalOwnedTickets', { n: totalTickets })}
               </span>
             </div>
             <p class="text-[11px] text-amber-950/80 leading-relaxed">
-              사은 지급된 골든티켓으로 <strong>아이폰 16 Pro 등 스페셜 사은품에 즉시 무료 응모</strong>하실 수 있습니다!
+              ${t('bonusTicketsUseDesc')}
             </p>
           </div>
 
@@ -275,16 +288,16 @@ export function showPurchaseSuccessModal(purchasedItem, earnedTickets, totalTick
           <div class="space-y-2">
             <button onclick="window.__closeSuccessModal(); window.location.hash='#'; window.scrollTo({top: 400, behavior: 'smooth'});" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 text-sm">
               <span class="material-symbols-outlined text-lg">military_tech</span>
-              <span>스페셜 래플(아이폰 16 Pro 등) 응모하기 ↗</span>
+              <span>${t('goToRaffleBtn')}</span>
             </button>
             
             <button onclick="window.__closeSuccessModal(); window.location.hash='#profile';" class="w-full py-3 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5 text-xs">
               <span class="material-symbols-outlined text-base">local_shipping</span>
-              <span>내 보관함(배송 신청) 확인하기</span>
+              <span>${t('goToVaultBtn')}</span>
             </button>
 
             <button onclick="window.__closeSuccessModal()" class="w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl text-xs hover:bg-gray-200 transition-colors">
-              계속 쇼핑하기
+              ${t('continueShoppingBtn')}
             </button>
           </div>
         </div>
@@ -340,7 +353,7 @@ window.__executePurchaseWithPoints = async (itemId, tierId) => {
 
     showPurchaseSuccessModal(item, earnedTickets, totalTickets, result.newPoints);
   } catch (err) {
-    alert(`구매 실패: ${err.message || '결제 중 오류가 발생했습니다.'}`);
+    alert(`${t('purchaseFailed')}: ${err.message || ''}`);
   }
 };
 
@@ -374,7 +387,7 @@ window.__processDirectPayment = async (tierId, amount, method, itemId) => {
   };
 
   if (method === 'danal_card') {
-    showLoading('신용·체크카드 결제창 연결 중');
+    showLoading(t('connectingCardPay'));
     try {
       await requestDanalCardPayment({
         amount: Number(amount),
@@ -385,7 +398,7 @@ window.__processDirectPayment = async (tierId, amount, method, itemId) => {
     } catch (err) {
       console.error('[CardPayment] Error:', err);
       restoreModal();
-      alert(`카드 결제 준비 실패: ${err.message || err}`);
+      alert(`${t('cardPayFailed')}: ${err.message || err}`);
     }
     return;
   }

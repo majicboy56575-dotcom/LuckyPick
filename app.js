@@ -8,12 +8,12 @@ import { getClosedProducts, getCurrentUser, getCurrentUserDocCache, chargeUserPo
 import { handleDanalSuccess } from '/services/payment.js';
 import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
-import '/services/pwa-install.js'; // PWA: app install prompt (Android one-tap / iPhone guide / in-app browser escape)
+import { isPwaStandalone } from '/services/pwa-install.js'; // PWA: app install prompt (Android one-tap / iPhone guide / in-app browser escape)
 
-import * as homePage from './pages/home.js?v=20261026_V53';
-import * as historyPage from './pages/history.js?v=20261026_V53';
-import * as profilePage from './pages/profile.js?v=20261026_V53';
-import * as adminPage from './pages/admin.js?v=20261026_V53';
+import * as homePage from './pages/home.js?v=20261126_V57';
+import * as historyPage from './pages/history.js?v=20261126_V57';
+import * as profilePage from './pages/profile.js?v=20261126_V57';
+import * as adminPage from './pages/admin.js?v=20261126_V57';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;
@@ -44,6 +44,7 @@ function renderHeader(pageName) {
   if (pageName === 'admin') return ''; // Admin has its own header
 
   const showAdminButton = isAdmin();
+  const showInstallBtn = !isPwaStandalone();
 
   return `
     <header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs flex justify-between items-center h-16 px-container-margin max-w-full border-b border-slate-200/80">
@@ -51,7 +52,13 @@ function renderHeader(pageName) {
         <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center font-black shadow-sm">🎁</span>
         <span class="font-display-lg text-primary font-black text-[22px]">LuckyPick</span>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        ${showInstallBtn ? `
+          <button onclick="window.__lpOpenInstallPrompt && window.__lpOpenInstallPrompt()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-all active:scale-95 cursor-pointer" title="${t('installAppBtn')}">
+            <span class="material-symbols-outlined text-[16px]">install_mobile</span>
+            <span class="whitespace-nowrap">${t('installAppBtn')}</span>
+          </button>
+        ` : ''}
         ${renderLanguageDropdown('header-lang-dropdown')}
         ${showAdminButton ? `
           <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all text-slate-700" onclick="window.location.hash='#admin'" title="Admin">
@@ -66,9 +73,9 @@ function renderBottomNav(pageName) {
   if (pageName === 'admin') return '';
 
   const tabs = [
-    { key: 'home', icon: 'shopping_bag', label: '상품 픽' },
-    { key: 'history', icon: 'military_tech', label: '당첨자' },
-    { key: 'profile', icon: 'inventory_2', label: '내 보관함' },
+    { key: 'home', icon: 'shopping_bag', label: t('navHome') },
+    { key: 'history', icon: 'military_tech', label: t('navWinners') },
+    { key: 'profile', icon: 'inventory_2', label: t('navVault') },
   ];
 
   return `
@@ -96,11 +103,11 @@ function renderFooter(pageName) {
             <span>럭키픽 (LuckyPick)</span>
           </div>
           <div class="flex items-center gap-3 text-xs">
-            <button onclick="window.__openPolicyModal('terms')" class="hover:text-primary hover:underline transition-colors">이용약관</button>
+            <button onclick="window.__openPolicyModal('terms')" class="hover:text-primary hover:underline transition-colors">${t('termsOfService')}</button>
             <span>|</span>
-            <button onclick="window.__openPolicyModal('privacy')" class="hover:text-primary hover:underline font-bold transition-colors">개인정보처리방침</button>
+            <button onclick="window.__openPolicyModal('privacy')" class="hover:text-primary hover:underline font-bold transition-colors">${t('privacyPolicy')}</button>
             <span>|</span>
-            <button onclick="window.__openPolicyModal('refund')" class="hover:text-primary hover:underline font-semibold transition-colors">취소 및 환불정책</button>
+            <button onclick="window.__openPolicyModal('refund')" class="hover:text-primary hover:underline font-semibold transition-colors">${t('refundPolicy')}</button>
           </div>
         </div>
 

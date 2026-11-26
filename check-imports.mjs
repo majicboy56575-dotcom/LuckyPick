@@ -7,6 +7,8 @@ import vm from 'vm';
 
 const TARGET_FILES = [
   'app.js',
+  'i18n.js',
+  'services/i18n-ui.js',
   'services/randombox.js',
   'services/unboxing-modal.js',
   'services/firestore.js',

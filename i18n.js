@@ -2,6 +2,7 @@
 // LuckyPick - Internationalization (i18n)
 // 7 Languages: KO, EN, TH, ES, VI, RU, ID
 // ============================================
+import { UI_TRANSLATIONS } from './services/i18n-ui.js';
 
 const translations = {
   ko: {
@@ -776,6 +777,12 @@ const translations = {
 // --- i18n Engine ---
 let currentLang = localStorage.getItem('luckypick_lang') || 'ko';
 
+// Merge extended UI translations for all 7 languages
+Object.keys(UI_TRANSLATIONS).forEach((lang) => {
+  if (!translations[lang]) translations[lang] = {};
+  Object.assign(translations[lang], UI_TRANSLATIONS[lang]);
+});
+
 function t(key, vars = {}) {
   let val = (translations[currentLang] && translations[currentLang][key]) ||
             (translations['en'] && translations['en'][key]) ||
@@ -792,8 +799,15 @@ function setLanguage(lang) {
   if (translations[lang]) {
     currentLang = lang;
     localStorage.setItem('luckypick_lang', lang);
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.lang = lang;
+    }
     window.dispatchEvent(new CustomEvent('languageChanged', { detail: { lang } }));
   }
+}
+
+if (typeof document !== 'undefined' && document.documentElement) {
+  document.documentElement.lang = currentLang;
 }
 
 function getCurrentLanguage() {

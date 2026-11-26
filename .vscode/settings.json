@@ -1,6 +1,8 @@
 {
-  "git.autorefresh": true,
+  "git.enabled": false,
+  "git.autorefresh": false,
   "git.autofetch": false,
   "git.showProgress": false,
+  "git.decorations.enabled": false,
   "git.promptToSaveFilesBeforeCommit": "never"
 }

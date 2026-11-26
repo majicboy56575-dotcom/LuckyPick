@@ -1,16 +1,16 @@
 // ============================================
-// LuckyPick - PWA Install Prompt
-// - Android Chrome: one-tap install via beforeinstallprompt
-// - iPhone Safari: "Share -> Add to Home Screen" guide
-// - Meta (Instagram/Facebook) / KakaoTalk in-app browsers: escape to Chrome / Safari first
-// - Already running as installed app (standalone): never shown
+// LuckyPick - PWA Install Prompt (i18n-enabled)
+// - Fast 1.2s initial prompt on mobile browsers
+// - Reinstall-friendly: no permanent INSTALLED_KEY lock (only standalone hides it)
+// - Header button support via isPwaStandalone() & window.__lpOpenInstallPrompt()
+// - Full 7-language i18n support + live re-render on languageChanged
 // ============================================
+import { t } from '../i18n.js';
 
 const DISMISS_KEY = 'lp_pwa_dismissed_until';
-const INSTALLED_KEY = 'lp_pwa_installed';
 const FORCE_PARAM = 'lp_install';
 const DISMISS_DAYS = 3;
-const SHOW_DELAY_MS = 2500;
+const SHOW_DELAY_MS = 1200;
 
 const ua = navigator.userAgent || '';
 const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -28,8 +28,7 @@ let showTimer = null;
 let blockedAttempts = 0;
 let promptWaitAttempts = 0;
 
-// ---------- helpers ----------
-function isStandalone() {
+export function isPwaStandalone() {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
     window.matchMedia('(display-mode: fullscreen)').matches ||
@@ -77,11 +76,10 @@ function blockingModalOpen() {
 }
 
 function shouldAutoShow() {
-  if (isStandalone() || !isMobile) return false;
+  if (isPwaStandalone() || !isMobile) return false;
   if (window.location.search.includes('danal=')) return false;
   if (window.location.hash.startsWith('#admin')) return false;
   if (forceRequested()) return true;
-  if (localStorage.getItem(INSTALLED_KEY) === '1') return false;
   return !isDismissed();
 }
 
@@ -104,14 +102,13 @@ function injectStyles() {
     </style>`);
 }
 
-// ---------- UI pieces ----------
 const SHARE_ICON = `<svg viewBox="0 0 24 24" class="w-4 h-4 inline-block align-[-3px]" fill="none" stroke="#0a84ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 002 2h10a2 2 0 002-2v-8"/></svg>`;
 
 function benefitsBlock() {
   const items = [
-    ['bolt', '홈 화면에서', '1초 바로 실행'],
-    ['fullscreen', '주소창 없는', '전체화면 앱'],
-    ['download_done', '설치 무료', '용량 거의 없음'],
+    ['bolt', t('pwaBenefit1a'), t('pwaBenefit1b')],
+    ['fullscreen', t('pwaBenefit2a'), t('pwaBenefit2b')],
+    ['download_done', t('pwaBenefit3a'), t('pwaBenefit3b')],
   ];
   return `
     <div class="grid grid-cols-3 gap-2 text-center">
@@ -156,12 +153,12 @@ function shell({ subtitle, body, buttons, centered = false, arrow = false }) {
         ${centered ? '' : '<div class="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 sm:hidden"></div>'}
         <div class="p-6 pt-4 space-y-4">
           <div class="flex items-center gap-3.5 pt-1">
-            <img src="/icons/icon-192.png" class="w-14 h-14 rounded-2xl shadow-md shrink-0" alt="럭키픽">
+            <img src="/icons/icon-192.png" class="w-14 h-14 rounded-2xl shadow-md shrink-0" alt="LuckyPick">
             <div class="min-w-0 flex-1">
-              <h3 class="font-black text-[17px] text-gray-900 leading-snug">럭키픽을 앱으로 설치하시겠습니까?</h3>
+              <h3 class="font-black text-[17px] text-gray-900 leading-snug">${t('pwaTitle')}</h3>
               <p class="text-xs text-gray-500 mt-0.5 leading-snug">${subtitle}</p>
             </div>
-            <button onclick="window.__lpPwa.later()" class="self-start p-1 text-slate-400 hover:text-slate-700 cursor-pointer" aria-label="닫기">
+            <button onclick="window.__lpPwa.later()" class="self-start p-1 text-slate-400 hover:text-slate-700 cursor-pointer" aria-label="${t('close')}">
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
@@ -171,70 +168,60 @@ function shell({ subtitle, body, buttons, centered = false, arrow = false }) {
       </div>
       ${arrow ? `
         <div class="lp-pwa-arrow fixed left-1/2 bottom-3 flex flex-col items-center text-white drop-shadow-lg pointer-events-none">
-          <span class="text-[11px] font-bold bg-black/60 rounded-full px-3 py-1 mb-1">여기 공유 버튼 ${SHARE_ICON}</span>
+          <span class="text-[11px] font-bold bg-black/60 rounded-full px-3 py-1 mb-1">${t('pwaHereShare')} ${SHARE_ICON}</span>
           <span class="material-symbols-outlined text-4xl">arrow_downward</span>
         </div>` : ''}
     </div>`;
 }
 
-// ---------- variants ----------
 const variants = {
-  // Android Chrome / Samsung Internet with native install prompt available
   androidPrompt: () => shell({
-    subtitle: '버튼 한 번으로 홈 화면에 럭키픽 앱이 설치됩니다.',
+    subtitle: t('pwaAndroidSub'),
     body: benefitsBlock(),
-    buttons: primaryBtn('앱 설치하기', 'window.__lpPwa.install()') + secondaryBtn('다음에 할게요', 'window.__lpPwa.later()'),
+    buttons: primaryBtn(t('pwaInstallBtn'), 'window.__lpPwa.install()') + secondaryBtn(t('pwaLaterBtn'), 'window.__lpPwa.later()'),
   }),
 
-  // Android browser without the native prompt (prompt not ready / unsupported browser)
   androidManual: () => shell({
-    subtitle: '브라우저 메뉴에서 바로 설치할 수 있어요.',
+    subtitle: t('pwaAndroidManualSub'),
     body: benefitsBlock() + stepsBlock([
-      '브라우저 우측 상단 <strong>⋮ 메뉴</strong> (삼성 인터넷은 하단 <strong>≡ 메뉴</strong>)를 누르세요.',
-      '<strong>“앱 설치”</strong> 또는 <strong>“홈 화면에 추가”</strong>를 누르세요.',
-      '<strong>“설치”</strong>를 누르면 홈 화면에 럭키픽 아이콘이 생깁니다.',
+      t('pwaAndroidStep1'),
+      t('pwaAndroidStep2'),
+      t('pwaAndroidStep3'),
     ]),
-    buttons: primaryBtn('확인했어요', 'window.__lpPwa.gotIt()', 'check_circle') + secondaryBtn('다음에 할게요', 'window.__lpPwa.later()'),
+    buttons: primaryBtn(t('pwaGotItBtn'), 'window.__lpPwa.gotIt()', 'check_circle') + secondaryBtn(t('pwaLaterBtn'), 'window.__lpPwa.later()'),
   }),
 
-  // iPhone / iPad - Safari (or Chrome iOS 16.4+) : Add to Home Screen guide
   iosBrowser: () => shell({
-    subtitle: '아이폰은 Safari에서 3초면 홈 화면에 설치됩니다.',
+    subtitle: t('pwaIosSub'),
     centered: isIPhone,
     arrow: isIPhone,
     body: stepsBlock([
-      `화면 하단의 <strong>공유 버튼</strong> ${SHARE_ICON} 을 누르세요. <span class="text-gray-400">(보이지 않으면 <strong>···</strong> 메뉴 → 공유)</span>`,
-      '목록을 내려 <strong>“홈 화면에 추가”</strong>를 누르세요.',
-      '오른쪽 위 <strong>“추가”</strong>를 누르면 설치 완료!',
+      t('pwaIosStep1', { icon: SHARE_ICON }),
+      t('pwaIosStep2'),
+      t('pwaIosStep3'),
     ]),
-    buttons: primaryBtn('확인했어요', 'window.__lpPwa.gotIt()', 'check_circle') + secondaryBtn('다음에 할게요', 'window.__lpPwa.later()'),
+    buttons: primaryBtn(t('pwaGotItBtn'), 'window.__lpPwa.gotIt()', 'check_circle') + secondaryBtn(t('pwaLaterBtn'), 'window.__lpPwa.later()'),
   }),
 
-  // Instagram / Facebook / Kakao in-app browser on Android -> jump to Chrome
   androidInApp: () => shell({
-    subtitle: '현재 앱 내부 브라우저에서는 설치가 제한돼요. Chrome에서 열면 바로 설치할 수 있습니다.',
+    subtitle: t('pwaAndroidInAppSub'),
     body: benefitsBlock(),
-    buttons: primaryBtn('Chrome으로 열고 앱 설치하기', 'window.__lpPwa.openExternal()', 'open_in_browser') + secondaryBtn('다음에 할게요', 'window.__lpPwa.later()'),
+    buttons: primaryBtn(t('pwaOpenChromeBtn'), 'window.__lpPwa.openExternal()', 'open_in_browser') + secondaryBtn(t('pwaLaterBtn'), 'window.__lpPwa.later()'),
   }),
 
-  // Instagram / Facebook / Kakao in-app browser on iPhone -> move to Safari
   iosInApp: () => shell({
-    subtitle: '인스타그램·페이스북 화면에서는 설치가 제한돼요. Safari에서 열어 설치해주세요.',
+    subtitle: t('pwaIosInAppSub'),
     body: stepsBlock(
       isKakaoInApp
-        ? ['아래 <strong>“Safari로 열기”</strong> 버튼을 누르세요.', 'Safari가 열리면 안내에 따라 <strong>홈 화면에 추가</strong>를 누르세요.']
-        : [
-          '화면 오른쪽 위(또는 아래)의 <strong>···</strong> 메뉴를 누르세요.',
-          '<strong>“외부 브라우저로 열기”</strong> 또는 <strong>“Safari로 열기”</strong>를 누르세요.',
-          'Safari가 열리면 안내에 따라 <strong>홈 화면에 추가</strong>를 누르세요.',
-        ]
+        ? [t('pwaKakaoStep1'), t('pwaIosInAppStep3')]
+        : [t('pwaIosInAppStep1'), t('pwaIosInAppStep2'), t('pwaIosInAppStep3')]
     ),
     buttons:
-      primaryBtn('Safari로 열기', 'window.__lpPwa.openExternal()', 'open_in_browser') +
+      primaryBtn(t('pwaOpenSafariBtn'), 'window.__lpPwa.openExternal()', 'open_in_browser') +
       `<button onclick="window.__lpPwa.copyLink()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-full text-xs cursor-pointer flex items-center justify-center gap-1">
-         <span class="material-symbols-outlined text-base">content_copy</span><span>링크 복사 (Safari 주소창에 붙여넣기)</span>
+         <span class="material-symbols-outlined text-base">content_copy</span><span>${t('pwaCopyLinkBtn')}</span>
        </button>` +
-      secondaryBtn('다음에 할게요', 'window.__lpPwa.later()'),
+      secondaryBtn(t('pwaLaterBtn'), 'window.__lpPwa.later()'),
   }),
 };
 
@@ -268,14 +255,14 @@ function tryAutoShow() {
   if (!shouldAutoShow() || document.getElementById('lp-pwa-sheet')) return;
 
   if (blockingModalOpen()) {
-    if (++blockedAttempts < 20) scheduleShow(3000);
+    if (++blockedAttempts < 20) scheduleShow(2500);
     return;
   }
 
-  // On Android Chrome the native prompt event can arrive a bit late - give it a short grace period
-  if (isAndroid && !isInApp && !deferredPrompt && promptWaitAttempts < 2) {
+  // Short 800ms grace period on Android Chrome so native prompt usually arrives first (max ~2s total)
+  if (isAndroid && !isInApp && !deferredPrompt && promptWaitAttempts < 1) {
     promptWaitAttempts++;
-    scheduleShow(2000);
+    scheduleShow(800);
     return;
   }
 
@@ -287,7 +274,6 @@ function scheduleShow(delay = SHOW_DELAY_MS) {
   showTimer = setTimeout(tryAutoShow, delay);
 }
 
-// ---------- actions ----------
 window.__lpPwa = {
   async install() {
     if (!deferredPrompt) {
@@ -337,9 +323,8 @@ window.__lpPwa = {
         `#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(full)};end`;
       return;
     }
-    // iOS (Instagram / Facebook): try Safari scheme; manual steps stay visible as fallback
     window.location.href = 'x-safari-' + full;
-    setTimeout(() => showToast('열리지 않으면 ··· 메뉴 → “외부 브라우저로 열기”를 눌러주세요'), 1200);
+    setTimeout(() => showToast(t('pwaToastOpenFallback')), 1200);
   },
 
   async copyLink() {
@@ -357,36 +342,37 @@ window.__lpPwa = {
       ta.remove();
     }
     track('PWACopyLink');
-    showToast('링크가 복사되었습니다. Safari 주소창에 붙여넣어 주세요');
+    showToast(t('pwaToastCopied'));
   },
 };
 
-// Manual entry point (e.g., a future "앱 설치" button)
 window.__lpOpenInstallPrompt = () => {
-  if (isStandalone()) {
-    showToast('이미 럭키픽 앱으로 실행 중입니다');
+  if (isPwaStandalone()) {
+    showToast(t('pwaToastAlreadyApp'));
     return;
   }
   showSheet();
 };
 
-// ---------- browser events ----------
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  // If the manual Android guide is already open, upgrade it to the one-tap version
   if (currentVariant === 'androidManual') renderSheet('androidPrompt');
 });
 
 window.addEventListener('appinstalled', () => {
-  localStorage.setItem(INSTALLED_KEY, '1');
   deferredPrompt = null;
   closeSheet();
   track('PWAInstalled');
-  showToast('🎉 럭키픽 앱이 홈 화면에 설치되었습니다!');
+  showToast(t('pwaToastInstalled'));
 });
 
-// ---------- init ----------
+window.addEventListener('languageChanged', () => {
+  if (currentVariant && document.getElementById('lp-pwa-sheet')) {
+    renderSheet(currentVariant);
+  }
+});
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('/sw.js').catch((err) => {
@@ -396,10 +382,7 @@ function registerServiceWorker() {
 
 function init() {
   registerServiceWorker();
-  if (isStandalone()) {
-    localStorage.setItem(INSTALLED_KEY, '1');
-    return;
-  }
+  if (isPwaStandalone()) return;
   scheduleShow();
 }
 

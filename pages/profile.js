@@ -65,10 +65,10 @@ function renderLoginSection() {
             <div class="flex justify-between items-center">
               <label class="text-xs font-bold text-on-surface-variant">${t('password')}</label>
               <button type="button" onclick="window.__openPasswordResetModal()" id="forgot-pw-btn" class="text-[11px] text-slate-500 hover:text-primary transition-colors cursor-pointer">
-                비밀번호를 잊으셨나요?
+                ${t('forgotPassword')}
               </button>
             </div>
-            <input type="password" id="auth-pw-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="6자 이상 입력" minlength="6" required>
+            <input type="password" id="auth-pw-input" class="w-full bg-surface-bright border border-outline-variant rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="${t('pwPlaceholder')}" minlength="6" required>
           </div>
           <button type="submit" id="email-submit-btn" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:bg-primary-container transition-all active:scale-95 text-sm shadow-md mt-2 cursor-pointer">
             ${t('emailLogin')}
@@ -80,7 +80,7 @@ function renderLoginSection() {
             ${t('noAccountSignup')}
           </button>
           <button type="button" onclick="window.__openPasswordResetModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-            아이디/비밀번호 찾기
+            ${t('findIdPw')}
           </button>
         </div>
 
@@ -102,15 +102,14 @@ function renderPasswordResetModal(initialEmail = '') {
           <span class="material-symbols-outlined text-3xl">lock_reset</span>
         </div>
         
-        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-1">아이디 / 비밀번호 재설정</h3>
+        <h3 class="font-headline-sm text-lg font-bold text-gray-900 mb-1">${t('pwResetTitle')}</h3>
         <p class="text-xs text-gray-500 mb-4 leading-relaxed">
-          LuckyPick의 아이디는 가입하신 <strong>이메일 주소</strong>입니다.<br>
-          비밀번호를 재설정할 이메일을 입력하시면 안전한 재설정 링크를 발송해 드립니다.
+          ${t('pwResetDesc')}
         </p>
 
         <form onsubmit="event.preventDefault(); window.__submitPasswordReset();" class="space-y-3 text-left">
           <div>
-            <label class="text-xs font-bold text-gray-700 block mb-1">가입 이메일 주소</label>
+            <label class="text-xs font-bold text-gray-700 block mb-1">${t('pwResetEmailLabel')}</label>
             <input type="email" id="reset-email-input" value="${initialEmail}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="user@example.com" required>
           </div>
 
@@ -119,10 +118,10 @@ function renderPasswordResetModal(initialEmail = '') {
           <div class="space-y-2 pt-2">
             <button type="submit" id="reset-submit-btn" class="w-full py-3 bg-primary text-white font-bold rounded-2xl text-xs hover:bg-primary-container shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
               <span class="material-symbols-outlined text-base">mail</span>
-              <span>비밀번호 재설정 이메일 전송</span>
+              <span>${t('pwResetSendBtn')}</span>
             </button>
             <button type="button" onclick="window.__closePasswordResetModal()" class="w-full py-2.5 bg-slate-100 text-slate-600 font-semibold rounded-xl text-xs hover:bg-slate-200 transition-colors cursor-pointer">
-              취소
+              ${t('cancel')}
             </button>
           </div>
         </form>
@@ -246,35 +245,35 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
           <div class="space-y-3">
             <div class="flex items-center gap-1.5 font-bold text-gray-900 text-xs border-b pb-1.5">
               <span class="material-symbols-outlined text-sm text-primary">pin_drop</span>
-              <span>수령인 및 배송지 정보</span>
+              <span>${t('shipRecipientSection')}</span>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="font-bold text-gray-700 block mb-1">수령인 성명 <span class="text-red-500 font-black">*</span></label>
+                <label class="font-bold text-gray-700 block mb-1">${t('shipNameLabel')} <span class="text-red-500 font-black">*</span></label>
                 <input type="text" id="s-ship-name" oninput="window.__clearShipFieldError('name')" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-primary text-xs font-bold transition-all" placeholder="홍길동">
-                <p id="s-ship-name-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">수령인 성명을 입력해주세요.</p>
+                <p id="s-ship-name-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">${t('shipNameLabel')}</p>
               </div>
               <div>
-                <label class="font-bold text-gray-700 block mb-1">연락처 <span class="text-red-500 font-black">*</span></label>
+                <label class="font-bold text-gray-700 block mb-1">${t('shipPhoneLabel')} <span class="text-red-500 font-black">*</span></label>
                 <input type="tel" id="s-ship-phone" oninput="window.__clearShipFieldError('phone')" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-primary text-xs font-bold transition-all" placeholder="010-1234-5678">
-                <p id="s-ship-phone-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">연락처(전화번호)를 입력해주세요.</p>
+                <p id="s-ship-phone-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">${t('shipPhoneLabel')}</p>
               </div>
             </div>
 
             <div>
-              <label class="font-bold text-gray-700 block mb-1">배송지 주소 <span class="text-red-500 font-black">*</span></label>
+              <label class="font-bold text-gray-700 block mb-1">${t('shipAddrLabel')} <span class="text-red-500 font-black">*</span></label>
               <input type="text" id="s-ship-addr" oninput="window.__clearShipFieldError('addr')" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-primary text-xs transition-all" placeholder="예: 서울시 강남구 테헤란로 123">
-              <p id="s-ship-addr-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">배송지 주소를 입력해주세요.</p>
+              <p id="s-ship-addr-err" class="text-[10px] text-red-500 font-bold mt-1 hidden">${t('shipAddrLabel')}</p>
             </div>
 
             <div>
-              <label class="font-bold text-gray-700 block mb-1">상세 주소 및 우편번호</label>
-              <input type="text" id="s-ship-detail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-primary text-xs" placeholder="예: 101동 202호 (우: 06234)">
+              <label class="font-bold text-gray-700 block mb-1">${t('shipDetailLabel')}</label>
+              <input type="text" id="s-ship-detail" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-primary text-xs" placeholder="101-202 (06234)">
             </div>
 
             <div>
-              <label class="font-bold text-gray-700 block mb-1">배송 메모</label>
+              <label class="font-bold text-gray-700 block mb-1">${t('shipMemoLabel')}</label>
               <select id="s-ship-memo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-primary text-xs font-medium">
                 <option value="부재 시 문 앞에 놓아주세요.">부재 시 문 앞에 놓아주세요.</option>
                 <option value="배송 전 미리 연락 바랍니다.">배송 전 미리 연락 바랍니다.</option>
@@ -287,7 +286,7 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
             <!-- Remote area checkbox -->
             <label class="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
               <input type="checkbox" id="s-ship-remote" onchange="window.__toggleRemoteAreaShipping()" class="rounded text-primary focus:ring-primary w-4 h-4">
-              <span class="font-bold text-gray-700 text-xs">제주도 및 도서산간 지역 배송 (+₩3,000원 추가 운임)</span>
+              <span class="font-bold text-gray-700 text-xs">${t('shipRemoteLabel')}</span>
             </label>
           </div>
 
@@ -296,9 +295,9 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
             <div class="flex items-center justify-between border-b pb-1.5">
               <div class="flex items-center gap-1.5 font-bold text-gray-900 text-xs">
                 <span class="material-symbols-outlined text-sm text-amber-600">payments</span>
-                <span>배송비 결제 수단 선택</span>
+                <span>${t('shipFeeMethodTitle')}</span>
               </div>
-              <span class="text-[11px] text-gray-500">기본 배송비 <strong>₩3,000원</strong></span>
+              <span class="text-[11px] text-gray-500">${t('shipBaseFee')} <strong>₩3,000${t('wonUnit')}</strong></span>
             </div>
 
             <div class="space-y-2">
@@ -308,13 +307,13 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
                   <input type="radio" name="ship-pay-method" value="points" ${canPayWithPoints ? 'checked' : ''} class="w-4 h-4 text-primary focus:ring-primary">
                   <div>
                     <div class="flex items-center gap-1.5">
-                      <span class="font-bold text-gray-900">보유 포인트 차감 결제</span>
+                      <span class="font-bold text-gray-900">${t('shipPayWithPoints')}</span>
                     </div>
-                    <p class="text-[11px] text-gray-500">내 보유 잔액: <strong class="font-mono ${canPayWithPoints ? 'text-primary' : 'text-red-500'}">₩${currentPts.toLocaleString()} P</strong></p>
+                    <p class="text-[11px] text-gray-500">${t('shipMyBalance')}: <strong class="font-mono ${canPayWithPoints ? 'text-primary' : 'text-red-500'}">₩${currentPts.toLocaleString()} P</strong></p>
                   </div>
                 </div>
                 <span class="font-mono font-bold text-xs ${canPayWithPoints ? 'text-primary' : 'text-gray-400'}">
-                  ${canPayWithPoints ? '즉시 차감 가능' : '잔액 부족'}
+                  ${canPayWithPoints ? t('shipInstantDeduct') : t('shipLowBalance')}
                 </span>
               </label>
 
@@ -323,8 +322,8 @@ function renderSingleShippingModal(vaultItemId, itemTitle, itemImage, itemPrice)
                 <div class="flex items-center gap-3">
                   <input type="radio" name="ship-pay-method" value="danal_card" ${!canPayWithPoints ? 'checked' : ''} class="w-4 h-4 text-primary focus:ring-primary">
                   <div>
-                    <span class="font-bold text-gray-900">신용·체크카드 결제</span>
-                    <p class="text-[11px] text-gray-500">국내 모든 신용카드 및 체크카드</p>
+                    <span class="font-bold text-gray-900">${t('creditCardPayTitle')}</span>
+                    <p class="text-[11px] text-gray-500">${t('creditCardPaySub')}</p>
                   </div>
                 </div>
                 <span class="material-symbols-outlined text-gray-400 text-sm">credit_card</span>
@@ -384,8 +383,8 @@ function renderPointsPaymentModal(points, amount) {
       <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
         <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
           <div>
-            <h3 class="font-bold text-lg">포인트 충전 결제</h3>
-            <p class="text-xs text-slate-400">충전 즉시 1P = 1원으로 원하는 상품 픽 구매에 사용됩니다</p>
+            <h3 class="font-bold text-lg">${t('chargeModalTitle')}</h3>
+            <p class="text-xs text-slate-400">${t('chargeModalSub')}</p>
           </div>
           <button onclick="window.__closeChargePayModal()" class="text-slate-400 hover:text-white">
             <span class="material-symbols-outlined">close</span>
@@ -399,8 +398,8 @@ function renderPointsPaymentModal(points, amount) {
               <span class="font-black text-2xl text-amber-600 font-mono">+₩${points.toLocaleString()} P</span>
             </div>
             <div class="text-right">
-              <span class="text-[10px] text-gray-500 font-bold block">결제 금액</span>
-              <span class="font-bold text-base text-gray-900 font-mono">₩${amount.toLocaleString()}원</span>
+              <span class="text-[10px] text-gray-500 font-bold block">${t('paidAmountLabel')}</span>
+              <span class="font-bold text-base text-gray-900 font-mono">₩${amount.toLocaleString()}${t('wonUnit')}</span>
             </div>
           </div>
 
@@ -412,8 +411,8 @@ function renderPointsPaymentModal(points, amount) {
                   <span class="material-symbols-outlined text-xl">credit_card</span>
                 </span>
                 <div>
-                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-primary">신용·체크카드 결제</h4>
-                  <p class="text-[11px] text-gray-500">국내 모든 신용카드 및 체크카드 결제 지원</p>
+                  <h4 class="font-bold text-sm text-gray-900 group-hover:text-primary">${t('creditCardPayTitle')}</h4>
+                  <p class="text-[11px] text-gray-500">${t('creditCardPaySub')}</p>
                 </div>
               </div>
               <span class="material-symbols-outlined text-gray-400 group-hover:text-primary">chevron_right</span>
@@ -423,7 +422,7 @@ function renderPointsPaymentModal(points, amount) {
 
         <div class="p-4 bg-gray-50 border-t border-gray-100 text-center">
           <button onclick="window.__closeChargePayModal()" class="text-xs font-bold text-gray-500 hover:text-gray-800">
-            닫기
+            ${t('close')}
           </button>
         </div>
       </div>
@@ -437,10 +436,10 @@ function renderVaultTab(vault) {
         <div class="w-20 h-20 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
           <span class="material-symbols-outlined text-4xl">inventory_2</span>
         </div>
-        <h3 class="font-bold text-lg text-gray-900 mb-1">보관함이 비어있습니다</h3>
-        <p class="text-xs text-gray-500 mb-6">100% 실물 정품 상품을 픽하고 배송받으세요!</p>
+        <h3 class="font-bold text-lg text-gray-900 mb-1">${t('vaultEmptyTitle')}</h3>
+        <p class="text-xs text-gray-500 mb-6">${t('vaultEmptyDesc')}</p>
         <button onclick="window.location.hash='#home'" class="px-6 py-3 bg-primary text-white font-bold rounded-2xl text-xs shadow-md hover:opacity-95">
-          인기 상품 픽 둘러보러 가기
+          ${t('browsePopularBtn')}
         </button>
       </div>`;
   }
@@ -456,32 +455,32 @@ function renderVaultTab(vault) {
         const isTaxVerified = item.taxStatus === 'verified';
 
         const statusBadges = {
-          in_vault: '<span class="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">보관 중 (수령 가능)</span>',
-          shipping_requested: '<span class="text-[10px] font-black bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">📦 배송 접수 (출고 대기)</span>',
-          shipped: '<span class="text-[10px] font-black bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full">🚚 배송 중 (출고 완료)</span>',
-          converted_to_points: '<span class="text-[10px] font-black bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">🔄 포인트 전환 완료</span>',
+          in_vault: `<span class="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">${t('statusInVault')}</span>`,
+          shipping_requested: `<span class="text-[10px] font-black bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">${t('statusShipReq')}</span>`,
+          shipped: `<span class="text-[10px] font-black bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full">${t('statusShipped')}</span>`,
+          converted_to_points: `<span class="text-[10px] font-black bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">${t('statusConverted')}</span>`,
         };
 
         let currentBadge = isShipped ? statusBadges.shipped : (statusBadges[item.status] || statusBadges.in_vault);
         if (isPendingShip && isTaxPending) {
-          currentBadge = '<span class="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>서류·입금 확인 중</span>';
+          currentBadge = `<span class="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>${t('statusTaxPending')}</span>`;
         } else if (isPendingShip && isTaxVerified) {
-          currentBadge = '<span class="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">✓ 제세공과금 승인 완료</span>';
+          currentBadge = `<span class="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">${t('statusTaxVerified')}</span>`;
         }
 
         const isSpecialRaffle = item.tierId === 'super_raffle' || (item.tierId && String(item.tierId).includes('raffle')) || item.grade === 'LEGENDARY';
         const defaultRate = isSpecialRaffle ? 0.8 : 0.6;
         const refundAmount = item.refundPoints || Math.round(item.retailPrice * defaultRate);
-        const displayTierName = item.tierName ? item.tierName.replace(/럭키박스/g, '픽') : '정가 픽';
+        const displayTierName = item.tierName ? item.tierName.replace(/럭키박스/g, '픽') : 'Pick';
 
         return `
           <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
             <div>
               <div class="flex justify-between items-center mb-3">
-                <span class="text-[10px] font-bold text-gray-400">${displayTierName} 획득</span>
+                <span class="text-[10px] font-bold text-gray-400">${t('acquiredFrom', { tier: displayTierName })}</span>
                 <div class="flex items-center gap-1.5">
                   ${currentBadge}
-                  <button type="button" onclick="window.__deleteVaultItem('${item.id}', '${item.title.replace(/'/g, "\\'")}')" class="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-colors cursor-pointer" title="보관함에서 이 아이템 삭제">
+                  <button type="button" onclick="window.__deleteVaultItem('${item.id}', '${item.title.replace(/'/g, "\\'")}')" class="p-1 text-slate-300 hover:text-red-500 rounded-lg transition-colors cursor-pointer">
                     <span class="material-symbols-outlined text-sm">delete</span>
                   </button>
                 </div>
@@ -492,7 +491,7 @@ function renderVaultTab(vault) {
                 <div class="min-w-0">
                   <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-200">${item.grade || 'NORMAL'}</span>
                   <h4 class="font-extrabold text-sm text-gray-900 mt-1 leading-snug line-clamp-2">${item.title}</h4>
-                  <p class="text-xs text-gray-500 mt-1">정가: <strong class="text-gray-900">₩${item.retailPrice.toLocaleString()}원</strong></p>
+                  <p class="text-xs text-gray-500 mt-1">${t('retail')}: <strong class="text-gray-900">₩${item.retailPrice.toLocaleString()}${t('wonUnit')}</strong></p>
                 </div>
               </div>
             </div>
@@ -501,11 +500,11 @@ function renderVaultTab(vault) {
               <div class="flex gap-2 pt-2 border-t border-slate-100">
                 <button onclick="window.__openSingleShippingModal('${item.id}', '${item.title.replace(/'/g, "\\'")}', '${item.imageUrl}', ${item.retailPrice})" class="flex-1 py-2.5 bg-primary text-white font-bold rounded-xl text-xs hover:bg-primary-container transition-colors flex items-center justify-center gap-1 shadow-xs active:scale-95">
                   <span class="material-symbols-outlined text-[15px]">local_shipping</span>
-                  배송 신청
+                  ${t('requestShippingBtn')}
                 </button>
                 <button onclick="window.__convertItemToPoints('${item.id}')" class="flex-1 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold rounded-xl text-xs hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1 active:scale-95">
                   <span class="material-symbols-outlined text-[15px]">published_with_changes</span>
-                  단순변심 반품 (+₩${refundAmount.toLocaleString()}P 적립)
+                  ${t('convertToPointsBtn', { pts: refundAmount.toLocaleString() })}
                 </button>
               </div>
             ` : isShipped ? `
@@ -515,11 +514,11 @@ function renderVaultTab(vault) {
                     <span class="material-symbols-outlined text-indigo-600 text-base">local_shipping</span>
                     <span>${item.carrier || 'CJ대한통운'}</span>
                   </div>
-                  <span class="font-mono font-bold text-indigo-800 bg-white px-2 py-0.5 rounded border border-indigo-100">${item.trackingNumber || '배송 준비'}</span>
+                  <span class="font-mono font-bold text-indigo-800 bg-white px-2 py-0.5 rounded border border-indigo-100">${item.trackingNumber || '---'}</span>
                 </div>
                 <button onclick="window.__trackDelivery('${item.carrier || 'CJ대한통운'}', '${item.trackingNumber || ''}')" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[11px] shadow-xs transition-colors flex items-center justify-center gap-1">
                   <span class="material-symbols-outlined text-sm">open_in_new</span>
-                  실시간 택배 배송 조회
+                  ${t('trackDeliveryBtn')}
                 </button>
               </div>
             ` : isPendingShip ? `
@@ -527,32 +526,29 @@ function renderVaultTab(vault) {
                 <div class="p-3 bg-amber-50/90 rounded-xl text-xs text-amber-950 border border-amber-300 space-y-1.5 shadow-2xs">
                   <div class="flex items-center gap-1.5 font-bold text-amber-900">
                     <span class="material-symbols-outlined text-amber-600 text-base animate-pulse">hourglass_top</span>
-                    <span>제세공과금 입금 및 신분증 서류 확인 중</span>
+                    <span>${t('statusTaxPending')}</span>
                   </div>
                   <p class="text-[11px] text-amber-800 leading-snug">
-                    입금자명: <strong>${item.taxDepositName || item.shippingData?.name || '확인 중'}</strong> (제세공과금 22% ₩${(item.taxAmount || Math.round(item.retailPrice * 0.22)).toLocaleString()}원)<br>
-                    카카오뱅크 입금 내역 및 국세청 서류 대조 후 즉시 안전하게 출고됩니다.
+                    ${item.taxDepositName || item.shippingData?.name || ''} (22% ₩${(item.taxAmount || Math.round(item.retailPrice * 0.22)).toLocaleString()})
                   </p>
                 </div>
               ` : isTaxVerified ? `
                 <div class="p-3 bg-emerald-50 rounded-xl text-xs text-emerald-950 border border-emerald-300 space-y-1.5 shadow-2xs">
                   <div class="flex items-center gap-1.5 font-bold text-emerald-900">
                     <span class="material-symbols-outlined text-emerald-600 text-base">verified</span>
-                    <span>제세공과금 및 서류 확인 완료! 출고 준비 중입니다</span>
+                    <span>${t('statusTaxVerified')}</span>
                   </div>
-                  <p class="text-[11px] text-emerald-800 leading-snug">
-                    관리자 서류 및 입금 확인이 정상 완료되었습니다. 물류센터에서 전용 안심 배송을 포장 중입니다.
-                  </p>
+                  <p class="text-[11px] text-emerald-800 leading-snug">${t('preparingShipment')}</p>
                 </div>
               ` : `
                 <div class="p-2.5 bg-blue-50/60 rounded-xl text-[11px] text-blue-900 border border-blue-100 flex items-center gap-2">
                   <span class="material-symbols-outlined text-blue-600 text-base">schedule</span>
-                  <span>출고 준비 중입니다 (관리자 확인 후 운송장 번호가 등록됩니다)</span>
+                  <span>${t('preparingShipment')}</span>
                 </div>
               `}
             ` : `
               <div class="p-2.5 bg-gray-50 rounded-xl text-[11px] text-gray-500 border border-gray-200 text-center font-bold">
-                ✓ 단순변심 반품 완료 (₩${refundAmount.toLocaleString()}P 스토어 적립금 전환)
+                ${t('convertedNotice', { pts: refundAmount.toLocaleString() })}
               </div>
             `}
           </div>`;
@@ -569,26 +565,26 @@ function renderTicketsTab(unassignedCount, appliedTickets) {
           <span class="text-[10px] font-black uppercase tracking-widest bg-slate-950 text-amber-300 px-2.5 py-0.5 rounded-full">
             MY GOLDEN WALLET
           </span>
-          <h3 class="text-2xl font-black mt-2">내 미응모 골든 티켓: ${unassignedCount}장</h3>
-          <p class="text-xs text-slate-900/80 mt-0.5">아이폰 16 Pro, PS5 Pro 등 원하는 스페셜 래플에 자유롭게 응모하세요!</p>
+          <h3 class="text-2xl font-black mt-2">${t('myUnassignedTickets', { n: unassignedCount })}</h3>
+          <p class="text-xs text-slate-900/80 mt-0.5">${t('myUnassignedDesc')}</p>
         </div>
         <button onclick="window.location.hash='#home'" class="px-6 py-3.5 bg-slate-950 hover:bg-slate-900 text-white font-extrabold rounded-2xl text-xs shadow-lg transition-all active:scale-95 flex items-center gap-1.5">
           <span class="material-symbols-outlined text-base">add_circle</span>
-          스페셜 상품에 응모하러 가기
+          ${t('goApplySpecialBtn')}
         </button>
       </div>
 
       <!-- Applied Tickets History -->
       <div>
-        <h4 class="font-black text-lg text-gray-900 mb-3">응모 완료된 골든 티켓 목록 (${appliedTickets.length}건)</h4>
+        <h4 class="font-black text-lg text-gray-900 mb-3">${t('appliedTicketsListTitle', { n: appliedTickets.length })}</h4>
         ${appliedTickets.length === 0 ? `
           <div class="bg-white rounded-2xl p-8 text-center border border-slate-200 text-xs text-gray-500">
-            아직 스페셜 래플에 응모한 티켓이 없습니다. 홈 화면에서 원하는 상품에 응모해 보세요!
+            ${t('noAppliedTickets')}
           </div>
         ` : `
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            ${appliedTickets.map(t => {
-              const status = t.resolvedStatus || 'active';
+            ${appliedTickets.map(tk => {
+              const status = tk.resolvedStatus || 'active';
               
               let badgeHtml = '';
               let borderClass = 'border-amber-300';
@@ -598,43 +594,43 @@ function renderTicketsTab(unassignedCount, appliedTickets) {
                 badgeHtml = `
                   <span class="text-[10px] text-amber-950 font-black bg-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
                     <span class="material-symbols-outlined text-xs">military_tech</span>
-                    🎉 1등 당첨 (보관함 지급)
+                    ${t('ticketWonBadge')}
                   </span>`;
                 borderClass = 'border-amber-500 shadow-md bg-amber-50/30';
-                actionHtml = `<span class="text-amber-700 font-extrabold text-[10px]">실물 보관함 확인</span>`;
+                actionHtml = `<span class="text-amber-700 font-extrabold text-[10px]">${t('tabVault')}</span>`;
               } else if (status === 'refunded') {
                 badgeHtml = `
                   <span class="text-[10px] text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1">
                     <span class="material-symbols-outlined text-xs">undo</span>
-                    목표 미달 100% 자동 환불
+                    ${t('ticketRefundedBadge')}
                   </span>`;
                 borderClass = 'border-slate-200 opacity-75';
-                actionHtml = `<span class="text-slate-400 font-bold text-[10px]">티켓 환불 완료</span>`;
+                actionHtml = `<span class="text-slate-400 font-bold text-[10px]">${t('fullRefundDone')}</span>`;
               } else if (status === 'closed_lost') {
                 badgeHtml = `
                   <span class="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full">
-                    🏁 추첨 종료 (미당첨)
+                    ${t('ticketLostBadge')}
                   </span>`;
                 borderClass = 'border-slate-200 opacity-75';
-                actionHtml = `<span class="text-slate-400 font-bold text-[10px]">마감됨</span>`;
+                actionHtml = `<span class="text-slate-400 font-bold text-[10px]">${t('closed')}</span>`;
               } else if (status === 'group_locked') {
                 badgeHtml = `
                   <span class="text-[10px] text-blue-700 font-extrabold bg-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                    그룹 ${t.groupNumber} 100% 달성 (추첨 대기)
+                    ${t('ticketGroupLocked', { n: tk.groupNumber })}
                   </span>`;
                 borderClass = 'border-blue-300';
-                actionHtml = `<span class="text-blue-600 font-bold text-[10px]">추첨 확정</span>`;
+                actionHtml = `<span class="text-blue-600 font-bold text-[10px]">${t('goalAchievedLocked')}</span>`;
               } else {
                 badgeHtml = `
                   <span class="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    그룹 ${t.groupNumber} 실시간 모집 중
+                    ${t('ticketGroupLive', { n: tk.groupNumber })}
                   </span>`;
                 borderClass = 'border-amber-300';
                 actionHtml = `
-                  <button onclick="window.__cancelTicketFromProfile('${t.raffleId}', '${t.ticketId}')" class="text-red-600 hover:text-red-800 font-bold underline cursor-pointer">
-                    응모 취소
+                  <button onclick="window.__cancelTicketFromProfile('${tk.raffleId}', '${tk.ticketId}')" class="text-red-600 hover:text-red-800 font-bold underline cursor-pointer">
+                    ${t('cancelEntryBtn')}
                   </button>`;
               }
 
@@ -644,14 +640,14 @@ function renderTicketsTab(unassignedCount, appliedTickets) {
                   <div>
                     <div class="flex justify-between items-center mb-2">
                       ${badgeHtml}
-                      <span class="text-[9px] text-gray-400">${new Date(t.appliedAt).toLocaleDateString()}</span>
+                      <span class="text-[9px] text-gray-400">${new Date(tk.appliedAt).toLocaleDateString()}</span>
                     </div>
-                    <p class="text-xs font-bold text-gray-800 line-clamp-1 mb-2">${t.raffleTitle}</p>
+                    <p class="text-xs font-bold text-gray-800 line-clamp-1 mb-2">${tk.raffleTitle}</p>
                     <div class="p-2.5 bg-slate-900 text-amber-300 rounded-xl text-center font-mono font-black text-sm tracking-wider shadow-inner mb-2">
-                      ${t.ticketNumber}
+                      ${tk.ticketNumber}
                     </div>
                     <div class="flex justify-between items-center text-[10px] pt-1 border-t border-slate-100">
-                      <span class="text-gray-500 font-mono">슬롯 #${t.slotIndex}</span>
+                      <span class="text-gray-500 font-mono">#${tk.slotIndex}</span>
                       ${actionHtml}
                     </div>
                   </div>
@@ -665,17 +661,17 @@ function renderTicketsTab(unassignedCount, appliedTickets) {
 
 function renderChargeTab() {
   const pointsPackages = [
-    { pts: 10000, price: 10000, bonus: 0, tag: '체험팩' },
-    { pts: 30000, price: 30000, bonus: 2000, tag: '인기팩 +2,000P 보너스' },
-    { pts: 50000, price: 50000, bonus: 5000, tag: '대박팩 +5,000P 보너스' },
-    { pts: 100000, price: 100000, bonus: 15000, tag: 'VIP팩 +15,000P 보너스' },
+    { pts: 10000, price: 10000, bonus: 0, tag: 'Starter' },
+    { pts: 30000, price: 30000, bonus: 2000, tag: 'Popular +2,000P' },
+    { pts: 50000, price: 50000, bonus: 5000, tag: 'Best +5,000P' },
+    { pts: 100000, price: 100000, bonus: 15000, tag: 'VIP +15,000P' },
   ];
 
   return `
     <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
       <div>
-        <h3 class="font-black text-xl text-gray-900">포인트 즉시 충전 (1P = 1원)</h3>
-        <p class="text-xs text-gray-500 mt-1">신용·체크카드로 포인트를 충전하고 원하는 상품을 픽하세요.</p>
+        <h3 class="font-black text-xl text-gray-900">${t('chargeTitle')}</h3>
+        <p class="text-xs text-gray-500 mt-1">${t('chargeSub')}</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -684,10 +680,10 @@ function renderChargeTab() {
             <div>
               <span class="text-[10px] font-extrabold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full">${pkg.tag}</span>
               <h4 class="font-black text-2xl text-gray-900 mt-3 font-mono">₩${(pkg.pts + pkg.bonus).toLocaleString()} P</h4>
-              <p class="text-xs text-gray-500 mt-1">결제 금액: <strong>₩${pkg.price.toLocaleString()}원</strong></p>
+              <p class="text-xs text-gray-500 mt-1">${t('paidAmountLabel')}: <strong>₩${pkg.price.toLocaleString()}${t('wonUnit')}</strong></p>
             </div>
             <button class="w-full mt-4 py-2.5 bg-slate-900 group-hover:bg-primary text-white font-bold rounded-xl text-xs transition-colors shadow-xs">
-              충전하기
+              ${t('chargeBtn')}
             </button>
           </div>
         `).join('')}
@@ -863,29 +859,29 @@ export function render() {
 
         <div class="flex flex-wrap items-center gap-3">
           <!-- Golden Tickets Summary Card -->
-          <div class="bg-gradient-to-r from-amber-500/20 to-yellow-500/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-amber-400/30 text-right cursor-pointer hover:border-amber-400 transition-all" onclick="window.location.hash='#home'" title="홈 화면에서 스페셜 상품에 응모하세요!">
+          <div class="bg-gradient-to-r from-amber-500/20 to-yellow-500/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-amber-400/30 text-right cursor-pointer hover:border-amber-400 transition-all" onclick="window.location.hash='#home'">
             <div class="flex items-center justify-between gap-2">
               <span class="text-[10px] text-amber-300 font-extrabold flex items-center gap-1">
                 <span class="material-symbols-outlined text-xs">confirmation_number</span>
-                골든티켓
+                ${t('tabTickets')}
               </span>
-              <span class="text-[9px] text-amber-200 font-bold bg-amber-400/20 px-1.5 py-0.2 rounded">응모하기 &gt;</span>
+              <span class="text-[9px] text-amber-200 font-bold bg-amber-400/20 px-1.5 py-0.2 rounded">${t('participateNow')} &gt;</span>
             </div>
-            <span class="font-black text-xl text-amber-400 font-mono mt-0.5 block">${unassignedTickets.toLocaleString()}장</span>
+            <span class="font-black text-xl text-amber-400 font-mono mt-0.5 block">${unassignedTickets.toLocaleString()}${t('ticketUnit')}</span>
           </div>
 
           <!-- Points Display Card -->
           <div class="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/15 text-right">
-            <span class="text-[10px] text-gray-300 font-bold block">내 보유 포인트</span>
+            <span class="text-[10px] text-gray-300 font-bold block">${t('myPointsLabel')}</span>
             <span id="profile-points-display" class="font-black text-2xl text-amber-300 font-mono">₩${userPts.toLocaleString()} P</span>
           </div>
 
           <button onclick="window.__switchProfileTab('charge')" class="px-5 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-md hover:from-amber-400 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
             <span class="material-symbols-outlined text-base">add_circle</span>
-            + 포인트 충전
+            + ${t('tabCharge')}
           </button>
 
-          <button onclick="window.__doLogout()" class="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer" title="로그아웃">
+          <button onclick="window.__doLogout()" class="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer" title="${t('secureLogout')}">
             <span class="material-symbols-outlined text-lg">logout</span>
           </button>
         </div>
@@ -895,17 +891,17 @@ export function render() {
       <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-6">
         <button onclick="window.__switchProfileTab('vault')" id="tab-btn-vault" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${activeProfileTab === 'vault' ? 'bg-primary text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
           <span class="material-symbols-outlined text-base">inventory_2</span>
-          내 실물 보관함 (${vault.length})
+          ${t('tabVault')} (${vault.length})
         </button>
 
         <button onclick="window.__switchProfileTab('tickets')" id="tab-btn-tickets" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${activeProfileTab === 'tickets' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md font-extrabold' : 'bg-white text-gray-600 hover:bg-slate-100'}">
           <span class="material-symbols-outlined text-base">confirmation_number</span>
-          내 골든 티켓 (${unassignedTickets}장 보유)
+          ${t('tabTickets')} (${unassignedTickets}${t('ticketUnit')})
         </button>
 
         <button onclick="window.__switchProfileTab('charge')" id="tab-btn-charge" class="px-5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${activeProfileTab === 'charge' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-slate-100'}">
           <span class="material-symbols-outlined text-base">payments</span>
-          포인트 충전
+          ${t('tabCharge')}
         </button>
       </div>
 
