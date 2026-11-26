@@ -7,16 +7,16 @@
 // ============================================
 import { t } from '../i18n.js';
 
-const DISMISS_KEY = 'lp_pwa_dismissed_until';
+const DISMISS_KEY = 'lp_pwa_dismissed_v2';
 const FORCE_PARAM = 'lp_install';
-const DISMISS_DAYS = 3;
-const SHOW_DELAY_MS = 1200;
+const DISMISS_DAYS = 1;
+const SHOW_DELAY_MS = 1000;
 
 const ua = navigator.userAgent || '';
 const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const isIPhone = /iPhone|iPod/i.test(ua);
-const isAndroid = /Android/i.test(ua);
-const isMobile = isIOS || isAndroid;
+const isAndroid = /Android/i.test(ua) || (!isIOS && (navigator.maxTouchPoints > 0 || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)));
+const isMobile = isIOS || isAndroid || window.innerWidth <= 900;
 const isMetaInApp = /FBAN|FBAV|FB_IAB|FBIOS|FB4A|Instagram/i.test(ua);
 const isKakaoInApp = /KAKAOTALK/i.test(ua);
 const isOtherInApp = /NAVER\(inapp|Line\/|DaumApps|; wv\)/i.test(ua);
