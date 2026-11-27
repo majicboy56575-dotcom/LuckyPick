@@ -24,6 +24,8 @@ const TOSS_SECRET_KEY =
 // Danal Payments Module
 const {
   readyDanalCardPayment,
+  decryptDanalReturnParams,
+  billDanalCard,
   confirmDanalCardPayment,
   readyDanalPhonePayment
 } = require("./danal");
@@ -1042,6 +1044,8 @@ exports.readyDanalPayment = onRequest(
         amount,
         itemName = "럭키픽 상품",
         productId,
+        itemId = "",
+        redirectBase = "https://luckypick-ec4cf.web.app/",
         returnUrl,
         cancelUrl,
         userAgent = "PC",
@@ -1050,16 +1054,18 @@ exports.readyDanalPayment = onRequest(
       const userEmail = (authUser && authUser.email) || bodyData.userEmail || "";
       const orderId = `LP_DANAL_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      console.log(`[Danal Ready] Method: ${method}, UA: ${userAgent}, user: ${uid}, amount: ${amount}, item: ${itemName}`);
+      console.log(`[Danal Ready] Method: ${method}, UA: ${userAgent}, user: ${uid}, amount: ${amount}, product: ${productId}, item: ${itemId || itemName}`);
 
       if (method === "card") {
+        // Always use a clean RETURNURL with ZERO '&' query params so Danal never truncates it.
+        const cleanReturnUrl = "https://asia-northeast3-luckypick-ec4cf.cloudfunctions.net/danalCardReturn";
         const result = await readyDanalCardPayment({
           amount: Number(amount),
           itemName,
           orderId,
           userId: uid,
           userEmail,
-          returnUrl,
+          returnUrl: cleanReturnUrl,
           cancelUrl,
           userAgent,
         });
@@ -1067,6 +1073,23 @@ exports.readyDanalPayment = onRequest(
         console.log(`[Danal Ready] Card response code: ${result.RETURNCODE}, TID: ${result.TID}`);
 
         if (result.RETURNCODE === "0000") {
+          // Persist pending order keyed by Danal TID so danalCardReturn can execute TXTYPE=BILL server-side
+          if (result.TID) {
+            await db.collection("pending_danal_orders").doc(String(result.TID)).set({
+              tid: String(result.TID),
+              uid,
+              userEmail,
+              productId: productId || "box_basic",
+              itemId: itemId || "",
+              itemName,
+              amount: Number(amount),
+              orderId,
+              redirectBase,
+              status: "pending",
+              createdAt: FieldValue.serverTimestamp(),
+            });
+          }
+
           return res.status(200).json({
             result: {
               success: true,
@@ -1229,14 +1252,32 @@ exports.confirmDanalPayment = onRequest(
 
 
 // ============================================
-// 10-C. danalCardReturn (HTTP POST Receiver for Danal RETURNURL)
-// Danal sends RETURNPARAMS via HTTP POST form body after card auth.
-// Static Firebase Hosting cannot read POST bodies, so this endpoint
-// captures RETURNPARAMS and 302-redirects back to the SPA.
+// 10-C. danalCardReturn (Server-Side POST Receiver + Immediate TXTYPE=BILL Approval)
+// Danal POSTs RETURNPARAMS here after card auth (works for ALL card issuers on PC & Mobile).
+// We decrypt RETURNPARAMS, look up pending_danal_orders/{tid}, execute TXTYPE=BILL
+// server-to-server immediately, record payment in Firestore, and redirect to the SPA.
 // ============================================
 exports.danalCardReturn = onRequest(
   { region: "asia-northeast3", invoker: "public", cors: true },
   async (req, res) => {
+    const allowedOrigins = [
+      "https://luckypick-ec4cf.web.app",
+      "https://luckypick-ec4cf.firebaseapp.com",
+      "http://localhost:5000",
+      "http://127.0.0.1:5000",
+    ];
+
+    const buildSafeRedirect = (rawUrl) => {
+      try {
+        const parsed = new URL(String(rawUrl || "https://luckypick-ec4cf.web.app/"));
+        return allowedOrigins.includes(parsed.origin)
+          ? parsed
+          : new URL("https://luckypick-ec4cf.web.app/");
+      } catch (e) {
+        return new URL("https://luckypick-ec4cf.web.app/");
+      }
+    };
+
     try {
       const returnParams =
         (req.body && (req.body.RETURNPARAMS || req.body.returnparams)) ||
@@ -1244,38 +1285,114 @@ exports.danalCardReturn = onRequest(
         req.query.returnparams ||
         "";
 
-      const rawRedirect = String(req.query.redirect || "https://luckypick-ec4cf.web.app/");
-      const allowedOrigins = [
-        "https://luckypick-ec4cf.web.app",
-        "https://luckypick-ec4cf.firebaseapp.com",
-        "http://localhost:5000",
-        "http://127.0.0.1:5000",
-      ];
+      console.log(`[Danal Card Return] method=${req.method}, hasReturnParams=${Boolean(returnParams)}, len=${String(returnParams).length}`);
 
-      let targetUrl;
-      try {
-        const parsed = new URL(rawRedirect);
-        targetUrl = allowedOrigins.includes(parsed.origin)
-          ? parsed
-          : new URL("https://luckypick-ec4cf.web.app/");
-      } catch (e) {
-        targetUrl = new URL("https://luckypick-ec4cf.web.app/");
+      if (!returnParams) {
+        const failUrl = buildSafeRedirect(req.query.redirect);
+        failUrl.searchParams.set("danal", "card_failed");
+        failUrl.searchParams.set("msg", "다날 인증 결과(RETURNPARAMS)가 전달되지 않았습니다.");
+        return res.redirect(302, failUrl.toString());
       }
 
-      targetUrl.searchParams.set("danal", "card_return");
-      if (req.query.productId) targetUrl.searchParams.set("productId", String(req.query.productId));
-      if (req.query.amount) targetUrl.searchParams.set("amount", String(req.query.amount));
-      if (req.query.itemId) targetUrl.searchParams.set("itemId", String(req.query.itemId));
-      if (returnParams) targetUrl.searchParams.set("RETURNPARAMS", String(returnParams));
+      // 1. Decrypt RETURNPARAMS on server
+      const authData = decryptDanalReturnParams(returnParams);
+      const tid = String(authData.TID || "");
+      const authCode = String(authData.RETURNCODE || "");
+      const authMsg = String(authData.RETURNMSG || "");
 
-      console.log(
-        `[Danal Card Return] method=${req.method}, hasReturnParams=${Boolean(returnParams)}, len=${String(returnParams).length}, productId=${req.query.productId || ""}, amount=${req.query.amount || ""}`
-      );
+      console.log(`[Danal Card Return] Decrypted: RETURNCODE=${authCode}, TID=${tid}, MSG=${authMsg}`);
 
+      // 2. Look up pending order saved during readyDanalPayment
+      let pending = null;
+      if (tid) {
+        const snap = await db.collection("pending_danal_orders").doc(tid).get();
+        if (snap.exists) pending = snap.data();
+      }
+
+      const targetUrl = buildSafeRedirect(pending?.redirectBase || req.query.redirect);
+
+      // 3. If card authentication itself failed/cancelled
+      if (authCode !== "0000") {
+        targetUrl.searchParams.set("danal", "card_failed");
+        targetUrl.searchParams.set("code", authCode || "AUTH_ERR");
+        targetUrl.searchParams.set("msg", authMsg || "카드 인증이 취소되었거나 실패했습니다.");
+        return res.redirect(302, targetUrl.toString());
+      }
+
+      if (!pending || !pending.amount) {
+        console.error(`[Danal Card Return] Pending order not found for TID=${tid}`);
+        targetUrl.searchParams.set("danal", "card_failed");
+        targetUrl.searchParams.set("code", "NO_ORDER");
+        targetUrl.searchParams.set("msg", "주문 정보를 찾을 수 없습니다. 다시 결제해주세요.");
+        return res.redirect(302, targetUrl.toString());
+      }
+
+      // 4. Idempotency: if already confirmed, redirect straight to confirmed
+      if (pending.status === "confirmed") {
+        targetUrl.searchParams.set("danal", "card_confirmed");
+        targetUrl.searchParams.set("tid", tid);
+        targetUrl.searchParams.set("productId", pending.productId || "");
+        targetUrl.searchParams.set("itemId", pending.itemId || "");
+        targetUrl.searchParams.set("amount", String(pending.amount));
+        return res.redirect(302, targetUrl.toString());
+      }
+
+      // 5. Execute Final Approval (TXTYPE=BILL) server-to-server right now
+      const billResult = await billDanalCard({ tid, amount: Number(pending.amount) });
+
+      if (billResult.RETURNCODE !== "0000") {
+        console.warn(`[Danal Card Return] BILL rejected: TID=${tid}, code=${billResult.RETURNCODE}, msg=${billResult.RETURNMSG}`);
+        await db.collection("pending_danal_orders").doc(tid).update({
+          status: "failed",
+          failCode: billResult.RETURNCODE || "",
+          failMsg: billResult.RETURNMSG || "",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        targetUrl.searchParams.set("danal", "card_failed");
+        targetUrl.searchParams.set("code", billResult.RETURNCODE || "BILL_ERR");
+        targetUrl.searchParams.set("msg", billResult.RETURNMSG || "카드사 승인이 거절되었습니다.");
+        return res.redirect(302, targetUrl.toString());
+      }
+
+      // 6. Record confirmed payment in Firestore
+      await db.collection("payments").doc(tid).set({
+        userId: pending.uid,
+        userEmail: pending.userEmail || "",
+        productId: pending.productId || "",
+        itemId: pending.itemId || "",
+        amount: Number(pending.amount),
+        orderId: pending.orderId || tid,
+        paymentKey: tid,
+        method: "DANAL_CARD",
+        status: "DONE",
+        createdAt: FieldValue.serverTimestamp(),
+        danalResult: {
+          cardName: billResult.CARDNAME || "",
+          cardCode: billResult.CARDCODE || "",
+          cardNo: billResult.CARDNO || "",
+          tid,
+        },
+      });
+
+      await db.collection("pending_danal_orders").doc(tid).update({
+        status: "confirmed",
+        confirmedAt: FieldValue.serverTimestamp(),
+      });
+
+      console.log(`[Danal Card Return] Payment CONFIRMED & recorded: TID=${tid}, amount=${pending.amount}, card=${billResult.CARDNAME || ""}`);
+
+      targetUrl.searchParams.set("danal", "card_confirmed");
+      targetUrl.searchParams.set("tid", tid);
+      targetUrl.searchParams.set("productId", pending.productId || "");
+      targetUrl.searchParams.set("itemId", pending.itemId || "");
+      targetUrl.searchParams.set("amount", String(pending.amount));
       return res.redirect(302, targetUrl.toString());
     } catch (err) {
       console.error("[Danal Card Return] Error:", err);
-      return res.redirect(302, "https://luckypick-ec4cf.web.app/?danal=cancel");
+      const errUrl = buildSafeRedirect(req.query.redirect);
+      errUrl.searchParams.set("danal", "card_failed");
+      errUrl.searchParams.set("msg", `결제 승인 처리 중 오류: ${err.message || err}`);
+      return res.redirect(302, errUrl.toString());
     }
   }
 );

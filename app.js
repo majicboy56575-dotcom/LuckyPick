@@ -340,38 +340,103 @@ function navigate() {
       return;
     }
     // Default: Fixed-Price Item Purchase
-    alert(`🎉 [${payMethod} 결제 완료] 상품 구매가 완료되었습니다.`);
-    executeUnboxingAnimation(prodId, payMethod === '다날 휴대폰 소액결제' ? 'danal_phone' : 'danal');
+    const chosenItemId = sessionStorage.getItem('danal_pending_item_id') || '';
+    sessionStorage.removeItem('danal_pending_item_id');
+    executeUnboxingAnimation(prodId, payMethod === '다날 휴대폰 소액결제' ? 'danal_phone' : 'danal', chosenItemId);
   };
 
   // --- Danal Payment Cross-Window Message Listener (for popup flow) ---
-  window.addEventListener('message', async (event) => {
-    if (event.origin !== window.location.origin) return;
-    if (event.data && event.data.type === 'DANAL_PAYMENT_SUCCESS') {
-      const { status, returnParams, amount, productId } = event.data;
-      if (status === 'card_return' && returnParams) {
-        try {
-          const result = await handleDanalSuccess(returnParams, amount, productId, null, 'card');
-          if (result && result.success) {
-            await handlePaymentSuccessAction(productId, amount, '다날 신용카드');
-          } else {
-            alert(`다날 결제 실패: ${result?.message || '승인 실패'}`);
+  if (!window.__danalMsgBound) {
+    window.__danalMsgBound = true;
+    window.addEventListener('message', async (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data && event.data.type === 'DANAL_PAYMENT_SUCCESS') {
+        const { status, returnParams, amount, productId, itemId } = event.data;
+        if (itemId) sessionStorage.setItem('danal_pending_item_id', itemId);
+        if (status === 'card_confirmed') {
+          await handlePaymentSuccessAction(productId, amount, '다날 신용카드');
+        } else if (status === 'card_failed') {
+          alert(`⚠️ 결제 승인 실패\n\n${event.data.msg || '카드사 승인이 거절되었습니다.'}${event.data.code ? ` (코드: ${event.data.code})` : ''}`);
+        } else if (status === 'card_return' && returnParams) {
+          try {
+            const result = await handleDanalSuccess(returnParams, amount, productId, null, 'card');
+            if (result && result.success) {
+              await handlePaymentSuccessAction(productId, amount, '다날 신용카드');
+            } else {
+              alert(`다날 결제 실패: ${result?.message || '승인 실패'}`);
+            }
+          } catch (err) {
+            console.error('[Danal] Popup confirm error:', err);
+            alert(`다날 결제 승인 실패: ${err.message || '오류가 발생했습니다.'}`);
           }
-        } catch (err) {
-          console.error('[Danal] Popup confirm error:', err);
-          alert(`다날 결제 승인 실패: ${err.message || '오류가 발생했습니다.'}`);
+        } else if (status === 'phone_return') {
+          await handlePaymentSuccessAction(productId, amount, '다날 휴대폰 소액결제');
         }
-      } else if (status === 'phone_return') {
-        await handlePaymentSuccessAction(productId, amount, '다날 휴대폰 소액결제');
       }
-    }
-  });
+    });
+  }
 
   // --- Danal Payment Redirect Handlers ---
   const danalStatus = urlParams.get('danal');
   const danalReturnParams = urlParams.get('RETURNPARAMS');
   const danalAmount = urlParams.get('amount');
   const danalProductId = urlParams.get('productId') || sessionStorage.getItem('danal_pending_product') || 'box_basic';
+  const danalItemId = urlParams.get('itemId') || sessionStorage.getItem('danal_pending_item_id') || '';
+  const danalFailCode = urlParams.get('code') || '';
+  const danalFailMsg = urlParams.get('msg') || '';
+
+  if (danalStatus === 'card_confirmed') {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    sessionStorage.removeItem('danal_pending_product');
+    if (danalItemId) sessionStorage.setItem('danal_pending_item_id', danalItemId);
+
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({
+          type: 'DANAL_PAYMENT_SUCCESS',
+          status: 'card_confirmed',
+          amount: danalAmount,
+          productId: danalProductId,
+          itemId: danalItemId
+        }, window.location.origin);
+        window.close();
+        return;
+      } catch (e) {
+        console.warn('[Danal] postMessage to opener failed, continuing in current window:', e);
+      }
+    }
+
+    (async () => {
+      const user = await waitForAuth(6000);
+      if (!user) {
+        alert('결제는 승인되었으나 로그인 정보를 다시 확인해야 합니다. 로그인 후 보관함을 확인해주세요.');
+        window.location.hash = '#profile';
+        return;
+      }
+      await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 신용카드');
+    })();
+    return;
+  }
+
+  if (danalStatus === 'card_failed') {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    sessionStorage.removeItem('danal_pending_product');
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.postMessage({
+          type: 'DANAL_PAYMENT_SUCCESS',
+          status: 'card_failed',
+          code: danalFailCode,
+          msg: danalFailMsg
+        }, window.location.origin);
+        window.close();
+        return;
+      } catch (e) { /* fallthrough */ }
+    }
+    alert(`⚠️ 결제 승인 실패\n\n${danalFailMsg || '카드사 승인이 거절되었습니다.'}${danalFailCode ? ` (코드: ${danalFailCode})` : ''}`);
+    window.location.hash = '#home';
+    return;
+  }
 
   if (danalStatus === 'cancel') {
     window.history.replaceState({}, document.title, window.location.pathname);

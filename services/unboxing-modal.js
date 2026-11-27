@@ -457,15 +457,22 @@ window.__switchModalProduct = (itemId, tierId) => {
 };
 
 // Legacy compatibility export for app.js and router
-export async function executeUnboxingAnimation(tierOrItemId, paymentMethod = 'points') {
+export async function executeUnboxingAnimation(tierOrItemId, paymentMethod = 'points', explicitItemId = '') {
   const all = getAllStoreProducts();
-  const product = all.find(p => p.id === tierOrItemId) || all.find(p => p.tierId === tierOrItemId) || all[0];
+  const product =
+    (explicitItemId && all.find(p => p.id === explicitItemId)) ||
+    all.find(p => p.id === tierOrItemId) ||
+    all.find(p => p.tierId === tierOrItemId) ||
+    all[0];
   if (!product) return;
 
   if (paymentMethod === 'danal' || paymentMethod === 'danal_phone') {
     try {
-      const res = await purchaseProductServer(product.id, product.tierId || 'tier_5k', paymentMethod);
-      showPurchaseSuccessModal(res.item, res.tier, res.earnedTickets, res.newPoints, res.newGoldenTickets);
+      const res = await purchaseProductServer(product.id, product.tierId || 'box_basic', paymentMethod);
+      const item = res.purchasedItem || res.item || product;
+      const earnedTickets = res.earnedTickets || (item.retailPrice >= 20000 ? 11 : item.retailPrice >= 10000 ? 5 : 2);
+      const totalTickets = res.newTickets ?? res.newGoldenTickets ?? getAvailableGoldenTicketsCount();
+      showPurchaseSuccessModal(item, earnedTickets, totalTickets, res.newPoints);
     } catch (err) {
       alert(`구매 처리 오류: ${err.message || err}`);
     }

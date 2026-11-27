@@ -52,9 +52,9 @@ async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', 
   }
 
   const baseUrl = window.location.origin + window.location.pathname;
-  const itemQuery = metadata && metadata.itemId ? `&itemId=${encodeURIComponent(metadata.itemId)}` : '';
-  // Danal POSTs RETURNPARAMS to RETURNURL; route through Cloud Function so POST body is captured and forwarded to SPA
-  const returnUrl = `${DANAL_CARD_RETURN_ENDPOINT}?redirect=${encodeURIComponent(baseUrl)}&productId=${encodeURIComponent(productId)}&amount=${amount}${itemQuery}`;
+  const itemId = (metadata && metadata.itemId) || '';
+  // Clean RETURNURL with ZERO '&' query params (order metadata is saved in Firestore by TID)
+  const returnUrl = DANAL_CARD_RETURN_ENDPOINT;
   const cancelUrl = `${baseUrl}?danal=cancel`;
 
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 900;
@@ -103,6 +103,8 @@ async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', 
       amount: Number(amount),
       itemName,
       productId,
+      itemId,
+      redirectBase: baseUrl,
       returnUrl,
       cancelUrl,
       userAgent: danalUserAgent

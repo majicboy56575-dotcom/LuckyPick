@@ -107,26 +107,40 @@ async function readyDanalCardPayment({
 }
 
 /**
- * 2. Danal Credit Card / EasyPay Confirm API
+ * 2-A. Decrypt Danal RETURNPARAMS (returns { RETURNCODE, RETURNMSG, TID, ... })
  */
-async function confirmDanalCardPayment({ returnParams, amount }) {
+function decryptDanalReturnParams(returnParams) {
   const decrypted = decryptDanal(
     DANAL_CARD_CONFIG.ENC_KEY,
     DANAL_CARD_CONFIG.ENC_IV,
     returnParams
   );
-  const cpCgiData = querystring.parse(decrypted);
+  return querystring.parse(decrypted);
+}
+
+/**
+ * 2-B. Execute Danal Credit Card Final Approval (TXTYPE=BILL)
+ */
+async function billDanalCard({ tid, amount }) {
+  const billResult = await sendTx(DANAL_CARD_CONFIG, {
+    AMOUNT: Number(amount),
+    TID: tid,
+    TXTYPE: 'BILL',
+    SERVICETYPE: 'DANALCARD'
+  });
+  console.log(`[Danal BILL] TID=${tid}, RETURNCODE=${billResult['RETURNCODE']}, RETURNMSG=${billResult['RETURNMSG'] || ''}`);
+  return billResult;
+}
+
+/**
+ * 2. Danal Credit Card Confirm API (Decrypt + BILL)
+ */
+async function confirmDanalCardPayment({ returnParams, amount }) {
+  const cpCgiData = decryptDanalReturnParams(returnParams);
   console.log(`[Danal Confirm] Decrypted RETURNPARAMS: RETURNCODE=${cpCgiData['RETURNCODE']}, TID=${cpCgiData['TID']}`);
 
   if (cpCgiData['RETURNCODE'] === '0000') {
-    const billResult = await sendTx(DANAL_CARD_CONFIG, {
-      AMOUNT: Number(amount),
-      TID: cpCgiData['TID'],
-      TXTYPE: 'BILL',
-      SERVICETYPE: 'DANALCARD'
-    });
-    console.log(`[Danal Confirm] BILL result: RETURNCODE=${billResult['RETURNCODE']}, TID=${billResult['TID']}`);
-    return billResult;
+    return await billDanalCard({ tid: cpCgiData['TID'], amount: Number(amount) });
   } else {
     return cpCgiData;
   }
@@ -162,6 +176,8 @@ module.exports = {
   DANAL_CARD_CONFIG,
   DANAL_PHONE_CONFIG,
   readyDanalCardPayment,
+  decryptDanalReturnParams,
+  billDanalCard,
   confirmDanalCardPayment,
   readyDanalPhonePayment
 };
