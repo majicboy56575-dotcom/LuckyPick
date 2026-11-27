@@ -29,14 +29,15 @@ const encryptDanal = (key, iv, text) => {
 };
 
 const decryptDanal = (key, iv, text) => {
-  const encryptedText = Buffer.from(text, 'base64');
+  const normalized = String(text || '').trim().replace(/ /g, '+');
+  const encryptedText = Buffer.from(normalized, 'base64');
   const decipher = crypto.createDecipheriv(
     'aes-256-cbc',
     Buffer.from(key, 'hex'),
     Buffer.from(iv, 'hex')
   );
-  const decrypted = decipher.update(encryptedText);
-  return Buffer.concat([decrypted, decipher.final()]).toString();
+  const decrypted = Buffer.concat([decipher.update(encryptedText), decipher.final()]);
+  return iconv.decode(decrypted, 'euc-kr');
 };
 
 const createTxRequestParam = (config, params) => {
@@ -80,14 +81,15 @@ async function readyDanalCardPayment({
   userId,
   userEmail,
   returnUrl,
-  cancelUrl
+  cancelUrl,
+  userAgent = 'PC'
 }) {
   const params = {
     SUBCPID: '',
     AMOUNT: Number(amount),
     CURRENCY: '410',
     ITEMNAME: itemName || '럭키픽 상품',
-    USERAGENT: 'PC',
+    USERAGENT: userAgent === 'WM' ? 'WM' : 'PC',
     ORDERID: orderId,
     OFFERPERIOD: '',
     USERNAME: userId || 'LuckyPick고객',
@@ -114,6 +116,7 @@ async function confirmDanalCardPayment({ returnParams, amount }) {
     returnParams
   );
   const cpCgiData = querystring.parse(decrypted);
+  console.log(`[Danal Confirm] Decrypted RETURNPARAMS: RETURNCODE=${cpCgiData['RETURNCODE']}, TID=${cpCgiData['TID']}`);
 
   if (cpCgiData['RETURNCODE'] === '0000') {
     const billResult = await sendTx(DANAL_CARD_CONFIG, {
@@ -122,6 +125,7 @@ async function confirmDanalCardPayment({ returnParams, amount }) {
       TXTYPE: 'BILL',
       SERVICETYPE: 'DANALCARD'
     });
+    console.log(`[Danal Confirm] BILL result: RETURNCODE=${billResult['RETURNCODE']}, TID=${billResult['TID']}`);
     return billResult;
   } else {
     return cpCgiData;

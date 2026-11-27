@@ -79,8 +79,7 @@ function shouldAutoShow() {
   if (isPwaStandalone() || !isMobile) return false;
   if (window.location.search.includes('danal=')) return false;
   if (window.location.hash.startsWith('#admin')) return false;
-  if (forceRequested()) return true;
-  return !isDismissed();
+  return true;
 }
 
 function showToast(message) {
@@ -297,13 +296,11 @@ window.__lpPwa = {
   },
 
   later() {
-    dismissFor(DISMISS_DAYS);
     track('PWAInstallLater', { variant: currentVariant });
     closeSheet();
   },
 
   gotIt() {
-    dismissFor(7);
     track('PWAGuideConfirmed', { variant: currentVariant });
     closeSheet();
   },

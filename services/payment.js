@@ -29,10 +29,12 @@ function getSelectedMethod() {
   return selectedMethod;
 }
 
+const DANAL_CARD_RETURN_ENDPOINT = 'https://asia-northeast3-luckypick-ec4cf.cloudfunctions.net/danalCardReturn';
+
 /**
- * --- Danal Credit Card & EasyPay (KakaoPay, NaverPay, SamsungPay) Integration ---
+ * --- Danal Credit Card Integration ---
  */
-async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', productId }) {
+async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', productId, metadata = {} }) {
   trackMetaEvent('InitiateCheckout', {
     content_name: itemName,
     content_ids: [productId],
@@ -43,12 +45,20 @@ async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', 
   // Store pending unboxing target in sessionStorage
   sessionStorage.setItem('danal_pending_product', productId);
   sessionStorage.setItem('pending_unboxing_box_id', productId);
+  if (metadata && metadata.itemId) {
+    sessionStorage.setItem('danal_pending_item_id', metadata.itemId);
+  } else {
+    sessionStorage.removeItem('danal_pending_item_id');
+  }
 
   const baseUrl = window.location.origin + window.location.pathname;
-  const returnUrl = `${baseUrl}?danal=card_return&productId=${encodeURIComponent(productId)}&amount=${amount}`;
+  const itemQuery = metadata && metadata.itemId ? `&itemId=${encodeURIComponent(metadata.itemId)}` : '';
+  // Danal POSTs RETURNPARAMS to RETURNURL; route through Cloud Function so POST body is captured and forwarded to SPA
+  const returnUrl = `${DANAL_CARD_RETURN_ENDPOINT}?redirect=${encodeURIComponent(baseUrl)}&productId=${encodeURIComponent(productId)}&amount=${amount}${itemQuery}`;
   const cancelUrl = `${baseUrl}?danal=cancel`;
 
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 900;
+  const danalUserAgent = isMobile ? 'WM' : 'PC';
   let popup = null;
 
   // On PC, try opening a popup immediately within the click event context to avoid browser popup blockers
@@ -94,7 +104,8 @@ async function requestDanalCardPayment({ amount, itemName = '럭키픽 상품', 
       itemName,
       productId,
       returnUrl,
-      cancelUrl
+      cancelUrl,
+      userAgent: danalUserAgent
     });
   } catch (err) {
     if (popup && !popup.closed) popup.close();
@@ -164,7 +175,8 @@ async function requestDanalPhonePayment({ amount, itemName = '럭키픽 상품',
   const returnUrl = `${baseUrl}?danal=phone_return&productId=${encodeURIComponent(productId)}&amount=${amount}`;
   const cancelUrl = `${baseUrl}?danal=cancel`;
 
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 900;
+  const danalUserAgent = isMobile ? 'WM' : 'PC';
   let popup = null;
 
   // On PC, try opening a popup immediately within the click event context

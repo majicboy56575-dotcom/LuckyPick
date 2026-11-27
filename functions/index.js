@@ -1044,12 +1044,13 @@ exports.readyDanalPayment = onRequest(
         productId,
         returnUrl,
         cancelUrl,
+        userAgent = "PC",
       } = bodyData;
 
       const userEmail = (authUser && authUser.email) || bodyData.userEmail || "";
       const orderId = `LP_DANAL_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      console.log(`[Danal Ready] Method: ${method}, user: ${uid}, amount: ${amount}, item: ${itemName}`);
+      console.log(`[Danal Ready] Method: ${method}, UA: ${userAgent}, user: ${uid}, amount: ${amount}, item: ${itemName}`);
 
       if (method === "card") {
         const result = await readyDanalCardPayment({
@@ -1060,6 +1061,7 @@ exports.readyDanalPayment = onRequest(
           userEmail,
           returnUrl,
           cancelUrl,
+          userAgent,
         });
 
         console.log(`[Danal Ready] Card response code: ${result.RETURNCODE}, TID: ${result.TID}`);
@@ -1221,6 +1223,59 @@ exports.confirmDanalPayment = onRequest(
       return res.status(200).json({
         error: { message: `결제 승인 처리 오류: ${err.message}`, status: "INTERNAL" }
       });
+    }
+  }
+);
+
+
+// ============================================
+// 10-C. danalCardReturn (HTTP POST Receiver for Danal RETURNURL)
+// Danal sends RETURNPARAMS via HTTP POST form body after card auth.
+// Static Firebase Hosting cannot read POST bodies, so this endpoint
+// captures RETURNPARAMS and 302-redirects back to the SPA.
+// ============================================
+exports.danalCardReturn = onRequest(
+  { region: "asia-northeast3", invoker: "public", cors: true },
+  async (req, res) => {
+    try {
+      const returnParams =
+        (req.body && (req.body.RETURNPARAMS || req.body.returnparams)) ||
+        req.query.RETURNPARAMS ||
+        req.query.returnparams ||
+        "";
+
+      const rawRedirect = String(req.query.redirect || "https://luckypick-ec4cf.web.app/");
+      const allowedOrigins = [
+        "https://luckypick-ec4cf.web.app",
+        "https://luckypick-ec4cf.firebaseapp.com",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+      ];
+
+      let targetUrl;
+      try {
+        const parsed = new URL(rawRedirect);
+        targetUrl = allowedOrigins.includes(parsed.origin)
+          ? parsed
+          : new URL("https://luckypick-ec4cf.web.app/");
+      } catch (e) {
+        targetUrl = new URL("https://luckypick-ec4cf.web.app/");
+      }
+
+      targetUrl.searchParams.set("danal", "card_return");
+      if (req.query.productId) targetUrl.searchParams.set("productId", String(req.query.productId));
+      if (req.query.amount) targetUrl.searchParams.set("amount", String(req.query.amount));
+      if (req.query.itemId) targetUrl.searchParams.set("itemId", String(req.query.itemId));
+      if (returnParams) targetUrl.searchParams.set("RETURNPARAMS", String(returnParams));
+
+      console.log(
+        `[Danal Card Return] method=${req.method}, hasReturnParams=${Boolean(returnParams)}, len=${String(returnParams).length}, productId=${req.query.productId || ""}, amount=${req.query.amount || ""}`
+      );
+
+      return res.redirect(302, targetUrl.toString());
+    } catch (err) {
+      console.error("[Danal Card Return] Error:", err);
+      return res.redirect(302, "https://luckypick-ec4cf.web.app/?danal=cancel");
     }
   }
 );

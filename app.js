@@ -47,24 +47,26 @@ function renderHeader(pageName) {
   const showInstallBtn = !isPwaStandalone();
 
   return `
-    <header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-xs flex justify-between items-center h-16 px-container-margin max-w-full border-b border-slate-200/80">
-      <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.hash='#home'">
-        <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center font-black shadow-sm">🎁</span>
-        <span class="font-display-lg text-primary font-black text-[22px]">LuckyPick</span>
-      </div>
-      <div class="flex items-center gap-2">
-        ${showInstallBtn ? `
-          <button onclick="window.__lpOpenInstallPrompt && window.__lpOpenInstallPrompt()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-all active:scale-95 cursor-pointer" title="${t('installAppBtn')}">
-            <span class="material-symbols-outlined text-[16px]">install_mobile</span>
-            <span class="whitespace-nowrap">${t('installAppBtn')}</span>
-          </button>
-        ` : ''}
-        ${renderLanguageDropdown('header-lang-dropdown')}
-        ${showAdminButton ? `
-          <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all text-slate-700" onclick="window.location.hash='#admin'" title="Admin">
-            <span class="material-symbols-outlined">admin_panel_settings</span>
-          </button>
-        ` : ''}
+    <header class="app-header fixed top-0 left-0 right-0 w-full z-50 bg-white/95 backdrop-blur-md shadow-xs border-b border-slate-200/80">
+      <div class="app-header-inner max-w-full">
+        <div class="flex items-center gap-2 cursor-pointer shrink-0" onclick="window.location.hash='#home'">
+          <span class="w-8 h-8 rounded-xl bg-primary text-white flex items-center justify-center font-black shadow-sm">🎁</span>
+          <span class="font-display-lg text-primary font-black text-[20px] sm:text-[22px] whitespace-nowrap">LuckyPick</span>
+        </div>
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          ${showInstallBtn ? `
+            <button onclick="window.__lpOpenInstallPrompt && window.__lpOpenInstallPrompt()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs transition-all active:scale-95 cursor-pointer" title="${t('installAppBtn')}">
+              <span class="material-symbols-outlined text-[16px]">install_mobile</span>
+              <span class="whitespace-nowrap">${t('installAppBtn')}</span>
+            </button>
+          ` : ''}
+          ${renderLanguageDropdown('header-lang-dropdown')}
+          ${showAdminButton ? `
+            <button class="flex items-center justify-center p-2 rounded-full hover:bg-surface-variant/20 transition-all text-slate-700" onclick="window.location.hash='#admin'" title="Admin">
+              <span class="material-symbols-outlined">admin_panel_settings</span>
+            </button>
+          ` : ''}
+        </div>
       </div>
     </header>`;
 }
@@ -79,13 +81,13 @@ function renderBottomNav(pageName) {
   ];
 
   return `
-    <nav class="fixed bottom-0 w-full z-50 bg-white/90 backdrop-blur-md border-t border-slate-200/80 shadow-lg flex justify-around items-center h-20 pb-safe px-4">
+    <nav class="app-bottom-nav fixed bottom-0 left-0 right-0 w-full z-50 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-lg flex justify-around items-center">
       ${tabs.map(tab => {
         const isActive = pageName === tab.key;
         return `
-          <a class="flex flex-col items-center justify-center ${isActive ? 'bg-primary text-white rounded-2xl px-5 py-1.5 shadow-sm' : 'text-slate-500 hover:text-primary'} transition-all scale-95 active:scale-90" href="#${tab.key}">
-            <span class="material-symbols-outlined">${tab.icon}</span>
-            <span class="text-[11px] font-bold mt-0.5">${tab.label}</span>
+          <a class="flex flex-col items-center justify-center ${isActive ? 'bg-primary text-white rounded-2xl px-5 py-1.5 shadow-sm' : 'text-slate-500 hover:text-primary px-3 py-1'} transition-all scale-95 active:scale-90" href="#${tab.key}">
+            <span class="material-symbols-outlined text-[22px]">${tab.icon}</span>
+            <span class="text-[11px] font-bold mt-0.5 whitespace-nowrap">${tab.label}</span>
           </a>`;
       }).join('')}
     </nav>`;
@@ -382,6 +384,17 @@ function navigate() {
     return;
   }
 
+  if (danalStatus === 'card_return' && !danalReturnParams) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    if (window.opener && !window.opener.closed) {
+      window.close();
+      return;
+    }
+    alert('다날 결제 인증 결과(RETURNPARAMS)를 수신하지 못해 결제가 승인되지 않았습니다. 다시 시도해주세요.');
+    window.location.hash = '#home';
+    return;
+  }
+
   if (danalStatus === 'card_return' && danalReturnParams) {
     window.history.replaceState({}, document.title, window.location.pathname);
     sessionStorage.removeItem('danal_pending_product');
@@ -489,7 +502,7 @@ function navigate() {
       app.innerHTML = route.render();
       if (route.init) route.init();
     } else {
-      app.innerHTML = renderHeader(pageName) + route.render() + renderFooter(pageName) + renderBottomNav(pageName);
+      app.innerHTML = renderHeader(pageName) + `<div class="app-page-shell">${route.render() + renderFooter(pageName)}</div>` + renderBottomNav(pageName);
     }
   } catch (renderError) {
     console.error(`[Router] Error rendering page ${pageName}:`, renderError);
