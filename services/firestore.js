@@ -14,11 +14,9 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   getDocs,
-  setDoc,
-  deleteDoc,
-  updateDoc,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import {
   getFunctions,
@@ -84,15 +82,13 @@ if (isFirebaseConfigured()) {
     );
 
     // ==========================================
-    // Real-time Listener: Closed Products
+    // Real-time Listener: Closed Products (latest 30 only to prevent unbounded reads)
     // ==========================================
     onSnapshot(
-      collection(db, 'closed_products'),
+      query(collection(db, 'closed_products'), orderBy('closedAt', 'desc'), limit(30)),
       (snapshot) => {
         const products = [];
         snapshot.forEach((doc) => products.push({ id: doc.id, ...doc.data() }));
-        // Sort by closedAt descending
-        products.sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
         closedProductsCache = products;
         window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
       },
@@ -188,35 +184,43 @@ if (isFirebaseConfigured()) {
         if (userDocUnsub) { userDocUnsub(); userDocUnsub = null; }
       }
 
-      if (!shippingUnsub) {
-        shippingUnsub = onSnapshot(
-          collection(db, 'shipping_infos'),
-          (snapshot) => {
-            const infos = [];
-            snapshot.forEach((doc) => infos.push({ id: doc.id, ...doc.data() }));
-            infos.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
-            shippingCache = infos;
-            window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-          },
-          (error) => {
-            console.warn('[Firestore] Shipping listener warning:', error.message);
-          }
-        );
-      }
+      // Admin-only collection listeners (NEVER download full users/shipping_infos for regular users)
+      const isAdminUser = Boolean(user?.email && user.email === 'majicboy56575@gmail.com');
+      if (isAdminUser) {
+        if (!shippingUnsub) {
+          shippingUnsub = onSnapshot(
+            query(collection(db, 'shipping_infos'), orderBy('submittedAt', 'desc'), limit(200)),
+            (snapshot) => {
+              const infos = [];
+              snapshot.forEach((doc) => infos.push({ id: doc.id, ...doc.data() }));
+              shippingCache = infos;
+              window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+            },
+            (error) => {
+              console.warn('[Firestore] Shipping listener warning:', error.message);
+            }
+          );
+        }
 
-      if (!usersUnsub) {
-        usersUnsub = onSnapshot(
-          collection(db, 'users'),
-          (snapshot) => {
-            const users = [];
-            snapshot.forEach((doc) => users.push({ id: doc.id, ...doc.data() }));
-            usersCache = users;
-            window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-          },
-          (error) => {
-            // Non-admin will receive permission denied for whole collection, which is normal
-          }
-        );
+        if (!usersUnsub) {
+          usersUnsub = onSnapshot(
+            query(collection(db, 'users'), limit(500)),
+            (snapshot) => {
+              const users = [];
+              snapshot.forEach((doc) => users.push({ id: doc.id, ...doc.data() }));
+              usersCache = users;
+              window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+            },
+            (error) => {
+              console.warn('[Firestore] Users listener warning:', error.message);
+            }
+          );
+        }
+      } else {
+        if (shippingUnsub) { shippingUnsub(); shippingUnsub = null; }
+        if (usersUnsub) { usersUnsub(); usersUnsub = null; }
+        shippingCache = [];
+        usersCache = [];
       }
     };
 
@@ -372,8 +376,9 @@ async function ensureInitialFirestoreData(defaultBoxes) {
     boxCatalogCache = defaultBoxes;
   }
 
-  // Auto-sync backend if box catalog document is missing in Firestore
-  if (db && functions) {
+  // Auto-sync backend only if signed-in admin and box catalog document is missing
+  const authUser = getCurrentAuthUser();
+  if (db && functions && authUser?.email === 'majicboy56575@gmail.com') {
     try {
       const catRef = doc(db, 'box_catalogs', 'default');
       const catSnap = await getDoc(catRef);

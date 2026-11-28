@@ -26,10 +26,10 @@ jobs:
         run: npm ci
         working-directory: functions
 
-      - name: Deploy Cloud Functions
+      - name: Deploy Cloud Functions & Firestore Rules
         uses: w9jds/firebase-action@master
         continue-on-error: true
         with:
-          args: deploy --only functions
+          args: deploy --only functions,firestore:rules
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUCKYPICK_EC4CF }}
