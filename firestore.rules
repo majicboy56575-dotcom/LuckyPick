@@ -25,10 +25,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Special Golden Raffles: public read, all writes via Cloud Functions only
+    // Special Golden Raffles & scalable entries subcollection: public read, Cloud Functions write only
     match /super_raffles/{raffleId} {
       allow read: if true;
       allow write: if false;
+
+      match /entries/{entryId} {
+        allow read: if true;
+        allow write: if false;
+      }
     }
 
     // Winner shipping details: owner or admin read only, writes via Cloud Functions only

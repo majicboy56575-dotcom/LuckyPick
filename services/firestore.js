@@ -50,6 +50,7 @@ let shippingCache = [];
 let usersCache = [];
 let currentUserDocCache = null;
 let superRafflesCache = [];
+let raffleEntriesCache = {};
 let boxCatalogCache = null;
 
 if (isFirebaseConfigured()) {
@@ -179,6 +180,8 @@ if (isFirebaseConfigured()) {
             console.error('[Firestore] User document listener ERROR:', error.code, error.message);
           }
         );
+        // Load user's own subcollection raffle entries for Profile > My Tickets
+        setTimeout(() => fetchMyRaffleEntries(user.uid), 400);
       } else {
         currentUserDocCache = null;
         if (userDocUnsub) { userDocUnsub(); userDocUnsub = null; }
@@ -258,6 +261,61 @@ async function saveUserDocData(data) {
 
 function getSuperRafflesCache() {
   return superRafflesCache || [];
+}
+
+function getRaffleEntriesCache(raffleId) {
+  return raffleEntriesCache[raffleId] || [];
+}
+
+async function fetchRaffleEntries(raffleId, maxEntries = 500) {
+  if (!db || !raffleId) return raffleEntriesCache[raffleId] || [];
+  try {
+    const q = query(
+      collection(db, 'super_raffles', raffleId, 'entries'),
+      orderBy('slotIndex', 'asc'),
+      limit(maxEntries)
+    );
+    const snap = await getDocs(q);
+    const list = [];
+    snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+    raffleEntriesCache[raffleId] = list;
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+    return list;
+  } catch (e) {
+    console.warn('[Firestore] fetchRaffleEntries warning:', e.message);
+    return raffleEntriesCache[raffleId] || [];
+  }
+}
+
+async function fetchMyRaffleEntries(uid) {
+  if (!db || !uid) return;
+  const raffles = superRafflesCache || [];
+  await Promise.all(
+    raffles.map(async (r) => {
+      if (!r?.id) return;
+      try {
+        const q = query(
+          collection(db, 'super_raffles', r.id, 'entries'),
+          where('userId', '==', uid),
+          limit(100)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return;
+        const existing = raffleEntriesCache[r.id] || [];
+        const map = new Map(existing.map((e) => [e.ticketId || e.id, e]));
+        snap.forEach((d) => {
+          const data = { id: d.id, ...d.data() };
+          map.set(data.ticketId || d.id, data);
+        });
+        raffleEntriesCache[r.id] = Array.from(map.values()).sort(
+          (a, b) => (Number(a.slotIndex) || 0) - (Number(b.slotIndex) || 0)
+        );
+      } catch (e) {
+        // Ignore single-raffle fetch warning
+      }
+    })
+  );
+  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
 }
 
 async function saveSuperRaffleToFirestore(raffle) {
@@ -752,6 +810,14 @@ async function applyGoldenRaffleServer(raffleId, count = 1) {
     if (currentUserDocCache) currentUserDocCache.goldenTickets = result.data.newTickets;
     window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: result.data.newTickets } }));
   }
+  if (Array.isArray(result?.data?.entries) && result.data.entries.length > 0) {
+    const existing = raffleEntriesCache[raffleId] || [];
+    const map = new Map(existing.map((e) => [e.ticketId || e.id, e]));
+    result.data.entries.forEach((e) => map.set(e.ticketId || e.id, e));
+    raffleEntriesCache[raffleId] = Array.from(map.values()).sort(
+      (a, b) => (Number(a.slotIndex) || 0) - (Number(b.slotIndex) || 0)
+    );
+  }
   return result.data;
 }
 
@@ -762,6 +828,11 @@ async function cancelGoldenRaffleServer(raffleId, ticketId) {
   if (result?.data?.newTickets !== undefined) {
     if (currentUserDocCache) currentUserDocCache.goldenTickets = result.data.newTickets;
     window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: result.data.newTickets } }));
+  }
+  if (raffleEntriesCache[raffleId]) {
+    raffleEntriesCache[raffleId] = raffleEntriesCache[raffleId].filter(
+      (e) => e.ticketId !== ticketId && e.id !== ticketId
+    );
   }
   return result.data;
 }
@@ -847,6 +918,20 @@ async function clearTicketRefundNoticesServer() {
   if (!functions) return { success: false };
   const callable = httpsCallable(functions, 'clearTicketRefundNotices');
   const result = await callable({});
+  return result.data;
+}
+
+async function getAdminDashboardCountsServer() {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'getAdminDashboardCounts');
+  const result = await callable({});
+  return result.data;
+}
+
+async function getAdminMembersServer(params = {}) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'getAdminMembers');
+  const result = await callable(params);
   return result.data;
 }
 
@@ -969,6 +1054,9 @@ export {
   getCurrentUserDocCache,
   saveUserDocData,
   getSuperRafflesCache,
+  getRaffleEntriesCache,
+  fetchRaffleEntries,
+  fetchMyRaffleEntries,
   saveSuperRaffleToFirestore,
   deleteSuperRaffleFromFirestore,
   getBoxCatalogCache,
@@ -995,4 +1083,6 @@ export {
   cleanDuplicateVaultItemsServer,
   deleteVaultItemServer,
   clearTicketRefundNoticesServer,
+  getAdminDashboardCountsServer,
+  getAdminMembersServer,
 };

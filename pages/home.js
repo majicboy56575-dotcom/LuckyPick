@@ -12,6 +12,7 @@ import {
   getDailyRaffleStats,
   applyGoldenTicketsToRaffle,
   getRaffleGroupData,
+  fetchRaffleEntries,
   cancelGoldenTicketApplication,
   checkAndResolveRaffleExpirations
 } from '../services/randombox.js';
@@ -649,10 +650,17 @@ export function render() {
   };
 
   window.__openTransparencyModal = (raffleId) => {
-    const container = document.getElementById('home-modal-container') || document.body;
-    const existing = document.getElementById('transparency-modal');
-    if (existing) existing.remove();
-    container.insertAdjacentHTML('beforeend', renderTransparencyModal(raffleId));
+    const renderModal = () => {
+      const container = document.getElementById('home-modal-container') || document.body;
+      const existing = document.getElementById('transparency-modal');
+      if (existing) existing.remove();
+      container.insertAdjacentHTML('beforeend', renderTransparencyModal(raffleId));
+    };
+    renderModal();
+    // On-demand fetch of scalable subcollection entries (never blocks home page load)
+    fetchRaffleEntries(raffleId).then(() => {
+      if (document.getElementById('transparency-modal')) renderModal();
+    }).catch(() => {});
   };
 
   window.__closeTransparencyModal = () => {

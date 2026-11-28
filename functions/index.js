@@ -1839,18 +1839,20 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
     }
 
     const raffle = raffleDoc.data();
-    if (raffle.status === "closed") {
-      throw new HttpsError("failed-precondition", "이미 마감된 래플입니다.");
+    if (raffle.status === "closed" || raffle.status === "drawing") {
+      throw new HttpsError("failed-precondition", "이미 마감되었거나 추첨 중인 래플입니다.");
     }
 
-    const entries = raffle.entries || [];
+    const legacyCount = (raffle.entries || []).length;
+    const baseCount = Math.max(Number(raffle.currentParticipants) || 0, legacyCount);
     const createdEntries = [];
 
     for (let i = 0; i < applyCount; i++) {
-      const nextSlot = entries.length + 1;
-      const ticketNumber = `#${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      const nextSlot = baseCount + i + 1;
+      const ticketNumber = `#${crypto.randomInt(1000, 10000)}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+      const ticketId = "t_" + Date.now() + "_" + i + "_" + crypto.randomUUID().slice(0, 6);
       const newEntry = {
-        ticketId: "t_" + Date.now() + "_" + i + "_" + Math.random().toString(36).substr(2, 4),
+        ticketId,
         ticketNumber,
         userId: uid,
         userName: maskName(callerName),
@@ -1859,7 +1861,9 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
         slotIndex: nextSlot,
         status: "active"
       };
-      entries.push(newEntry);
+      // Store each entry in scalable subcollection (avoids 1MB single-document limit)
+      const entryRef = raffleRef.collection("entries").doc(ticketId);
+      transaction.set(entryRef, newEntry);
       createdEntries.push(newEntry);
     }
 
@@ -1867,16 +1871,20 @@ exports.applyGoldenRaffle = onCall({ region: "asia-northeast3" }, async (request
     const newDailyCount = usedToday + applyCount;
     dailyRaffleByProduct[raffleId] = { date: today, count: newDailyCount };
 
-    transaction.update(userRef, { 
-      goldenTickets: newTickets, 
+    transaction.update(userRef, {
+      goldenTickets: newTickets,
       dailyRaffleByProduct,
-      updatedAt: Date.now() 
+      updatedAt: Date.now()
     });
-    transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
+    transaction.update(raffleRef, {
+      currentParticipants: baseCount + applyCount,
+      entriesStorage: "subcollection",
+      updatedAt: Date.now()
+    });
 
-    return { 
-      newTickets, 
-      appliedCount: applyCount, 
+    return {
+      newTickets,
+      appliedCount: applyCount,
       entries: createdEntries,
       raffle: { id: raffleId, title: raffle.title, retailPrice: raffle.retailPrice }
     };
@@ -1900,35 +1908,64 @@ exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (reques
 
   const userRef = db.collection("users").doc(uid);
   const raffleRef = db.collection("super_raffles").doc(raffleId);
+  const subEntryRef = raffleRef.collection("entries").doc(String(ticketId));
 
   const result = await db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    const raffleDoc = await transaction.get(raffleRef);
+    const [userDoc, raffleDoc, subEntryDoc] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(raffleRef),
+      transaction.get(subEntryRef)
+    ]);
     if (!raffleDoc.exists) throw new HttpsError("not-found", "해당 골든 래플을 찾을 수 없습니다.");
 
     const raffle = raffleDoc.data();
-    if (raffle.status === "closed") throw new HttpsError("failed-precondition", "이미 마감된 래플의 응모는 취소할 수 없습니다.");
-
-    const entries = raffle.entries || [];
-    const index = entries.findIndex((e) => e.ticketId === ticketId);
-    if (index === -1) throw new HttpsError("not-found", "해당 티켓 응모 내역을 찾을 수 없습니다.");
-
-    const entry = entries[index];
-    if (entry.userId !== uid) throw new HttpsError("permission-denied", "본인의 티켓만 취소할 수 있습니다.");
-
-    // Completed Group Check
-    const unitSize = raffle.unitSize || 200;
-    const groupIndex = Math.floor(index / unitSize);
-    const isCompletedGroup = (groupIndex + 1) * unitSize <= entries.length;
-    if (isCompletedGroup) {
-      throw new HttpsError("failed-precondition", "이미 목표 인원을 100% 달성하여 추첨이 확정된 그룹은 취소할 수 없습니다.");
+    if (raffle.status === "closed" || raffle.status === "drawing") {
+      throw new HttpsError("failed-precondition", "이미 마감되었거나 추첨 중인 래플의 응모는 취소할 수 없습니다.");
     }
 
-    // Remove entry and shift
-    const [removedEntry] = entries.splice(index, 1);
-    entries.forEach((e, idx) => {
-      e.slotIndex = idx + 1;
-    });
+    const unitSize = Number(raffle.unitSize) || 200;
+    const legacyEntries = raffle.entries || [];
+    const totalCount = Math.max(Number(raffle.currentParticipants) || 0, legacyEntries.length);
+
+    let removedEntry = null;
+    if (subEntryDoc.exists) {
+      const entry = subEntryDoc.data();
+      if (entry.userId !== uid) throw new HttpsError("permission-denied", "본인의 티켓만 취소할 수 있습니다.");
+      const groupIndex = Math.floor((Math.max(1, Number(entry.slotIndex) || 1) - 1) / unitSize);
+      const isCompletedGroup = (groupIndex + 1) * unitSize <= totalCount;
+      if (isCompletedGroup) {
+        throw new HttpsError("failed-precondition", "이미 목표 인원을 100% 달성하여 추첨이 확정된 그룹은 취소할 수 없습니다.");
+      }
+      removedEntry = entry;
+      transaction.delete(subEntryRef);
+      transaction.update(raffleRef, {
+        currentParticipants: Math.max(0, totalCount - 1),
+        updatedAt: Date.now()
+      });
+    } else {
+      const entries = [...legacyEntries];
+      const index = entries.findIndex((e) => e.ticketId === ticketId);
+      if (index === -1) throw new HttpsError("not-found", "해당 티켓 응모 내역을 찾을 수 없습니다.");
+
+      const entry = entries[index];
+      if (entry.userId !== uid) throw new HttpsError("permission-denied", "본인의 티켓만 취소할 수 있습니다.");
+
+      const groupIndex = Math.floor(index / unitSize);
+      const isCompletedGroup = (groupIndex + 1) * unitSize <= totalCount;
+      if (isCompletedGroup) {
+        throw new HttpsError("failed-precondition", "이미 목표 인원을 100% 달성하여 추첨이 확정된 그룹은 취소할 수 없습니다.");
+      }
+
+      [removedEntry] = entries.splice(index, 1);
+      entries.forEach((e, idx) => {
+        e.slotIndex = idx + 1;
+      });
+      transaction.update(raffleRef, {
+        entries,
+        currentParticipants: Math.max(0, totalCount - 1),
+        updatedAt: Date.now()
+      });
+    }
 
     const userData = userDoc.exists ? userDoc.data() : { goldenTickets: 0 };
     const newTickets = (Number(userData.goldenTickets) || 0) + 1;
@@ -1939,12 +1976,11 @@ exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (reques
       dailyRaffleByProduct[raffleId].count = Math.max(0, dailyRaffleByProduct[raffleId].count - 1);
     }
 
-    transaction.update(userRef, { 
-      goldenTickets: newTickets, 
+    transaction.update(userRef, {
+      goldenTickets: newTickets,
       dailyRaffleByProduct,
-      updatedAt: Date.now() 
+      updatedAt: Date.now()
     });
-    transaction.update(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() });
 
     return { newTickets, removedEntry };
   });
@@ -2524,6 +2560,67 @@ exports.clearTicketRefundNotices = onCall({ region: "asia-northeast3" }, async (
     updatedAt: Date.now()
   }, { merge: true });
   return { success: true };
+});
+
+// ============================================
+// 28. getAdminDashboardCounts (Callable) - Scalable Aggregation Counts for 1M+ Users
+// ============================================
+exports.getAdminDashboardCounts = onCall({ region: "asia-northeast3" }, async (request) => {
+  assertAdmin(request, "관리자만 통계를 조회할 수 있습니다.");
+  const [usersCountSnap, pendingShipSnap, rafflesCountSnap] = await Promise.all([
+    db.collection("users").count().get(),
+    db.collection("shipping_infos").where("status", "==", "pending").count().get(),
+    db.collection("super_raffles").count().get()
+  ]);
+  return {
+    success: true,
+    totalMembers: usersCountSnap.data().count,
+    pendingShipments: pendingShipSnap.data().count,
+    totalRaffles: rafflesCountSnap.data().count
+  };
+});
+
+// ============================================
+// 29. getAdminMembers (Callable) - Paginated / Email-Searchable Admin Member Directory
+// ============================================
+exports.getAdminMembers = onCall({ region: "asia-northeast3" }, async (request) => {
+  assertAdmin(request, "관리자만 회원 목록을 조회할 수 있습니다.");
+  const { limitCount = 50, searchEmail = "", startAfterUid = "" } = request.data || {};
+  const pageSize = Math.min(200, Math.max(1, parseInt(limitCount, 10) || 50));
+
+  let snap;
+  if (searchEmail && String(searchEmail).trim()) {
+    const emailQuery = String(searchEmail).trim();
+    snap = await db.collection("users").where("email", "==", emailQuery).limit(20).get();
+  } else {
+    let q = db.collection("users").orderBy("createdAt", "desc").limit(pageSize);
+    if (startAfterUid) {
+      const cursorDoc = await db.collection("users").doc(String(startAfterUid)).get();
+      if (cursorDoc.exists) {
+        q = db.collection("users").orderBy("createdAt", "desc").startAfter(cursorDoc).limit(pageSize);
+      }
+    }
+    snap = await q.get();
+  }
+
+  const members = [];
+  snap.forEach((d) => {
+    const u = d.data();
+    members.push({
+      id: d.id,
+      uid: d.id,
+      displayName: u.displayName || u.name || "",
+      email: u.email || "",
+      points: Number(u.points) || 0,
+      goldenTickets: Number(u.goldenTickets) || 0,
+      vaultCount: Array.isArray(u.vault) ? u.vault.length : 0,
+      status: u.status || "ACTIVE",
+      createdAt: u.createdAt || u.updatedAt || 0
+    });
+  });
+
+  const lastId = members.length > 0 ? members[members.length - 1].id : null;
+  return { success: true, members, nextCursor: members.length === pageSize ? lastId : null };
 });
 
 

@@ -6,7 +6,9 @@
 import { 
   getCurrentUserDocCache, 
   saveUserDocData, 
-  getSuperRafflesCache, 
+  getSuperRafflesCache,
+  getRaffleEntriesCache,
+  fetchRaffleEntries,
   saveSuperRaffleToFirestore, 
   deleteSuperRaffleFromFirestore,
   getBoxCatalogCache, 
@@ -324,6 +326,24 @@ export async function setAvailableGoldenTicketsCount(count) {
 // User is initialized directly via Cloud Functions / Firestore cache
 
 
+// Helper: Merge legacy inline raffle.entries + scalable subcollection cache (deduplicated)
+function getMergedRaffleEntries(raffle) {
+  if (!raffle) return [];
+  const legacy = Array.isArray(raffle.entries) ? raffle.entries : [];
+  const sub = getRaffleEntriesCache(raffle.id) || [];
+  if (sub.length === 0) return legacy;
+  const map = new Map();
+  legacy.forEach((e) => {
+    if (e && e.status !== 'cancelled') map.set(e.ticketId || `${e.userId}_${e.slotIndex}`, e);
+  });
+  sub.forEach((e) => {
+    if (e && e.status !== 'cancelled') map.set(e.ticketId || e.id || `${e.userId}_${e.slotIndex}`, e);
+  });
+  return Array.from(map.values()).sort(
+    (a, b) => (Number(a.slotIndex) || 0) - (Number(b.slotIndex) || 0)
+  );
+}
+
 export function getAppliedGoldenTickets(currentUserId) {
   const authUser = getCurrentAuthUser();
   const myId = currentUserId || authUser?.uid || 'my_user_id';
@@ -332,17 +352,19 @@ export function getAppliedGoldenTickets(currentUserId) {
   const applied = [];
   
   raffles.forEach(raffle => {
-    const entries = raffle.entries || [];
+    const entries = getMergedRaffleEntries(raffle);
     const unitSize = raffle.unitSize || 200;
+    const totalCount = Math.max(Number(raffle.currentParticipants) || 0, entries.length);
     const isClosed = raffle.status === 'closed';
     const isExpired = Date.now() >= (raffle.endTime || 0);
     const winners = raffle.winners || [];
-    const fullGroupsCount = Math.floor(entries.length / unitSize);
+    const fullGroupsCount = Math.floor(totalCount / unitSize);
 
     entries.forEach((entry, idx) => {
       if (entry.userId === myId || (myEmail && entry.userEmail === myEmail) || (myId === 'my_user_id' && entry.userId === 'my_user_id')) {
-        const groupNumber = Math.floor(idx / unitSize) + 1;
-        const isGroupComplete = (groupNumber * unitSize) <= entries.length;
+        const slotNum = Number(entry.slotIndex) || (idx + 1);
+        const groupNumber = Math.floor((slotNum - 1) / unitSize) + 1;
+        const isGroupComplete = (groupNumber * unitSize) <= totalCount;
 
         // Check if this specific ticket won
         const isWinningTicket = winners.some(w => 
@@ -391,8 +413,8 @@ export function getRaffleGroupData(raffle, currentUserId) {
   const myId = currentUserId || authUser?.uid || 'my_user_id';
   const myEmail = authUser?.email || '';
   const unitSize = raffle.unitSize || 200;
-  const entries = raffle.entries || [];
-  const totalCount = entries.length;
+  const entries = getMergedRaffleEntries(raffle);
+  const totalCount = Math.max(Number(raffle.currentParticipants) || 0, entries.length);
 
   const totalGroups = Math.max(1, Math.ceil(totalCount / unitSize) || 1);
   const groups = [];
@@ -400,8 +422,14 @@ export function getRaffleGroupData(raffle, currentUserId) {
   for (let g = 0; g < totalGroups; g++) {
     const startIdx = g * unitSize;
     const endIdx = startIdx + unitSize;
-    const groupEntries = entries.slice(startIdx, endIdx);
-    const count = groupEntries.length;
+    const groupEntries = entries.filter((e, idx) => {
+      const slot = Number(e.slotIndex) || (idx + 1);
+      return slot > startIdx && slot <= endIdx;
+    });
+    const count = Math.max(
+      groupEntries.length,
+      Math.max(0, Math.min(unitSize, totalCount - startIdx))
+    );
     const isComplete = count >= unitSize;
 
     // Check user's participation in this group
@@ -797,6 +825,7 @@ export function createDemoShippingRequest() {
 export {
   openLuckyBoxServer,
   purchaseProductServer,
-  convertVaultItemToPointsServer
+  convertVaultItemToPointsServer,
+  fetchRaffleEntries
 };
 
