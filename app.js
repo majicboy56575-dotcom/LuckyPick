@@ -6,14 +6,14 @@ import { t, setLanguage, getCurrentLanguage, getAvailableLanguages, renderLangua
 import { getCurrentAuthUser, waitForAuth, isAdmin } from './services/auth.js';
 import { getClosedProducts, getCurrentUser, getCurrentUserDocCache, chargeUserPointsServer, requestVaultShippingServer } from './services/firestore.js';
 import { handleDanalSuccess } from '/services/payment.js';
-import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
+import { getTicketRefundNotices, clearTicketRefundNotices, getSuperRaffles, getAppliedGoldenTickets, setUserPoints, setAvailableGoldenTicketsCount, getUserPoints, getAvailableGoldenTicketsCount } from './services/randombox.js';
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 import { isPwaStandalone } from '/services/pwa-install.js'; // PWA: app install prompt (Android one-tap / iPhone guide / in-app browser escape)
 
-import * as homePage from './pages/home.js?v=20261128_V68';
-import * as historyPage from './pages/history.js?v=20261128_V68';
-import * as profilePage from './pages/profile.js?v=20261128_V68';
-import * as adminPage from './pages/admin.js?v=20261128_V68';
+import * as homePage from './pages/home.js?v=20261128_V69';
+import * as historyPage from './pages/history.js?v=20261128_V69';
+import * as profilePage from './pages/profile.js?v=20261128_V69';
+import * as adminPage from './pages/admin.js?v=20261128_V69';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;
@@ -144,12 +144,39 @@ function renderFooter(pageName) {
     </footer>`;
 }
 
+// Persistent per-user dismissed notification keys (0 server cost, survives page reload)
+function getDismissedNoticeKeys(uid) {
+  if (!uid) return [];
+  try {
+    return JSON.parse(localStorage.getItem(`lp_raffle_notified_${uid}`) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function markNoticeDismissed(uid, keys) {
+  if (!uid) return;
+  const list = Array.isArray(keys) ? keys : [keys];
+  const current = new Set(getDismissedNoticeKeys(uid));
+  list.forEach((k) => { if (k) current.add(String(k)); });
+  // Keep latest 200 keys to prevent localStorage bloat
+  const trimmed = Array.from(current).slice(-200);
+  try {
+    localStorage.setItem(`lp_raffle_notified_${uid}`, JSON.stringify(trimmed));
+  } catch (e) {}
+}
+
 // Global Notification Handlers (Defined unconditionally at module top-level)
-window.__dismissTicketRefundNotice = () => {
+window.__dismissTicketRefundNotice = (noticeKey = '') => {
   const modal = document.getElementById('refund-notice-modal');
   if (modal) modal.remove();
-  clearTicketRefundNotices();
-  
+  const authUser = getCurrentAuthUser();
+  if (noticeKey && authUser?.uid) {
+    markNoticeDismissed(authUser.uid, noticeKey);
+  } else {
+    clearTicketRefundNotices();
+  }
+
   // Check if there are more notifications to show
   setTimeout(() => {
     const app = document.getElementById('app');
@@ -157,12 +184,21 @@ window.__dismissTicketRefundNotice = () => {
     if (nextNotification && app) {
       app.insertAdjacentHTML('beforeend', nextNotification);
     }
-  }, 100);
+  }, 120);
 };
 
-window.__closeDrawNotification = (productId) => {
-  const modal = document.getElementById(`draw-result-modal-${productId}`);
+window.__closeDrawNotification = (noticeKey, extraKeysCsv = '') => {
+  const modal = document.querySelector('[id^="draw-result-modal-"]');
   if (modal) modal.remove();
+
+  const authUser = getCurrentAuthUser();
+  if (authUser?.uid) {
+    const keysToDismiss = [noticeKey];
+    if (extraKeysCsv) {
+      extraKeysCsv.split(',').forEach((k) => { if (k) keysToDismiss.push(k); });
+    }
+    markNoticeDismissed(authUser.uid, keysToDismiss);
+  }
 
   // Check if there are more notifications to show
   setTimeout(() => {
@@ -171,17 +207,20 @@ window.__closeDrawNotification = (productId) => {
     if (nextNotification && app) {
       app.insertAdjacentHTML('beforeend', nextNotification);
     }
-  }, 100);
+  }, 120);
 };
 
 function renderDrawResultNotification() {
   const authUser = getCurrentAuthUser();
-  if (!authUser) return '';
+  if (!authUser || !authUser.uid) return '';
 
-  // 1. Golden Ticket Underflow Refund Notices
-  const refundNotices = getTicketRefundNotices();
-  if (refundNotices && refundNotices.length > 0) {
-    const notice = refundNotices[0];
+  const uid = authUser.uid;
+  const dismissed = new Set(getDismissedNoticeKeys(uid));
+
+  // 0. Legacy server ticketRefundNotices if present
+  const legacyRefundNotices = getTicketRefundNotices();
+  if (legacyRefundNotices && legacyRefundNotices.length > 0) {
+    const notice = legacyRefundNotices[0];
     return `
       <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="refund-notice-modal" onclick="if(event.target===this)window.__dismissTicketRefundNotice()">
         <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
@@ -209,94 +248,165 @@ function renderDrawResultNotification() {
       </div>`;
   }
 
-  // Track which products we've already notified about this session
-  const notifiedKey = 'luckypick_draw_notified';
-  let notified = [];
-  try {
-    notified = JSON.parse(sessionStorage.getItem(notifiedKey) || '[]');
-  } catch (e) { notified = []; }
+  // Gather closed Special Golden Raffles (newest first)
+  const closedRaffles = (getSuperRaffles() || [])
+    .filter((r) => r && r.status === 'closed')
+    .sort((a, b) => (Number(b.closedAt) || 0) - (Number(a.closedAt) || 0));
 
-  const closedProducts = getClosedProducts();
-  if (!closedProducts || closedProducts.length === 0) return '';
+  // 1. PRIORITY 1: Special Golden Raffle WIN Notification (checks super_raffles.winners by UID)
+  for (const raffle of closedRaffles) {
+    const winners = Array.isArray(raffle.winners) ? raffle.winners : [];
+    for (const w of winners) {
+      const winnerObj = w?.winner || w;
+      if (!winnerObj || winnerObj.userId !== uid) continue;
+      const ticketId = winnerObj.ticketId || `g${w.groupNumber || 1}`;
+      const noticeKey = `win_${raffle.id}_${ticketId}_${raffle.closedAt || 0}`;
+      if (dismissed.has(noticeKey)) continue;
 
-  const userEmail = authUser.email;
-  let toasts = '';
-
-  for (const product of closedProducts) {
-    if (notified.includes(product.id)) continue;
-    if (!product.participants || product.participants.length === 0) continue;
-
-    // Check if this user participated (compare with both masked and unmasked emails)
-    const wasParticipant = product.participants.some(p =>
-      p.email === userEmail ||
-      p.email === userEmail.replace(/(.{2})(.*)(@.*)/, '$1****$3') ||
-      userEmail === 'majicboy56575@gmail.com'
-    );
-    if (!wasParticipant) continue;
-
-    // Mark as notified
-    notified.push(product.id);
-    sessionStorage.setItem(notifiedKey, JSON.stringify(notified));
-
-    // Check if this user is the winner
-    const isWinner = product.winner && (
-      product.winner.email === userEmail ||
-      product.winner.email === userEmail.replace(/(.{2})(.*)(@.*)/, '$1****$3') ||
-      userEmail === 'majicboy56575@gmail.com'
-    );
-
-    if (isWinner) {
-      toasts += `
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="draw-result-modal-${product.id}" onclick="if(event.target===this)window.__closeDrawNotification('${product.id}')">
-          <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8 relative">
-            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="${t('close')}">
+      const ticketNumber = winnerObj.ticketNumber || '#WINNER';
+      const groupNum = w.groupNumber || 1;
+      return `
+        <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/70 backdrop-blur-sm" id="draw-result-modal-${raffle.id}" onclick="if(event.target===this)window.__closeDrawNotification('${noticeKey}')">
+          <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-7 relative animate-in zoom-in-95">
+            <button class="absolute top-4 right-4 w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors cursor-pointer" onclick="window.__closeDrawNotification('${noticeKey}')" title="${t('close')}">
               <span class="material-symbols-outlined">close</span>
             </button>
-            <div class="w-20 h-20 rounded-full bg-tertiary/10 flex items-center justify-center mx-auto mb-4">
-              <span class="material-symbols-outlined text-tertiary text-5xl">emoji_events</span>
+            <div class="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <span class="material-symbols-outlined text-amber-500 text-5xl">emoji_events</span>
             </div>
-            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">${t('congratsWinner')}</h2>
-            <p class="text-on-surface-variant mb-2"><strong>${product.title}</strong></p>
-            <div class="bg-tertiary/10 border border-tertiary/20 rounded-xl p-4 mb-6">
-              <p class="font-label-caps text-label-caps text-tertiary mb-1">${t('ticketNumberLabel')}</p>
-              <p class="font-timer-numeric text-xl font-bold text-primary">${product.ticketNumber || '#WINNER'}</p>
+            <span class="inline-block text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-3 py-1 rounded-full mb-2">
+              스페셜 래플 [그룹 ${groupNum}] 1등 당첨!
+            </span>
+            <h2 class="font-headline-md text-xl font-black text-slate-900 mb-1">${t('congratsWinner')}</h2>
+            <p class="text-sm font-bold text-slate-700 mb-4">${raffle.title}</p>
+            ${raffle.imageUrl ? `<img src="${raffle.imageUrl}" alt="${raffle.title}" class="w-28 h-28 object-contain mx-auto mb-4 rounded-2xl bg-slate-50 p-2 border border-slate-100" />` : ''}
+            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-5">
+              <p class="text-[11px] font-bold text-emerald-700 mb-1">${t('ticketNumberLabel')}</p>
+              <p class="font-timer-numeric text-xl font-black text-primary">${ticketNumber}</p>
+              <p class="text-[11px] text-emerald-800 mt-1.5">당첨 경품이 <strong>내 보관함</strong>에 안전하게 지급되었습니다.</p>
             </div>
             <div class="flex flex-col gap-2.5">
-              <button onclick="window.location.hash='#profile'; window.__closeDrawNotification('${product.id}')" class="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2">
+              <button onclick="window.__closeDrawNotification('${noticeKey}'); window.location.hash='#profile';" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-2xl hover:opacity-95 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer">
                 <span class="material-symbols-outlined">local_shipping</span>
                 ${t('goEnterShipping')}
               </button>
-              <button onclick="window.__closeDrawNotification('${product.id}')" class="w-full py-2.5 bg-surface-variant/30 text-on-surface-variant hover:bg-surface-variant/50 font-semibold rounded-full transition-all">
+              <button onclick="window.__closeDrawNotification('${noticeKey}')" class="w-full py-2.5 bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold rounded-2xl text-xs transition-all cursor-pointer">
                 ${t('close')}
               </button>
             </div>
           </div>
         </div>`;
-    } else {
-      toasts += `
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop" id="draw-result-modal-${product.id}" onclick="if(event.target===this)window.__closeDrawNotification('${product.id}')">
-          <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-8 relative">
-            <button class="absolute top-4 right-4 w-10 h-10 rounded-full hover:bg-surface-variant/30 flex items-center justify-center text-on-surface-variant transition-colors" onclick="window.__closeDrawNotification('${product.id}')" title="${t('close')}">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-            <div class="w-20 h-20 rounded-full bg-error-container/30 flex items-center justify-center mx-auto mb-4">
-              <span class="material-symbols-outlined text-error text-5xl">sentiment_dissatisfied</span>
-            </div>
-            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">${t('drawResultTitle')}</h2>
-            <p class="text-error font-bold mb-2">[${product.title}] ${t('notWonTitle')}</p>
-            <p class="text-on-surface-variant text-sm mb-6 leading-relaxed whitespace-pre-line">${t('notWonDesc', { title: product.title, winner: product.winner ? product.winner.name : '-' })}</p>
-            <button onclick="window.__closeDrawNotification('${product.id}')" class="w-full py-3 bg-primary text-on-primary font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-md">
-              ${t('close')}
-            </button>
-          </div>
-        </div>`;
     }
-
-    // Only show one notification at a time
-    break;
   }
 
-  return toasts;
+  // Gather user's own applied tickets (client-side comparison — 0 extra server writes)
+  const myTickets = getAppliedGoldenTickets(uid) || [];
+
+  // 2. PRIORITY 2: Incomplete-Group 100% Auto-Refund Notification (grouped per raffle)
+  const refundedByRaffle = new Map();
+  myTickets.forEach((tk) => {
+    if (tk.resolvedStatus !== 'refunded') return;
+    const key = `refund_${tk.raffleId}_${tk.closedAt || 0}`;
+    if (dismissed.has(key)) return;
+    if (!refundedByRaffle.has(key)) {
+      refundedByRaffle.set(key, {
+        noticeKey: key,
+        raffleTitle: tk.raffleTitle || '스페셜 래플',
+        groupNumber: tk.groupNumber || 1,
+        refundCount: 0,
+        closedAt: Number(tk.closedAt) || 0
+      });
+    }
+    refundedByRaffle.get(key).refundCount += 1;
+  });
+
+  if (refundedByRaffle.size > 0) {
+    const latestRefund = Array.from(refundedByRaffle.values())
+      .sort((a, b) => b.closedAt - a.closedAt)[0];
+    return `
+      <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="refund-notice-modal" onclick="if(event.target===this)window.__dismissTicketRefundNotice('${latestRefund.noticeKey}')">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6 text-center animate-in zoom-in-95">
+          <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-outlined text-3xl">verified_user</span>
+          </div>
+          <span class="text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white px-2.5 py-0.5 rounded-full">
+            골든 티켓 100% 자동 반환 완료
+          </span>
+          <h3 class="font-headline-sm text-lg font-bold text-gray-900 mt-2 mb-1">[${latestRefund.raffleTitle}]</h3>
+          <p class="text-xs text-gray-600 mb-4 leading-relaxed">
+            <strong>그룹 ${latestRefund.groupNumber}</strong>이 목표 인원 미달로 마감되어 응모하신 골든 티켓이 100% 자동 반환되었습니다.
+          </p>
+          <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-left text-xs mb-5 space-y-1">
+            <div class="flex justify-between items-center font-bold text-emerald-950">
+              <span>반환된 골든 티켓</span>
+              <span class="font-mono text-base text-emerald-700">+${latestRefund.refundCount}장</span>
+            </div>
+            <p class="text-[11px] text-emerald-800">보유 골든 티켓에 즉시 복구되어 다른 스페셜 경품에 바로 응모하실 수 있습니다.</p>
+          </div>
+          <button onclick="window.__dismissTicketRefundNotice('${latestRefund.noticeKey}')" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md hover:bg-primary-container transition-all active:scale-95 cursor-pointer">
+            확인 및 다른 경품 응모하기
+          </button>
+        </div>
+      </div>`;
+  }
+
+  // 3. PRIORITY 3: Not-Won Result Notification (show only the latest 1 unseen; dismiss older ones together so user is never spammed)
+  const lostByRaffle = new Map();
+  myTickets.forEach((tk) => {
+    if (tk.resolvedStatus !== 'closed_lost') return;
+    const key = `lost_${tk.raffleId}_${tk.closedAt || 0}`;
+    if (dismissed.has(key)) return;
+    if (!lostByRaffle.has(key)) {
+      const rObj = closedRaffles.find((r) => r.id === tk.raffleId);
+      const firstWinner = rObj?.winners?.[0]?.winner || rObj?.winners?.[0] || null;
+      lostByRaffle.set(key, {
+        noticeKey: key,
+        raffleId: tk.raffleId,
+        raffleTitle: tk.raffleTitle || rObj?.title || '스페셜 래플',
+        winnerName: firstWinner?.userName || firstWinner?.name || '-',
+        winnerTicket: firstWinner?.ticketNumber || '',
+        closedAt: Number(tk.closedAt) || Number(rObj?.closedAt) || 0
+      });
+    }
+  });
+
+  if (lostByRaffle.size > 0) {
+    const sortedLost = Array.from(lostByRaffle.values()).sort((a, b) => b.closedAt - a.closedAt);
+    const latestLost = sortedLost[0];
+    const olderKeysCsv = sortedLost.slice(1).map((x) => x.noticeKey).join(',');
+    const extraCountNote = sortedLost.length > 1
+      ? `<p class="text-[11px] text-slate-400 mt-1">외 최근 마감된 응모 ${sortedLost.length - 1}건의 결과는 '당첨자' 탭에서 확인하실 수 있습니다.</p>`
+      : '';
+
+    return `
+      <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop bg-black/60 backdrop-blur-sm" id="draw-result-modal-${latestLost.raffleId}" onclick="if(event.target===this)window.__closeDrawNotification('${latestLost.noticeKey}','${olderKeysCsv}')">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden text-center p-7 relative animate-in zoom-in-95">
+          <button class="absolute top-4 right-4 w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors cursor-pointer" onclick="window.__closeDrawNotification('${latestLost.noticeKey}','${olderKeysCsv}')" title="${t('close')}">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-outlined text-slate-500 text-4xl">campaign</span>
+          </div>
+          <h2 class="font-headline-md text-lg font-black text-slate-900 mb-1">${t('drawResultTitle')}</h2>
+          <p class="text-sm font-bold text-slate-700 mb-2">[${latestLost.raffleTitle}]</p>
+          <p class="text-xs text-slate-600 mb-4 leading-relaxed">
+            아쉽게도 이번 추첨에는 당첨되지 않았습니다.<br>
+            1등 당첨자: <strong>${latestLost.winnerName}</strong> ${latestLost.winnerTicket ? `<span class="font-mono text-primary">(${latestLost.winnerTicket})</span>` : ''}
+          </p>
+          ${extraCountNote}
+          <div class="mt-5 flex flex-col gap-2">
+            <button onclick="window.__closeDrawNotification('${latestLost.noticeKey}','${olderKeysCsv}'); window.location.hash='#home';" class="w-full py-3.5 bg-primary text-white font-bold rounded-2xl text-xs shadow-md hover:opacity-95 active:scale-95 transition-all cursor-pointer">
+              다음 스페셜 경품 도전하기
+            </button>
+            <button onclick="window.__closeDrawNotification('${latestLost.noticeKey}','${olderKeysCsv}'); window.location.hash='#history';" class="w-full py-2.5 bg-slate-100 text-slate-600 font-bold rounded-2xl text-xs hover:bg-slate-200 transition-all cursor-pointer">
+              전체 당첨자 명단 보기
+            </button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  return '';
 }
 
 function navigate() {
@@ -775,8 +885,13 @@ document.addEventListener('click', (e) => {
 // --- Debounced Router for Background Data Syncs ---
 let backgroundSyncTimer = null;
 function debouncedNavigate() {
-  // If an active animation modal is open, defer re-rendering so animations are not interrupted
-  if (document.getElementById('unboxing-stage-modal') || document.getElementById('direct-pay-modal')) {
+  // If an active animation or draw-result notification modal is open, defer re-rendering so it is not interrupted
+  if (
+    document.getElementById('unboxing-stage-modal') ||
+    document.getElementById('direct-pay-modal') ||
+    document.getElementById('refund-notice-modal') ||
+    document.querySelector('[id^="draw-result-modal-"]')
+  ) {
     return;
   }
   if (backgroundSyncTimer) clearTimeout(backgroundSyncTimer);
