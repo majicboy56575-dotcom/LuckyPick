@@ -2052,21 +2052,30 @@ exports.forceDrawRaffle = onCall({ region: "asia-northeast3", timeoutSeconds: 30
         wonAt: drawnAt
       });
 
-      // Deliver to winner's vault idempotently
+      // Deliver to winner's vault idempotently (keyed by winning ticketId so reopened raffles always award properly)
       if (winnerEntry.userId) {
         const winnerUserRef = db.collection("users").doc(winnerEntry.userId);
         await db.runTransaction(async (tx) => {
           const userDoc = await tx.get(winnerUserRef);
-          if (!userDoc.exists) return;
+          if (!userDoc.exists) {
+            console.warn(`[forceDrawRaffle] Winner user doc not found for UID=${winnerEntry.userId}, ticket=${winnerEntry.ticketNumber}`);
+            return;
+          }
           const vault = userDoc.data().vault || [];
-          const uniqueVaultId = `vault_raffle_${raffle.id}_group_${g + 1}`;
-          const alreadyAwarded = vault.some((v) => v.id === uniqueVaultId || (v.itemId === raffle.id && v.tierName === `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`));
+          const ticketKey = winnerEntry.ticketId || String(drawnAt);
+          const uniqueVaultId = `vault_raffle_${raffle.id}_g${g + 1}_${ticketKey}`;
+          const alreadyAwarded = vault.some((v) =>
+            v.id === uniqueVaultId ||
+            (winnerEntry.ticketId && v.winningTicketId === winnerEntry.ticketId)
+          );
           if (!alreadyAwarded) {
             vault.unshift({
               id: uniqueVaultId,
               tierId: "super_raffle",
               tierName: `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`,
               itemId: raffle.id,
+              winningTicketId: winnerEntry.ticketId || "",
+              winningTicketNumber: winnerEntry.ticketNumber || "",
               title: raffle.title,
               imageUrl: raffle.imageUrl || "",
               retailPrice: raffle.retailPrice || 1000000,
@@ -2076,6 +2085,9 @@ exports.forceDrawRaffle = onCall({ region: "asia-northeast3", timeoutSeconds: 30
               wonAt: drawnAt
             });
             tx.update(winnerUserRef, { vault, updatedAt: Date.now() });
+            console.log(`[forceDrawRaffle] Awarded vault item ${uniqueVaultId} to UID=${winnerEntry.userId} (ticket=${winnerEntry.ticketNumber})`);
+          } else {
+            console.log(`[forceDrawRaffle] Skipped duplicate award ${uniqueVaultId} for UID=${winnerEntry.userId}`);
           }
         });
       }
