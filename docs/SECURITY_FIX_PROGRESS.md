@@ -17,8 +17,11 @@
 | **A1/A2/B2** | 카드 결제(`purchaseProduct`)·포인트 충전(`chargeUserPoints`)·배송비(`requestVaultShipping`) 서버 결제 검증 (`payments/{tid}` + `consumed` 중복 방지) + `app.js`/`unboxing-modal.js` `tid` 전달 + 배송 ID 고유화(`crypto.randomUUID`) | `functions/index.js`, `app.js`, `services/unboxing-modal.js`, `services/firestore.js` | `[x]` | `46ccf11` |
 | **A3** | 브라우저 직접 Firestore 쓰기 fallback 제거 + `deleteVaultItem`/`clearTicketRefundNotices` 서버 Callable 추가 + 관리자 쓰기 Cloud Functions 통일 | `services/firestore.js`, `services/randombox.js`, `services/unboxing-modal.js`, `functions/index.js` | `[x]` | `b089a00` |
 | **기존1 + 규칙** | 일반 유저 전체 `users`/`shipping_infos` 실시간 구독 차단 + `firestore.rules` 보안 잠금 + CI에 `firestore:rules` 배포 추가 | `services/firestore.js`, `firestore.rules`, `.github/workflows/firebase-hosting-merge.yml` | `[x]` | `16beee8` |
-| **A4/A5** | 하드코딩된 Toss/PayPal 시크릿 제거 + 모든 관리자 함수 `assertAdmin()` 통일 (`syncBoxCatalog`, `saveBoxCatalogAdmin` 허점 제거) | `functions/index.js` | `[x]` | 커밋 중 |
-| **기존3** | `firebase.json` 이미지 캐시(7일) + `closed_products` `limit(30)` + 캐시 버전(`20261128_V66`) 갱신 및 전체 검증 | `firebase.json`, `services/firestore.js`, `index.html`, `app.js` | `[x]` | 커밋 중 |
+| **A4/A5** | 하드코딩된 Toss/PayPal 시크릿 제거 + 모든 관리자 함수 `assertAdmin()` 통일 (`syncBoxCatalog`, `saveBoxCatalogAdmin` 허점 제거) | `functions/index.js` | `[x]` | `8b53247` |
+| **기존3** | `firebase.json` 이미지 캐시(7일) + `closed_products` `limit(30)` + 캐시 버전(`20261128_V66`) 갱신 및 전체 검증 | `firebase.json`, `services/firestore.js`, `index.html`, `app.js` | `[x]` | `8b53247` |
+| **B1/C3/C4** | `forceDrawRaffle` `drawing` 원자적 잠금 + `timeoutSeconds: 300` + `BulkWriter` 일괄 환불 + `crypto.randomInt()` 공정 추첨 + `closed_products` 경량화 | `functions/index.js` | `[x]` | `20ae62f` |
+| **기존2 + B3** | 스페셜 래플 응모 내역 하위 컬렉션(`super_raffles/{id}/entries`) 분리(1MB 한계 해결 + 기존 데이터 100% 호환) + 명부 온디맨드 로딩 + 관리자 집계(`getAdminDashboardCounts`)·페이징 검색(`getAdminMembers`) API 추가 | `functions/index.js`, `firestore.rules`, `services/firestore.js`, `services/randombox.js`, `pages/home.js` | `[x]` | 커밋 중 |
+| **C1** | 상품 이미지 5종 800x800 압축 (2,541KB → 254KB, 90% 용량 절감) + 캐시 버전 `20261128_V67` 갱신 | `assets/products/*.jpg`, `index.html`, `app.js` | `[x]` | 커밋 중 |
 
 ---
 
