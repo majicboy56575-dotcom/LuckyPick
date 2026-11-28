@@ -14,13 +14,24 @@ initializeApp();
 const db = getFirestore();
 
 // ============================================
-// ADMIN EMAIL (used for admin privilege checks)
+// ADMIN EMAIL & Strict Admin Assertion Helper
 // ============================================
 const ADMIN_EMAIL = "majicboy56575@gmail.com";
 
-// Toss Payments Secret Key (주문서형·결제창형 라이브 시크릿 키)
-const TOSS_SECRET_KEY =
-  process.env.TOSS_SECRET_KEY || "live_gsk_DpexMgkW367LEY5O7wAMVGbR5ozO";
+function assertAdmin(request, denyMessage = "관리자만 실행할 수 있는 기능입니다.") {
+  const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+  if (isEmulator) return;
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  }
+  const callerEmail = request.auth.token.email || "";
+  if (callerEmail !== ADMIN_EMAIL) {
+    throw new HttpsError("permission-denied", denyMessage);
+  }
+}
+
+// Toss Payments Secret Key (read from environment only — no hardcoded fallback)
+const TOSS_SECRET_KEY = process.env.TOSS_SECRET_KEY || "";
 
 // Danal Payments Module
 const {
@@ -524,14 +535,10 @@ exports.createUserProfile = onCall({ region: "asia-northeast3" }, async (request
 });
 
 // ============================================
-// PayPal REST API Helpers & Cloud Functions
+// PayPal REST API Helpers & Cloud Functions (env-only credentials)
 // ============================================
-const PAYPAL_CLIENT_ID =
-  process.env.PAYPAL_CLIENT_ID ||
-  "AfpgoZ6e_ILYGliBdTpax8I2ikXh0itt9BE1wFFsYUYM4grXZ-Uln529Cetf5nPnl0VBJ45vqOnshtHU";
-const PAYPAL_CLIENT_SECRET =
-  process.env.PAYPAL_CLIENT_SECRET ||
-  "ECYUxw80Q6KcqVaA5kw6FIeLL-CYQ7-PlGoHfNEhCZ1kyyh24GpCeGY8felnklmWv3zRz6cBpdI5tI5N";
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "";
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || "";
 const PAYPAL_ENV = process.env.PAYPAL_ENV || "sandbox";
 
 function getPayPalBaseUrl() {
@@ -2282,9 +2289,10 @@ exports.grantUserBalance = onCall({ region: "asia-northeast3" }, async (request)
 });
 
 // ============================================
-// 19. syncBoxCatalog (Callable) - Sync Version 3.0 Box Catalog
+// 19. syncBoxCatalog (Callable) - Admin Only Sync Version 3.0 Box Catalog
 // ============================================
 exports.syncBoxCatalog = onCall({ region: "asia-northeast3" }, async (request) => {
+  assertAdmin(request, "관리자만 기본 상품 카탈로그를 동기화할 수 있습니다.");
   const catRef = db.collection("box_catalogs").doc("default");
   const catalogPayload = {
     tiers: SERVER_DEFAULT_BOXES,
@@ -2300,17 +2308,7 @@ exports.syncBoxCatalog = onCall({ region: "asia-northeast3" }, async (request) =
 // 20. saveBoxCatalogAdmin (Callable) - Save Box Tiers from Admin
 // ============================================
 exports.saveBoxCatalogAdmin = onCall({ region: "asia-northeast3" }, async (request) => {
-  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev) {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-    }
-    const callerEmail = request.auth.token.email || "";
-    const allowedAdmins = [ADMIN_EMAIL, "admin@luckypick.com", "tester@luckypick.kr", "leejeayoung0713@gmail.com"];
-    if (!allowedAdmins.includes(callerEmail) && !callerEmail.includes("admin")) {
-      throw new HttpsError("permission-denied", "관리자만 박스 카탈로그를 수정할 수 있습니다.");
-    }
-  }
+  assertAdmin(request, "관리자만 박스 카탈로그를 수정할 수 있습니다.");
 
   const { tiers } = request.data;
   if (!tiers || !Array.isArray(tiers)) {

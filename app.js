@@ -10,10 +10,10 @@ import { getTicketRefundNotices, clearTicketRefundNotices, setUserPoints, setAva
 import { executeUnboxingAnimation } from '/services/unboxing-modal.js';
 import { isPwaStandalone } from '/services/pwa-install.js'; // PWA: app install prompt (Android one-tap / iPhone guide / in-app browser escape)
 
-import * as homePage from './pages/home.js?v=20261128_V65';
-import * as historyPage from './pages/history.js?v=20261128_V65';
-import * as profilePage from './pages/profile.js?v=20261128_V65';
-import * as adminPage from './pages/admin.js?v=20261128_V65';
+import * as homePage from './pages/home.js?v=20261128_V66';
+import * as historyPage from './pages/history.js?v=20261128_V66';
+import * as profilePage from './pages/profile.js?v=20261128_V66';
+import * as adminPage from './pages/admin.js?v=20261128_V66';
 
 // Expose dev helpers to window
 window.setUserPoints = setUserPoints;
