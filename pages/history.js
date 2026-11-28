@@ -257,7 +257,7 @@ export function render() {
         title: r.title,
         imageUrl: r.imageUrl,
         retailPrice: r.retailPrice,
-        totalParticipants: entries.length,
+        totalParticipants: Math.max(Number(r.currentParticipants) || 0, entries.length),
         closedAt: r.closedAt || Date.now(),
         winners: winners,
         winner: winners[0] || null,

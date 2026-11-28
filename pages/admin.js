@@ -23,7 +23,8 @@ import {
   setAvailableGoldenTicketsCount,
   getUserVault,
   deleteVaultItem,
-  getRaffleGroupData
+  getRaffleGroupData,
+  fetchRaffleEntries
 } from '../services/randombox.js';
 import { getMembers, grantUserBalanceServer } from '../services/firestore.js';
 
@@ -1668,10 +1669,18 @@ export function render() {
     }
   };
 
-  window.__viewRaffleParticipants = (raffleId) => {
+  window.__viewRaffleParticipants = (raffleId, skipFetch = false) => {
     const raffles = getSuperRaffles();
     const raffle = raffles.find(r => r.id === raffleId);
     if (!raffle) return;
+
+    if (!skipFetch) {
+      fetchRaffleEntries(raffleId).then(() => {
+        if (document.getElementById('raffle-participants-modal')) {
+          window.__viewRaffleParticipants(raffleId, true);
+        }
+      }).catch(() => {});
+    }
 
     const groupData = getRaffleGroupData(raffle);
 

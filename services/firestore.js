@@ -109,6 +109,10 @@ if (isFirebaseConfigured()) {
         superRafflesCache = raffles;
         window.dispatchEvent(new CustomEvent('superRafflesChanged', { detail: raffles }));
         window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+        const curAuth = getCurrentAuthUser();
+        if (curAuth?.uid && raffles.length > 0) {
+          fetchMyRaffleEntries(curAuth.uid);
+        }
       },
       (error) => {
         console.warn('[Firestore] super_raffles listener error:', error.message);
@@ -287,35 +291,42 @@ async function fetchRaffleEntries(raffleId, maxEntries = 500) {
   }
 }
 
+let myRaffleEntriesInFlight = false;
 async function fetchMyRaffleEntries(uid) {
-  if (!db || !uid) return;
+  if (!db || !uid || myRaffleEntriesInFlight) return;
   const raffles = superRafflesCache || [];
-  await Promise.all(
-    raffles.map(async (r) => {
-      if (!r?.id) return;
-      try {
-        const q = query(
-          collection(db, 'super_raffles', r.id, 'entries'),
-          where('userId', '==', uid),
-          limit(100)
-        );
-        const snap = await getDocs(q);
-        if (snap.empty) return;
-        const existing = raffleEntriesCache[r.id] || [];
-        const map = new Map(existing.map((e) => [e.ticketId || e.id, e]));
-        snap.forEach((d) => {
-          const data = { id: d.id, ...d.data() };
-          map.set(data.ticketId || d.id, data);
-        });
-        raffleEntriesCache[r.id] = Array.from(map.values()).sort(
-          (a, b) => (Number(a.slotIndex) || 0) - (Number(b.slotIndex) || 0)
-        );
-      } catch (e) {
-        // Ignore single-raffle fetch warning
-      }
-    })
-  );
-  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  if (raffles.length === 0) return;
+  myRaffleEntriesInFlight = true;
+  try {
+    await Promise.all(
+      raffles.map(async (r) => {
+        if (!r?.id) return;
+        try {
+          const q = query(
+            collection(db, 'super_raffles', r.id, 'entries'),
+            where('userId', '==', uid),
+            limit(100)
+          );
+          const snap = await getDocs(q);
+          if (snap.empty) return;
+          const existing = raffleEntriesCache[r.id] || [];
+          const map = new Map(existing.map((e) => [e.ticketId || e.id, e]));
+          snap.forEach((d) => {
+            const data = { id: d.id, ...d.data() };
+            map.set(data.ticketId || d.id, data);
+          });
+          raffleEntriesCache[r.id] = Array.from(map.values()).sort(
+            (a, b) => (Number(a.slotIndex) || 0) - (Number(b.slotIndex) || 0)
+          );
+        } catch (e) {
+          // Ignore single-raffle fetch warning
+        }
+      })
+    );
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
+  } finally {
+    myRaffleEntriesInFlight = false;
+  }
 }
 
 async function saveSuperRaffleToFirestore(raffle) {

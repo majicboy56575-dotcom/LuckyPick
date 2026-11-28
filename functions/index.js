@@ -1511,7 +1511,7 @@ exports.forceCloseProduct = onCall({ region: "asia-northeast3" }, async (request
 
   for (let g = 0; g < completedGroupsCount; g++) {
     const groupMembers = participants.slice(g * unitSize, (g + 1) * unitSize);
-    const winIdx = Math.floor(Math.random() * groupMembers.length);
+    const winIdx = crypto.randomInt(0, groupMembers.length);
     const winnerMember = groupMembers[winIdx];
     const ticketNumber = `${ticketPrefix}-${100 + winIdx}`;
 
