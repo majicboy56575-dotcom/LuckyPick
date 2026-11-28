@@ -237,6 +237,12 @@ function renderSuperRaffleCard(raffle, index) {
               </div>
             `).join('')}
           </div>
+
+          <!-- 100% Auto Refund Guarantee Banner -->
+          <div class="flex items-center gap-1.5 pt-2.5 border-t border-white/10 text-[11px] text-emerald-300 font-semibold">
+            <span class="material-symbols-outlined text-[15px] shrink-0">verified_user</span>
+            <span>${t('raffleRefundGuarantee')}</span>
+          </div>
         </div>
       </div>
 
