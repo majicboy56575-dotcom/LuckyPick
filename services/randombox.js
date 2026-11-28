@@ -23,7 +23,9 @@ import {
   cancelGoldenRaffleServer,
   forceDrawRaffleServer,
   requestVaultShippingServer,
-  grantUserBalanceServer
+  grantUserBalanceServer,
+  deleteVaultItemServer,
+  clearTicketRefundNoticesServer
 } from './firestore.js';
 import { getCurrentAuthUser } from './auth.js';
 
@@ -634,61 +636,12 @@ export function getTicketRefundNotices() {
 
 export function clearTicketRefundNotices() {
   saveUserDocData({ ticketRefundNotices: [] });
+  clearTicketRefundNoticesServer().catch((e) => console.warn('[Raffle] clearTicketRefundNoticesServer:', e.message));
 }
 
-// Open Random Box (100% Firestore User Doc backed)
-export function openRandomBox(tierId) {
-  const tiers = getRandomBoxTiers();
-  const tier = tiers.find(t => t.id === tierId);
-  if (!tier) throw new Error('존재하지 않는 상품 픽입니다.');
-
-  const rand = Math.random();
-  let cumulative = 0;
-  let wonItem = tier.items[tier.items.length - 1];
-
-  for (const item of tier.items) {
-    cumulative += item.prob;
-    if (rand <= cumulative) {
-      wonItem = item;
-      break;
-    }
-  }
-
-  const vaultId = 'vault_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-  const refundPoints = Math.round(wonItem.retailPrice * 0.6);
-
-  const vaultRecord = {
-    id: vaultId,
-    tierId: tier.id,
-    tierName: tier.name,
-    itemId: wonItem.id,
-    title: wonItem.name,
-    imageUrl: wonItem.image,
-    retailPrice: wonItem.retailPrice,
-    grade: wonItem.grade,
-    refundPoints: refundPoints,
-    status: 'in_vault',
-    wonAt: Date.now(),
-  };
-
-  const vault = getUserVault();
-  vault.unshift(vaultRecord);
-
-  const currentTickets = getAvailableGoldenTicketsCount();
-  const newTicketBalance = currentTickets + tier.goldenTickets;
-
-  saveUserDocData({ 
-    vault, 
-    goldenTickets: newTicketBalance 
-  });
-
-  return {
-    tier,
-    wonItem,
-    vaultRecord,
-    earnedGoldenTickets: tier.goldenTickets,
-    totalGoldenTickets: newTicketBalance
-  };
+// Legacy client-side openRandomBox disabled (all purchases must run server-side via purchaseFixedPriceProduct)
+export function openRandomBox() {
+  throw new Error('클라이언트 직접 구매는 보안상 비활성화되었습니다. 정상 결제 경로를 이용해주세요.');
 }
 
 // Convert won item into points (60% value) (Server-Backed Atomic Refund)
@@ -701,12 +654,10 @@ export async function convertVaultItemToPoints(vaultId) {
   }
 }
 
-// Direct Delete Item from User Vault
+// Delete Item from User Vault (Server-Backed)
 export async function deleteVaultItem(vaultId) {
-  const vault = getUserVault();
-  const targetIdx = vault.findIndex(v => String(v.id) === String(vaultId));
-  if (targetIdx === -1) return false;
-  vault.splice(targetIdx, 1);
+  const res = await deleteVaultItemServer(vaultId);
+  const vault = res?.vault || getUserVault().filter(v => String(v.id) !== String(vaultId));
   await saveUserDocData({ vault });
   window.dispatchEvent(new CustomEvent('vaultUpdated', { detail: { vault } }));
   return true;

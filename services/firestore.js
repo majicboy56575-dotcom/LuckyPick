@@ -244,17 +244,10 @@ function getCurrentUserDocCache() {
 }
 
 async function saveUserDocData(data) {
+  // Local in-memory cache update only — all persistent Firestore writes go through Cloud Functions
   if (currentUserDocCache) {
     Object.assign(currentUserDocCache, data);
     window.dispatchEvent(new CustomEvent('userDataChanged', { detail: currentUserDocCache }));
-  }
-  const authUser = getCurrentAuthUser();
-  if (db && authUser?.uid) {
-    try {
-      await updateDoc(doc(db, 'users', authUser.uid), { ...data, updatedAt: Date.now() });
-    } catch (e) {
-      console.warn('[Firestore] saveUserDocData direct update fallback:', e.message);
-    }
   }
   return true;
 }
@@ -265,17 +258,7 @@ function getSuperRafflesCache() {
 
 async function saveSuperRaffleToFirestore(raffle) {
   if (!raffle?.id) return false;
-  const payload = { ...raffle, updatedAt: Date.now() };
-  if (db) {
-    try {
-      await setDoc(doc(db, 'super_raffles', raffle.id), payload, { merge: true });
-    } catch (e) {
-      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
-      await saveSuperRaffleServer(raffle);
-    }
-  } else {
-    await saveSuperRaffleServer(raffle);
-  }
+  await saveSuperRaffleServer(raffle);
 
   // Update real-time cache upon success
   const idx = superRafflesCache.findIndex(r => r.id === raffle.id);
@@ -291,16 +274,7 @@ async function saveSuperRaffleToFirestore(raffle) {
 
 async function deleteSuperRaffleFromFirestore(raffleId) {
   if (!raffleId) return false;
-  if (db) {
-    try {
-      await deleteDoc(doc(db, 'super_raffles', raffleId));
-    } catch (e) {
-      console.warn('[Firestore] Direct deleteDoc fallback to cloud function:', e.message);
-      await deleteSuperRaffleServer(raffleId);
-    }
-  } else {
-    await deleteSuperRaffleServer(raffleId);
-  }
+  await deleteSuperRaffleServer(raffleId);
 
   // Remove from cache upon success
   superRafflesCache = superRafflesCache.filter(r => r.id !== raffleId);
@@ -346,25 +320,8 @@ async function saveBoxCatalogToFirestore(tiers) {
     updatedAt: Date.now()
   };
 
-  // 2. Direct Firestore setDoc & Cloud Function Sync
-  if (db) {
-    try {
-      await setDoc(doc(db, 'box_catalogs', 'default'), payload);
-    } catch (e) {
-      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
-      try {
-        await saveBoxCatalogServer(tiers);
-      } catch (fnErr) {
-        console.warn('[Firestore] Cloud function fallback also failed, but local state preserved:', fnErr.message);
-      }
-    }
-  } else {
-    try {
-      await saveBoxCatalogServer(tiers);
-    } catch (fnErr2) {
-      console.warn('[Firestore] Cloud function save failed, local state preserved:', fnErr2.message);
-    }
-  }
+  // 2. Cloud Function Admin Sync (server-only write)
+  await saveBoxCatalogServer(tiers);
   return true;
 }
 
@@ -374,42 +331,16 @@ function getAllShippingInfosCache() {
 
 async function submitShippingInfoToFirestore(data) {
   if (!data) return false;
-  const shippingId = data.shippingId || ('ship_' + Date.now());
-  const payload = {
-    ...data,
-    shippingId,
-    submittedAt: data.submittedAt || Date.now(),
-    status: data.status || 'pending'
-  };
-  if (db) {
-    try {
-      await setDoc(doc(db, 'shipping_infos', shippingId), payload, { merge: true });
-    } catch (e) {}
+  const res = await submitShippingInfo(data);
+  if (res) {
+    shippingCache = [res, ...shippingCache.filter(s => s.id !== res.id && s.shippingId !== res.shippingId)];
+    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
   }
-  shippingCache = [payload, ...shippingCache.filter(s => s.shippingId !== shippingId)];
-  window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-  return payload;
+  return res;
 }
 
 async function updateShippingStatusInFirestore(shippingId, status, carrier = '', trackingNumber = '', taxStatus = '') {
-  const updateData = {
-    updatedAt: Date.now()
-  };
-  if (status) updateData.status = status;
-  if (carrier) updateData.carrier = carrier;
-  if (trackingNumber) updateData.trackingNumber = trackingNumber;
-  if (taxStatus) updateData.taxStatus = taxStatus;
-
-  if (db) {
-    try {
-      await setDoc(doc(db, 'shipping_infos', shippingId), updateData, { merge: true });
-    } catch (e) {
-      console.warn('[Firestore] Direct setDoc fallback to cloud function:', e.message);
-      await updateShippingStatus(shippingId, status, carrier, trackingNumber, taxStatus);
-    }
-  } else {
-    await updateShippingStatus(shippingId, status, carrier, trackingNumber, taxStatus);
-  }
+  await updateShippingStatus(shippingId, status, carrier, trackingNumber, taxStatus);
 
   // Update cache upon success
   const item = shippingCache.find(s => s.id === shippingId || s.shippingId === shippingId);
@@ -425,16 +356,7 @@ async function updateShippingStatusInFirestore(shippingId, status, carrier = '',
 }
 
 async function deleteShippingInfoFromFirestore(shippingId) {
-  if (db) {
-    try {
-      await deleteDoc(doc(db, 'shipping_infos', shippingId));
-    } catch (e) {
-      console.warn('[Firestore] Direct deleteDoc fallback to cloud function:', e.message);
-      await deleteShippingServer(shippingId);
-    }
-  } else {
-    await deleteShippingServer(shippingId);
-  }
+  await deleteShippingServer(shippingId);
 
   // Remove from cache upon success
   shippingCache = shippingCache.filter(s => s.id !== shippingId && s.shippingId !== shippingId);
@@ -818,160 +740,25 @@ async function convertVaultItemToPointsServer(vaultId) {
 }
 
 async function applyGoldenRaffleServer(raffleId, count = 1) {
-  if (functions) {
-    try {
-      const callable = httpsCallable(functions, 'applyGoldenRaffle');
-      const result = await callable({ raffleId, count });
-      if (result?.data?.newTickets !== undefined) {
-        if (currentUserDocCache) currentUserDocCache.goldenTickets = result.data.newTickets;
-        window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: result.data.newTickets } }));
-      }
-      return result.data;
-    } catch (e) {
-      console.warn('[Firestore] Cloud function applyGoldenRaffle failed, attempting direct Firestore entry:', e.message);
-    }
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'applyGoldenRaffle');
+  const result = await callable({ raffleId, count });
+  if (result?.data?.newTickets !== undefined) {
+    if (currentUserDocCache) currentUserDocCache.goldenTickets = result.data.newTickets;
+    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: result.data.newTickets } }));
   }
-
-  // Direct Firestore fallback (works seamlessly on dev servers)
-  if (db) {
-    const authUser = getCurrentAuthUser();
-    if (!authUser || !authUser.uid) throw new Error('로그인이 필요합니다.');
-    const uid = authUser.uid;
-    const userRef = doc(db, 'users', uid);
-    const raffleRef = doc(db, 'super_raffles', raffleId);
-
-    const userSnap = await getDoc(userRef);
-    const raffleSnap = await getDoc(raffleRef);
-    if (!raffleSnap.exists()) throw new Error('해당 골든 래플을 찾을 수 없습니다.');
-
-    const userData = userSnap.exists() ? userSnap.data() : { goldenTickets: 0 };
-    const curTickets = Number(userData.goldenTickets) || 0;
-    if (curTickets < count) throw new Error(`보유 골든티켓이 부족합니다. (보유: ${curTickets}장 / 요청: ${count}장)`);
-
-    // 1인당 상품별 1일 최대 10회 응모 제한 (Daily Cap) 검증
-    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const dailyRaffleByProduct = userData.dailyRaffleByProduct || {};
-    const productStats = dailyRaffleByProduct[raffleId] || {};
-    const usedToday = productStats.date === today ? (Number(productStats.count) || 0) : 0;
-    const remainingToday = Math.max(0, 10 - usedToday);
-
-    if (usedToday >= 10) {
-      throw new Error('해당 상품의 오늘 응모 한도(10회)를 모두 사용하셨습니다. 다른 스페셜 상품에 응모하시거나 내일 다시 응모해주세요!');
-    }
-    if (usedToday + count > 10) {
-      throw new Error(`해당 상품의 오늘 추가 응모 가능 횟수는 최대 ${remainingToday}회입니다. (상품별 1일 10회 한도)`);
-    }
-
-    const raffle = raffleSnap.data();
-    if (raffle.status === 'closed') throw new Error('이미 마감된 래플입니다.');
-
-    const entries = raffle.entries || [];
-    const createdEntries = [];
-    for (let i = 0; i < count; i++) {
-      const nextSlot = entries.length + 1;
-      const ticketNumber = `#${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-      const newEntry = {
-        ticketId: 't_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 4),
-        ticketNumber,
-        userId: uid,
-        userName: maskName(authUser.displayName || '참여자'),
-        userEmail: maskEmail(authUser.email || ''),
-        appliedAt: Date.now(),
-        slotIndex: nextSlot,
-        status: 'active'
-      };
-      entries.push(newEntry);
-      createdEntries.push(newEntry);
-    }
-
-    const newTickets = curTickets - count;
-    const newDailyCount = usedToday + count;
-    dailyRaffleByProduct[raffleId] = { date: today, count: newDailyCount };
-
-    await setDoc(userRef, { 
-      goldenTickets: newTickets, 
-      dailyRaffleByProduct,
-      updatedAt: Date.now() 
-    }, { merge: true });
-    await setDoc(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() }, { merge: true });
-
-    if (currentUserDocCache) {
-      currentUserDocCache.goldenTickets = newTickets;
-      currentUserDocCache.dailyRaffleByProduct = dailyRaffleByProduct;
-    }
-    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
-    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-
-    return {
-      newTickets,
-      appliedCount: count,
-      entries: createdEntries,
-      raffle: { id: raffleId, title: raffle.title, retailPrice: raffle.retailPrice }
-    };
-  }
-
-  throw new Error('골든티켓 응모 처리 중 오류가 발생했습니다.');
+  return result.data;
 }
 
 async function cancelGoldenRaffleServer(raffleId, ticketId) {
-  if (functions) {
-    try {
-      const callable = httpsCallable(functions, 'cancelGoldenRaffle');
-      const result = await callable({ raffleId, ticketId });
-      return result.data;
-    } catch (e) {
-      console.warn('[Firestore] Cloud function cancelGoldenRaffle failed, attempting direct Firestore cancel:', e.message);
-    }
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'cancelGoldenRaffle');
+  const result = await callable({ raffleId, ticketId });
+  if (result?.data?.newTickets !== undefined) {
+    if (currentUserDocCache) currentUserDocCache.goldenTickets = result.data.newTickets;
+    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: result.data.newTickets } }));
   }
-
-  // Direct Firestore fallback
-  if (db) {
-    const authUser = getCurrentAuthUser();
-    if (!authUser || !authUser.uid) throw new Error('로그인이 필요합니다.');
-    const uid = authUser.uid;
-    const userRef = doc(db, 'users', uid);
-    const raffleRef = doc(db, 'super_raffles', raffleId);
-
-    const userSnap = await getDoc(userRef);
-    const raffleSnap = await getDoc(raffleRef);
-    if (!raffleSnap.exists()) throw new Error('해당 골든 래플을 찾을 수 없습니다.');
-
-    const raffle = raffleSnap.data();
-    const entries = raffle.entries || [];
-    const idx = entries.findIndex(e => (e.ticketId === ticketId || e.id === ticketId) && e.userId === uid);
-    if (idx === -1) throw new Error('취소할 수 있는 응모 티켓을 찾을 수 없습니다.');
-
-    const removedEntry = entries.splice(idx, 1)[0];
-    const userData = userSnap.exists() ? userSnap.data() : { goldenTickets: 0 };
-    const newTickets = (Number(userData.goldenTickets) || 0) + 1;
-
-    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const dailyRaffleByProduct = userData.dailyRaffleByProduct || {};
-    if (dailyRaffleByProduct[raffleId] && dailyRaffleByProduct[raffleId].date === today && (dailyRaffleByProduct[raffleId].count || 0) > 0) {
-      dailyRaffleByProduct[raffleId].count = Math.max(0, dailyRaffleByProduct[raffleId].count - 1);
-    }
-
-    await setDoc(userRef, { 
-      goldenTickets: newTickets, 
-      dailyRaffleByProduct,
-      updatedAt: Date.now() 
-    }, { merge: true });
-    await setDoc(raffleRef, { entries, currentParticipants: entries.length, updatedAt: Date.now() }, { merge: true });
-
-    if (currentUserDocCache) {
-      currentUserDocCache.goldenTickets = newTickets;
-      currentUserDocCache.dailyRaffleByProduct = dailyRaffleByProduct;
-    }
-    window.dispatchEvent(new CustomEvent('ticketsUpdated', { detail: { count: newTickets } }));
-    window.dispatchEvent(new CustomEvent('firestoreDataChanged'));
-
-    return {
-      newTickets,
-      removedEntry
-    };
-  }
-
-  throw new Error('골든티켓 응모 취소 중 오류가 발생했습니다.');
+  return result.data;
 }
 
 async function forceDrawRaffleServer(raffleId) {
@@ -1040,6 +827,20 @@ async function deleteShippingServer(shippingId) {
 async function cleanDuplicateVaultItemsServer() {
   if (!functions) throw new Error('Firebase Functions not initialized');
   const callable = httpsCallable(functions, 'cleanDuplicateVaultItems');
+  const result = await callable({});
+  return result.data;
+}
+
+async function deleteVaultItemServer(vaultId) {
+  if (!functions) throw new Error('Firebase Functions not initialized');
+  const callable = httpsCallable(functions, 'deleteVaultItem');
+  const result = await callable({ vaultId });
+  return result.data;
+}
+
+async function clearTicketRefundNoticesServer() {
+  if (!functions) return { success: false };
+  const callable = httpsCallable(functions, 'clearTicketRefundNotices');
   const result = await callable({});
   return result.data;
 }
@@ -1187,4 +988,6 @@ export {
   syncBoxCatalogServer,
   deleteShippingServer,
   cleanDuplicateVaultItemsServer,
+  deleteVaultItemServer,
+  clearTicketRefundNoticesServer,
 };

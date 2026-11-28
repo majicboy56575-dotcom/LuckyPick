@@ -428,12 +428,6 @@ window.__quickConvertPoints = async (vaultId) => {
     const res = await convertVaultItemToPointsServer(vaultId);
     alert(`🎉 [${res.item?.title || res.item?.name || '상품'}] 상품이 ₩${res.addedPoints.toLocaleString()}P 로 즉시 전환되었습니다!\n현재 보유 포인트: ₩${res.newPoints.toLocaleString()}P`);
 
-    const currentVault = getUserVault().filter(v => v.id !== vaultId);
-    await saveUserDocData({
-      vault: currentVault,
-      points: res.newPoints
-    });
-
     window.__closeSuccessModal();
     window.location.hash = '#profile';
     if (typeof window.__switchProfileTab === 'function') {

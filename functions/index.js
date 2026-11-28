@@ -2441,5 +2441,42 @@ exports.cleanDuplicateVaultItems = onCall({ region: "asia-northeast3" }, async (
   return { success: true, removedCount, remainingCount: cleanedVault.length, vault: cleanedVault };
 });
 
+// ============================================
+// 26. deleteVaultItem (Callable) - Authenticated User Deletes Own Vault Item
+// ============================================
+exports.deleteVaultItem = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  const uid = request.auth.uid;
+  const { vaultId } = request.data || {};
+  if (!vaultId) throw new HttpsError("invalid-argument", "삭제할 보관함 아이템 ID가 필요합니다.");
+
+  const userRef = db.collection("users").doc(uid);
+  const result = await db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) throw new HttpsError("not-found", "유저 정보를 찾을 수 없습니다.");
+    const vault = userDoc.data().vault || [];
+    const idx = vault.findIndex((v) => String(v.id) === String(vaultId));
+    if (idx === -1) return { removed: false, vault };
+    vault.splice(idx, 1);
+    transaction.update(userRef, { vault, updatedAt: Date.now() });
+    return { removed: true, vault };
+  });
+
+  return { success: true, ...result };
+});
+
+// ============================================
+// 27. clearTicketRefundNotices (Callable) - Clear User Refund Notices
+// ============================================
+exports.clearTicketRefundNotices = onCall({ region: "asia-northeast3" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+  const uid = request.auth.uid;
+  await db.collection("users").doc(uid).set({
+    ticketRefundNotices: [],
+    updatedAt: Date.now()
+  }, { merge: true });
+  return { success: true };
+});
+
 
 
