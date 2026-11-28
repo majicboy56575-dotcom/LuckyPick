@@ -373,7 +373,7 @@ exports.checkExpiredProducts = onSchedule(
             groupStart,
             groupStart + unitSize
           );
-          const winnerIndex = Math.floor(Math.random() * groupMembers.length);
+          const winnerIndex = crypto.randomInt(0, groupMembers.length);
           const w = groupMembers[winnerIndex];
 
           const ticketPrefix = product.title
@@ -462,8 +462,13 @@ exports.checkExpiredProducts = onSchedule(
             : { name: "미당첨 (참여자 없음)", email: "-", phone: "-" },
         ticketNumber:
           winners.length > 0 ? winners[0].ticketNumber : "#NONE",
-        participants: sortedParticipants,
-        refundedParticipants,
+        refundCount: refundedParticipants.length,
+        drawAudit: {
+          algorithm: "crypto.randomInt",
+          drawnAt: now,
+          totalParticipants: totalCount,
+          completedGroups
+        },
         endTime: product.endTime,
         closedAt: now,
       };
@@ -1948,113 +1953,158 @@ exports.cancelGoldenRaffle = onCall({ region: "asia-northeast3" }, async (reques
 });
 
 // ============================================
-// 16-2. forceDrawRaffle (Callable) - Draw Winners & Auto-Refund
+// 16-2. forceDrawRaffle (Callable) - Atomic Lock, Crypto RNG, BulkWriter Auto-Refund
 // ============================================
-exports.forceDrawRaffle = onCall({ region: "asia-northeast3" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  }
-  const callerEmail = request.auth.token.email || "";
-  const isDev = process.env.FUNCTIONS_EMULATOR === "true";
-  if (!isDev && callerEmail !== ADMIN_EMAIL) {
-    throw new HttpsError("permission-denied", "관리자만 추첨을 진행할 수 있습니다.");
-  }
+exports.forceDrawRaffle = onCall({ region: "asia-northeast3", timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
+  assertAdmin(request, "관리자만 추첨을 진행할 수 있습니다.");
 
-  const { raffleId } = request.data;
+  const { raffleId } = request.data || {};
   if (!raffleId) throw new HttpsError("invalid-argument", "래플 ID가 필요합니다.");
 
   const raffleRef = db.collection("super_raffles").doc(raffleId);
-  const raffleDoc = await raffleRef.get();
-  if (!raffleDoc.exists) throw new HttpsError("not-found", "해당 래플을 찾을 수 없습니다.");
 
-  const raffle = raffleDoc.data();
-  if (raffle.status === "closed") throw new HttpsError("failed-precondition", "이미 마감된 래플입니다.");
-
-  const entries = raffle.entries || [];
-  const unitSize = raffle.unitSize || 200;
-  const fullGroupsCount = Math.floor(entries.length / unitSize);
-  const remainderCount = entries.length % unitSize;
-
-  const winners = [];
-  for (let g = 0; g < fullGroupsCount; g++) {
-    const groupEntries = entries.slice(g * unitSize, (g + 1) * unitSize);
-    const winnerEntry = groupEntries[Math.floor(Math.random() * groupEntries.length)];
-    winners.push({
-      groupNumber: g + 1,
-      startSlot: g * unitSize + 1,
-      endSlot: (g + 1) * unitSize,
-      winner: winnerEntry,
-      wonAt: Date.now()
-    });
-
-    // Deliver to winner's vault
-    if (winnerEntry.userId) {
-      const winnerUserRef = db.collection("users").doc(winnerEntry.userId);
-      const userDoc = await winnerUserRef.get();
-      if (userDoc.exists) {
-        const vault = userDoc.data().vault || [];
-        const uniqueVaultId = `vault_raffle_${raffle.id}_group_${g + 1}`;
-        const alreadyAwarded = vault.some((v) => v.id === uniqueVaultId || (v.itemId === raffle.id && v.tierName === `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`));
-
-        if (!alreadyAwarded) {
-          vault.unshift({
-            id: uniqueVaultId,
-            tierId: "super_raffle",
-            tierName: `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`,
-            itemId: raffle.id,
-            title: raffle.title,
-            imageUrl: raffle.imageUrl || "",
-            retailPrice: raffle.retailPrice || 1000000,
-            grade: "LEGENDARY",
-            refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
-            status: "in_vault",
-            wonAt: Date.now()
-          });
-          await winnerUserRef.update({ vault, updatedAt: Date.now() });
-        }
-      }
-    }
-  }
-
-  // Refund remainder tickets to users
-  if (remainderCount > 0) {
-    const incompleteEntries = entries.slice(fullGroupsCount * unitSize);
-    const refundCounts = {};
-    incompleteEntries.forEach(e => {
-      if (e.userId) {
-        refundCounts[e.userId] = (refundCounts[e.userId] || 0) + 1;
-      }
-    });
-
-    for (const [userId, count] of Object.entries(refundCounts)) {
-      const uRef = db.collection("users").doc(userId);
-      await uRef.update({
-        goldenTickets: FieldValue.increment(count),
-        updatedAt: Date.now()
-      }).catch(err => console.warn(`Refund ticket update failed for ${userId}:`, err));
-    }
-  }
-
-  await raffleRef.update({
-    status: "closed",
-    winners,
-    refundCount: remainderCount,
-    closedAt: Date.now(),
-    updatedAt: Date.now()
+  // 1. Atomic status lock: active -> drawing (prevents concurrent or double draw/refund)
+  const raffle = await db.runTransaction(async (transaction) => {
+    const raffleDoc = await transaction.get(raffleRef);
+    if (!raffleDoc.exists) throw new HttpsError("not-found", "해당 래플을 찾을 수 없습니다.");
+    const data = raffleDoc.data();
+    if (data.status === "closed") throw new HttpsError("failed-precondition", "이미 마감된 래플입니다.");
+    if (data.status === "drawing") throw new HttpsError("failed-precondition", "이미 추첨이 진행 중입니다. 잠시 후 새로고침해주세요.");
+    transaction.update(raffleRef, { status: "drawing", drawStartedAt: Date.now(), updatedAt: Date.now() });
+    return { id: raffleDoc.id, ...data };
   });
 
-  return {
-    success: true,
-    fullGroupsCount,
-    remainderCount,
-    winners,
-    raffle: { 
-      id: raffleId, 
-      title: raffle.title,
-      retailPrice: Number(raffle.retailPrice) || 0,
-      image: raffle.image || ''
+  try {
+    // 2. Collect active entries from BOTH legacy array and scalable subcollection
+    const entryMap = new Map();
+    for (const e of (raffle.entries || [])) {
+      if (e && e.status !== "cancelled") {
+        const key = e.ticketId || `${e.userId}_${e.slotIndex}`;
+        entryMap.set(key, e);
+      }
     }
-  };
+    const subSnap = await raffleRef.collection("entries").get();
+    subSnap.forEach((docSnap) => {
+      const e = docSnap.data();
+      if (e && e.status !== "cancelled") {
+        const key = e.ticketId || docSnap.id;
+        entryMap.set(key, e);
+      }
+    });
+
+    const entries = Array.from(entryMap.values()).sort((a, b) => {
+      const slotDiff = (Number(a.slotIndex) || 0) - (Number(b.slotIndex) || 0);
+      if (slotDiff !== 0) return slotDiff;
+      return (Number(a.appliedAt) || 0) - (Number(b.appliedAt) || 0);
+    });
+
+    const unitSize = Number(raffle.unitSize) || 200;
+    const fullGroupsCount = Math.floor(entries.length / unitSize);
+    const remainderCount = entries.length % unitSize;
+    const drawnAt = Date.now();
+
+    const winners = [];
+    for (let g = 0; g < fullGroupsCount; g++) {
+      const groupEntries = entries.slice(g * unitSize, (g + 1) * unitSize);
+      const winnerIndex = crypto.randomInt(0, groupEntries.length);
+      const winnerEntry = groupEntries[winnerIndex];
+      winners.push({
+        groupNumber: g + 1,
+        startSlot: g * unitSize + 1,
+        endSlot: (g + 1) * unitSize,
+        winner: winnerEntry,
+        wonAt: drawnAt
+      });
+
+      // Deliver to winner's vault idempotently
+      if (winnerEntry.userId) {
+        const winnerUserRef = db.collection("users").doc(winnerEntry.userId);
+        await db.runTransaction(async (tx) => {
+          const userDoc = await tx.get(winnerUserRef);
+          if (!userDoc.exists) return;
+          const vault = userDoc.data().vault || [];
+          const uniqueVaultId = `vault_raffle_${raffle.id}_group_${g + 1}`;
+          const alreadyAwarded = vault.some((v) => v.id === uniqueVaultId || (v.itemId === raffle.id && v.tierName === `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`));
+          if (!alreadyAwarded) {
+            vault.unshift({
+              id: uniqueVaultId,
+              tierId: "super_raffle",
+              tierName: `스페셜 래플 [그룹 ${g + 1}] 1등 당첨`,
+              itemId: raffle.id,
+              title: raffle.title,
+              imageUrl: raffle.imageUrl || "",
+              retailPrice: raffle.retailPrice || 1000000,
+              grade: "LEGENDARY",
+              refundPoints: Math.round(Number(raffle.retailPrice || 1000000) * 0.8),
+              status: "in_vault",
+              wonAt: drawnAt
+            });
+            tx.update(winnerUserRef, { vault, updatedAt: Date.now() });
+          }
+        });
+      }
+    }
+
+    // 3. Refund remainder tickets using BulkWriter (scales cleanly to thousands of users)
+    if (remainderCount > 0) {
+      const incompleteEntries = entries.slice(fullGroupsCount * unitSize);
+      const refundCounts = {};
+      incompleteEntries.forEach((e) => {
+        if (e.userId) {
+          refundCounts[e.userId] = (refundCounts[e.userId] || 0) + 1;
+        }
+      });
+
+      const bulkWriter = db.bulkWriter();
+      bulkWriter.onWriteError((error) => {
+        console.warn(`[forceDrawRaffle] Refund BulkWriter error on ${error.documentRef.path}:`, error.message);
+        return error.failedAttempts < 2;
+      });
+
+      for (const [userId, count] of Object.entries(refundCounts)) {
+        const uRef = db.collection("users").doc(userId);
+        bulkWriter.update(uRef, {
+          goldenTickets: FieldValue.increment(count),
+          updatedAt: Date.now()
+        });
+      }
+      await bulkWriter.close();
+    }
+
+    // 4. Finalize closed state with cryptographic audit metadata
+    await raffleRef.update({
+      status: "closed",
+      winners,
+      currentParticipants: entries.length,
+      refundCount: remainderCount,
+      drawAudit: {
+        algorithm: "crypto.randomInt",
+        drawnAt,
+        totalEntries: entries.length,
+        fullGroupsCount,
+        remainderCount
+      },
+      closedAt: drawnAt,
+      updatedAt: Date.now()
+    });
+
+    return {
+      success: true,
+      fullGroupsCount,
+      remainderCount,
+      winners,
+      raffle: {
+        id: raffleId,
+        title: raffle.title,
+        retailPrice: Number(raffle.retailPrice) || 0,
+        image: raffle.image || ""
+      }
+    };
+  } catch (err) {
+    console.error(`[forceDrawRaffle] Error while drawing ${raffleId}:`, err);
+    await raffleRef.update({ status: "draw_error", drawError: String(err.message || err), updatedAt: Date.now() }).catch(() => {});
+    throw err;
+  }
 });
 
 // ============================================
