@@ -13,8 +13,8 @@
 
 | ID | 항목 | 대상 파일 | 상태 | 커밋 |
 | :-- | :-- | :-- | :--: | :-- |
-| **DOC** | 진행 기록 문서 생성 | `docs/SECURITY_FIX_PROGRESS.md` | `[x]` | 생성 중 |
-| **A1/A2/B2** | 카드 결제(`purchaseProduct`)·포인트 충전(`chargeUserPoints`)·배송비(`requestVaultShipping`) 서버 결제 검증 (`payments/{tid}` + `consumed` 중복 방지) + `app.js`/`unboxing-modal.js` `tid` 전달 + 배송 ID 고유화(`crypto.randomUUID`) | `functions/index.js`, `app.js`, `services/unboxing-modal.js`, `services/firestore.js` | `[ ]` | - |
+| **DOC** | 진행 기록 문서 생성 | `docs/SECURITY_FIX_PROGRESS.md` | `[x]` | `7e7b93c` |
+| **A1/A2/B2** | 카드 결제(`purchaseProduct`)·포인트 충전(`chargeUserPoints`)·배송비(`requestVaultShipping`) 서버 결제 검증 (`payments/{tid}` + `consumed` 중복 방지) + `app.js`/`unboxing-modal.js` `tid` 전달 + 배송 ID 고유화(`crypto.randomUUID`) | `functions/index.js`, `app.js`, `services/unboxing-modal.js`, `services/firestore.js` | `[x]` | 커밋 중 |
 | **A3** | 브라우저 직접 Firestore 쓰기 fallback 제거 + `deleteVaultItem`/`clearTicketRefundNotices` 서버 Callable 추가 + 관리자 쓰기 Cloud Functions 통일 | `services/firestore.js`, `services/randombox.js`, `services/unboxing-modal.js`, `functions/index.js` | `[ ]` | - |
 | **기존1 + 규칙** | 일반 유저 전체 `users`/`shipping_infos` 실시간 구독 차단 + `firestore.rules` 보안 잠금 | `services/firestore.js`, `firestore.rules` | `[ ]` | - |
 | **A4/A5** | 하드코딩된 Toss/PayPal 시크릿 제거 + 모든 관리자 함수 `assertAdmin()` 통일 (`syncBoxCatalog`, `saveBoxCatalogAdmin` 허점 제거) | `functions/index.js` | `[ ]` | - |

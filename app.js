@@ -303,13 +303,13 @@ function navigate() {
   const urlParams = new URLSearchParams(window.location.search);
 
   // Helper to handle payment success for either LuckyBox unboxing or Points Recharge
-  const handlePaymentSuccessAction = async (prodId, amt, payMethod) => {
+  const handlePaymentSuccessAction = async (prodId, amt, payMethod, paymentKey = '') => {
     if (prodId && prodId.startsWith('points_')) {
       const parts = prodId.split('_');
       const chargePts = parseInt(parts[1], 10) || Number(amt);
       try {
-        const res = await chargeUserPointsServer(chargePts, payMethod);
-        alert(`🎉 [${payMethod} 결제 완료]\n₩${chargePts.toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${(res?.newPoints || chargePts).toLocaleString()}P`);
+        const res = await chargeUserPointsServer(chargePts, payMethod, paymentKey);
+        alert(`🎉 [${payMethod} 결제 완료]\n₩${(res?.addedPoints || chargePts).toLocaleString()}P 가 즉시 충전되었습니다!\n현재 잔액: ₩${(res?.newPoints || chargePts).toLocaleString()}P`);
       } catch (e) {
         console.error('Point charge credit error:', e);
         alert(`포인트 반영 오류: ${e.message || e}`);
@@ -325,6 +325,7 @@ function navigate() {
       if (savedStr) {
         try {
           const shippingData = JSON.parse(savedStr);
+          if (paymentKey) shippingData.paymentKey = paymentKey;
           await requestVaultShippingServer(vaultId, shippingData);
           sessionStorage.removeItem('danal_pending_shipping_' + vaultId);
           alert(`🎉 [${payMethod} 배송비 결제 완료]\n배송 접수가 성공적으로 완료되었습니다!\n\n• 수령인: ${shippingData.name} (${shippingData.phone})\n• 배송지: ${shippingData.address}\n• 결제 배송비: ₩${Number(amt || shippingData.fee).toLocaleString()}원`);
@@ -342,7 +343,7 @@ function navigate() {
     // Default: Fixed-Price Item Purchase
     const chosenItemId = sessionStorage.getItem('danal_pending_item_id') || '';
     sessionStorage.removeItem('danal_pending_item_id');
-    executeUnboxingAnimation(prodId, payMethod === '다날 휴대폰 소액결제' ? 'danal_phone' : 'danal', chosenItemId);
+    executeUnboxingAnimation(prodId, payMethod === '다날 휴대폰 소액결제' ? 'danal_phone' : 'danal', chosenItemId, paymentKey);
   };
 
   // --- Danal Payment Cross-Window Message Listener (for popup flow) ---
@@ -351,17 +352,17 @@ function navigate() {
     window.addEventListener('message', async (event) => {
       if (event.origin !== window.location.origin) return;
       if (event.data && event.data.type === 'DANAL_PAYMENT_SUCCESS') {
-        const { status, returnParams, amount, productId, itemId } = event.data;
+        const { status, returnParams, amount, productId, itemId, tid } = event.data;
         if (itemId) sessionStorage.setItem('danal_pending_item_id', itemId);
         if (status === 'card_confirmed') {
-          await handlePaymentSuccessAction(productId, amount, '다날 신용카드');
+          await handlePaymentSuccessAction(productId, amount, '다날 신용카드', tid || '');
         } else if (status === 'card_failed') {
           alert(`⚠️ 결제 승인 실패\n\n${event.data.msg || '카드사 승인이 거절되었습니다.'}${event.data.code ? ` (코드: ${event.data.code})` : ''}`);
         } else if (status === 'card_return' && returnParams) {
           try {
             const result = await handleDanalSuccess(returnParams, amount, productId, null, 'card');
             if (result && result.success) {
-              await handlePaymentSuccessAction(productId, amount, '다날 신용카드');
+              await handlePaymentSuccessAction(productId, amount, '다날 신용카드', result.tid || '');
             } else {
               alert(`다날 결제 실패: ${result?.message || '승인 실패'}`);
             }
@@ -370,7 +371,7 @@ function navigate() {
             alert(`다날 결제 승인 실패: ${err.message || '오류가 발생했습니다.'}`);
           }
         } else if (status === 'phone_return') {
-          await handlePaymentSuccessAction(productId, amount, '다날 휴대폰 소액결제');
+          await handlePaymentSuccessAction(productId, amount, '다날 휴대폰 소액결제', tid || '');
         }
       }
     });
@@ -379,6 +380,7 @@ function navigate() {
   // --- Danal Payment Redirect Handlers ---
   const danalStatus = urlParams.get('danal');
   const danalReturnParams = urlParams.get('RETURNPARAMS');
+  const danalTid = urlParams.get('tid') || '';
   const danalAmount = urlParams.get('amount');
   const danalProductId = urlParams.get('productId') || sessionStorage.getItem('danal_pending_product') || 'box_basic';
   const danalItemId = urlParams.get('itemId') || sessionStorage.getItem('danal_pending_item_id') || '';
@@ -395,6 +397,7 @@ function navigate() {
         window.opener.postMessage({
           type: 'DANAL_PAYMENT_SUCCESS',
           status: 'card_confirmed',
+          tid: danalTid,
           amount: danalAmount,
           productId: danalProductId,
           itemId: danalItemId
@@ -413,7 +416,7 @@ function navigate() {
         window.location.hash = '#profile';
         return;
       }
-      await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 신용카드');
+      await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 신용카드', danalTid);
     })();
     return;
   }
@@ -491,7 +494,7 @@ function navigate() {
       try {
         const result = await handleDanalSuccess(danalReturnParams, danalAmount, danalProductId, null, 'card');
         if (result && result.success) {
-          await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 신용카드');
+          await handlePaymentSuccessAction(danalProductId, danalAmount, '다날 신용카드', result.tid || '');
         } else {
           alert(`다날 결제 실패: ${result.message || '승인 실패'}`);
           window.location.hash = '#home';

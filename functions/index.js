@@ -2,6 +2,7 @@
 // LuckyPick - Cloud Functions Backend
 // All business logic runs server-side
 // ============================================
+const crypto = require("crypto");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -226,7 +227,7 @@ exports.submitShippingInfo = onCall({ region: "asia-northeast3" }, async (reques
   const callerEmail = request.auth.token.email || "";
   const callerName = request.auth.token.name || callerEmail.split("@")[0] || "당첨자";
 
-  const id = "ship_" + Date.now();
+  const id = "ship_" + Date.now() + "_" + crypto.randomUUID().slice(0, 8);
   const newInfo = {
     id,
     productId: productId || "",
@@ -1031,7 +1032,8 @@ exports.readyDanalPayment = onRequest(
       }
 
       const bodyData = req.body && req.body.data !== undefined ? req.body.data : (req.body || {});
-      const uid = authUser ? authUser.uid : (bodyData.userId || null);
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+      const uid = authUser ? authUser.uid : (isEmulator ? (bodyData.userId || null) : null);
 
       if (!uid) {
         return res.status(200).json({
@@ -1165,7 +1167,8 @@ exports.confirmDanalPayment = onRequest(
       }
 
       const bodyData = req.body && req.body.data !== undefined ? req.body.data : (req.body || {});
-      const uid = authUser ? authUser.uid : (bodyData.userId || null);
+      const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+      const uid = authUser ? authUser.uid : (isEmulator ? (bodyData.userId || null) : null);
 
       if (!uid) {
         return res.status(200).json({
@@ -1365,6 +1368,7 @@ exports.danalCardReturn = onRequest(
         paymentKey: tid,
         method: "DANAL_CARD",
         status: "DONE",
+        consumed: false,
         createdAt: FieldValue.serverTimestamp(),
         danalResult: {
           cardName: billResult.CARDNAME || "",
@@ -1533,7 +1537,6 @@ exports.forceCloseProduct = onCall({ region: "asia-northeast3" }, async (request
 // ============================================
 // 13. Secure Helper: Cryptographic Random Float
 // ============================================
-const crypto = require("crypto");
 function secureRandomFloat() {
   const buf = crypto.randomBytes(4);
   return buf.readUInt32BE(0) / 0xffffffff;
@@ -1587,7 +1590,7 @@ exports.purchaseProduct = onCall({ region: "asia-northeast3" }, async (request) 
     throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
   }
   const uid = request.auth.uid;
-  const { tierId, itemId, payMethod = "points" } = request.data;
+  const { tierId, itemId, payMethod = "points", paymentKey = "" } = request.data;
   if (!itemId && !tierId) {
     throw new HttpsError("invalid-argument", "구매할 상품 정보가 필요합니다.");
   }
@@ -1628,13 +1631,41 @@ exports.purchaseProduct = onCall({ region: "asia-northeast3" }, async (request) 
     const userDoc = await transaction.get(userRef);
     const userData = userDoc.exists ? userDoc.data() : { points: 0, goldenTickets: 0, vault: [] };
 
-    const currentPoints = Number(userData.points) || 0;
-    if (payMethod === "points" && currentPoints < itemPrice) {
-      throw new HttpsError("failed-precondition", `포인트가 부족합니다. (보유: ${currentPoints.toLocaleString()}P / 필요: ${itemPrice.toLocaleString()}P)`);
+    let payRef = null;
+    if (payMethod === "points") {
+      const currentPoints = Number(userData.points) || 0;
+      if (currentPoints < itemPrice) {
+        throw new HttpsError("failed-precondition", `포인트가 부족합니다. (보유: ${currentPoints.toLocaleString()}P / 필요: ${itemPrice.toLocaleString()}P)`);
+      }
+    } else {
+      // Non-point purchase MUST verify a real, unconsumed server-confirmed payment record
+      if (!paymentKey || typeof paymentKey !== "string") {
+        throw new HttpsError("failed-precondition", "결제 승인 번호(TID)가 누락되어 상품을 지급할 수 없습니다.");
+      }
+      payRef = db.collection("payments").doc(String(paymentKey));
+      const payDoc = await transaction.get(payRef);
+      if (!payDoc.exists) {
+        throw new HttpsError("failed-precondition", "승인된 결제 내역을 찾을 수 없습니다.");
+      }
+      const payData = payDoc.data();
+      if (payData.status !== "DONE") {
+        throw new HttpsError("failed-precondition", "결제 승인이 완료되지 않은 주문입니다.");
+      }
+      if (payData.userId !== uid && payData.uid !== uid) {
+        throw new HttpsError("permission-denied", "본인의 결제 내역만 사용할 수 있습니다.");
+      }
+      if (payData.consumed === true) {
+        throw new HttpsError("already-exists", "이미 상품 지급이 완료된 결제입니다.");
+      }
+      if (Number(payData.amount) < itemPrice) {
+        throw new HttpsError("failed-precondition", `결제 금액(${Number(payData.amount).toLocaleString()}원)이 상품 가격(${itemPrice.toLocaleString()}원)보다 부족합니다.`);
+      }
     }
 
+    const currentPoints = Number(userData.points) || 0;
+
     const purchasedItem = {
-      id: "vault_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+      id: "vault_" + Date.now() + "_" + crypto.randomUUID().slice(0, 6),
       tierId: targetTier.id,
       tierName: targetTier.name,
       itemId: selectedItem.id,
@@ -1648,12 +1679,22 @@ exports.purchaseProduct = onCall({ region: "asia-northeast3" }, async (request) 
       status: "in_vault",
       wonAt: Date.now(),
       purchasedAt: Date.now(),
-      orderType: "fixed_price"
+      orderType: "fixed_price",
+      paymentKey: payMethod === "points" ? "" : String(paymentKey)
     };
 
     const newPoints = payMethod === "points" ? (currentPoints - itemPrice) : currentPoints;
     const newTickets = (Number(userData.goldenTickets) || 0) + earnedTickets;
     const updatedVault = [purchasedItem, ...(userData.vault || [])];
+
+    if (payRef) {
+      transaction.update(payRef, {
+        consumed: true,
+        consumedAt: Date.now(),
+        consumedBy: "purchaseProduct",
+        consumedItemId: purchasedItem.id
+      });
+    }
 
     transaction.set(userRef, {
       points: newPoints,
@@ -2017,35 +2058,77 @@ exports.chargeUserPoints = onCall({ region: "asia-northeast3" }, async (request)
     throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
   }
   const uid = request.auth.uid;
-  const { points, method = "toss", paymentKey } = request.data;
-  const chargeAmount = Number(points);
-  if (!chargeAmount || chargeAmount <= 0) {
-    throw new HttpsError("invalid-argument", "충전할 포인트 금액이 올바르지 않습니다.");
+  const { method = "danal_card", paymentKey } = request.data;
+  if (!paymentKey || typeof paymentKey !== "string") {
+    throw new HttpsError("failed-precondition", "승인된 결제 번호(TID)가 없어 포인트를 충전할 수 없습니다.");
   }
 
   const userRef = db.collection("users").doc(uid);
+  const payRef = db.collection("payments").doc(String(paymentKey));
+
   const result = await db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
+    const [userDoc, payDoc] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(payRef)
+    ]);
+
+    if (!payDoc.exists) {
+      throw new HttpsError("failed-precondition", "승인된 결제 내역을 찾을 수 없습니다.");
+    }
+    const payData = payDoc.data();
+    if (payData.status !== "DONE") {
+      throw new HttpsError("failed-precondition", "결제 승인이 완료되지 않았습니다.");
+    }
+    if (payData.userId !== uid && payData.uid !== uid) {
+      throw new HttpsError("permission-denied", "본인의 결제 내역만 충전할 수 있습니다.");
+    }
+    if (payData.consumed === true) {
+      throw new HttpsError("already-exists", "이미 포인트가 지급된 결제입니다.");
+    }
+    if (!String(payData.productId || "").startsWith("points_")) {
+      throw new HttpsError("failed-precondition", "포인트 충전용 결제가 아닙니다.");
+    }
+
+    const paidAmount = Number(payData.amount) || 0;
+    if (paidAmount <= 0) {
+      throw new HttpsError("failed-precondition", "결제 금액이 올바르지 않습니다.");
+    }
+
+    // Server-authoritative point calculation (allow up to 20% package bonus if encoded in productId)
+    const parts = String(payData.productId).split("_");
+    const parsedPts = parseInt(parts[1], 10);
+    const verifiedPoints = (parsedPts > 0 && parsedPts <= Math.round(paidAmount * 1.2))
+      ? parsedPts
+      : paidAmount;
+
     const userData = userDoc.exists ? userDoc.data() : { points: 0 };
     const curPts = Number(userData.points) || 0;
-    const newPts = curPts + chargeAmount;
+    const newPts = curPts + verifiedPoints;
+
+    transaction.update(payRef, {
+      consumed: true,
+      consumedAt: Date.now(),
+      consumedBy: "chargeUserPoints",
+      creditedPoints: verifiedPoints
+    });
 
     transaction.set(userRef, {
       points: newPts,
       updatedAt: Date.now()
     }, { merge: true });
 
-    const txRef = db.collection("transactions").doc("tx_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4));
+    const txRef = db.collection("transactions").doc("tx_" + Date.now() + "_" + crypto.randomUUID().slice(0, 8));
     transaction.set(txRef, {
       uid,
       type: "charge",
-      points: chargeAmount,
+      points: verifiedPoints,
+      paidAmount,
       method,
-      paymentKey: paymentKey || "",
+      paymentKey: String(paymentKey),
       createdAt: Date.now()
     });
 
-    return { newPoints: newPts, addedPoints: chargeAmount };
+    return { newPoints: newPts, addedPoints: verifiedPoints };
   });
 
   return { success: true, ...result };
@@ -2078,11 +2161,25 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
     if (item.status === "shipping_requested") throw new HttpsError("failed-precondition", "이미 배송 신청됨");
     if (item.status === "converted_to_points") throw new HttpsError("failed-precondition", "이미 포인트 전환됨");
 
-    const fee = Number(shippingData.fee) || 3000;
+    const fee = Math.max(3000, Number(shippingData.fee) || 3000);
     let newPoints = Number(userData.points) || 0;
+    let shipPayRef = null;
     if (shippingData.payMethod === "points") {
       if (newPoints < fee) throw new HttpsError("failed-precondition", "배송비 결제를 위한 포인트가 부족합니다.");
       newPoints -= fee;
+    } else {
+      const shipPaymentKey = shippingData.paymentKey;
+      if (!shipPaymentKey || typeof shipPaymentKey !== "string") {
+        throw new HttpsError("failed-precondition", "배송비 결제 승인 번호(TID)가 누락되었습니다.");
+      }
+      shipPayRef = db.collection("payments").doc(String(shipPaymentKey));
+      const shipPayDoc = await transaction.get(shipPayRef);
+      if (!shipPayDoc.exists) throw new HttpsError("failed-precondition", "승인된 배송비 결제 내역을 찾을 수 없습니다.");
+      const shipPayData = shipPayDoc.data();
+      if (shipPayData.status !== "DONE") throw new HttpsError("failed-precondition", "배송비 결제가 완료되지 않았습니다.");
+      if (shipPayData.userId !== uid && shipPayData.uid !== uid) throw new HttpsError("permission-denied", "본인의 결제 내역만 사용할 수 있습니다.");
+      if (shipPayData.consumed === true) throw new HttpsError("already-exists", "이미 배송 접수에 사용된 결제입니다.");
+      if (Number(shipPayData.amount) < fee) throw new HttpsError("failed-precondition", "결제된 배송비가 부족합니다.");
     }
 
     const isSpecialGift = (Number(item.retailPrice) > 50000) || Boolean(item.isSpecialGift);
@@ -2100,9 +2197,18 @@ exports.requestVaultShipping = onCall({ region: "asia-northeast3" }, async (requ
     item.shippingData = shippingData;
     vault[idx] = item;
 
+    if (shipPayRef) {
+      transaction.update(shipPayRef, {
+        consumed: true,
+        consumedAt: Date.now(),
+        consumedBy: "requestVaultShipping",
+        vaultId
+      });
+    }
+
     transaction.update(userRef, { vault, points: newPoints, updatedAt: Date.now() });
 
-    const shippingId = "ship_" + Date.now();
+    const shippingId = "ship_" + Date.now() + "_" + crypto.randomUUID().slice(0, 8);
     const shippingRecord = {
       shippingId,
       productId: item.id || vaultId,

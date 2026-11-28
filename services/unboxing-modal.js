@@ -457,7 +457,7 @@ window.__switchModalProduct = (itemId, tierId) => {
 };
 
 // Legacy compatibility export for app.js and router
-export async function executeUnboxingAnimation(tierOrItemId, paymentMethod = 'points', explicitItemId = '') {
+export async function executeUnboxingAnimation(tierOrItemId, paymentMethod = 'points', explicitItemId = '', paymentKey = '') {
   const all = getAllStoreProducts();
   const product =
     (explicitItemId && all.find(p => p.id === explicitItemId)) ||
@@ -468,7 +468,13 @@ export async function executeUnboxingAnimation(tierOrItemId, paymentMethod = 'po
 
   if (paymentMethod === 'danal' || paymentMethod === 'danal_phone') {
     try {
-      const res = await purchaseProductServer(product.id, product.tierId || 'box_basic', paymentMethod);
+      const res = await purchaseProductServer({
+        tierId: product.tierId || 'box_basic',
+        itemId: product.id,
+        item: product,
+        payMethod: paymentMethod,
+        paymentKey
+      });
       const item = res.purchasedItem || res.item || product;
       const earnedTickets = res.earnedTickets || (item.retailPrice >= 20000 ? 11 : item.retailPrice >= 10000 ? 5 : 2);
       const totalTickets = res.newTickets ?? res.newGoldenTickets ?? getAvailableGoldenTicketsCount();
